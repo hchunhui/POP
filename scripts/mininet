@@ -1,0 +1,2 @@
+#!/bin/bash
+exec mn --controller=remote --switch=pofs --mac --arp --custom topo.py --topo mytopo
