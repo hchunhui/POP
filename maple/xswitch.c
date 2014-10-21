@@ -70,6 +70,7 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 		fprintf(stderr, "error switch state.\n");
 		abort();
 	}
+	msgbuf_delete(msg);
 }
 
 //void xswitch_on_close(struct xswitch *sw)
