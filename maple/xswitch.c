@@ -40,25 +40,25 @@ struct xswitch *xswitch_on_accept(struct sw *_sw)
 
 void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 {
+	struct msgbuf *rmsg;
 	switch(sw->state) {
 	case XS_HELLO:
 		fprintf(stderr, "expect hello\n");
 		if(msg_process_hello(msg)) {
 			fprintf(stderr, "sending features request\n");
-			msg = msg_features_request();
-			xswitch_send(sw, msg);
+			rmsg = msg_features_request();
+			xswitch_send(sw, rmsg);
 			sw->state = XS_FEATURES_REPLY;
 		}
 		break;
 	case XS_FEATURES_REPLY:
 		fprintf(stderr, "expect features reply\n");
 		if(msg_process_features_reply(msg, &sw->dpid, &sw->n_ports)) {
-			struct msgbuf *msg;
 			fprintf(stderr, "sending set/get config\n");
-			msg = msg_set_config(128);
-			xswitch_send(sw, msg);
-			msg = msg_get_config_request();
-			xswitch_send(sw, msg);
+			rmsg = msg_set_config(128);
+			xswitch_send(sw, rmsg);
+			rmsg = msg_get_config_request();
+			xswitch_send(sw, rmsg);
 			xswitch_up(sw);
 			sw->state = XS_RUNNING;
 		}
