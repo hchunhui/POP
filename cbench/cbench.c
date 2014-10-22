@@ -14,9 +14,7 @@
 
 #include <netinet/in.h>
 
-#include "msgqueue.h"
-#include "msgbuf.h"
-
+#include "io/msgbuf.h"
 #include "io/sw.h"
 #include "io/io.h"
 
