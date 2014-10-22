@@ -11,13 +11,7 @@ struct match;
 struct action;
 
 /* xswitch */
-//struct xswitch *xswitch_on_accept(struct vconn *);
-//void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
-//void xswitch_on_close(struct xswitch *);
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
-
-int xswitch_run(struct xswitch *);
-void xswitch_wait(struct xswitch *);
 
 
 /* flow table */
