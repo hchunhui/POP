@@ -141,7 +141,7 @@ accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 	}
 
 	adjust_bufsize(newfd);
-	make_fd_nonblock(newfd);
+	//make_fd_nonblock(newfd);
 
 	new_watcher = malloc(sizeof(*new_watcher));
 	assert(new_watcher != NULL);
