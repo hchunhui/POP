@@ -1,14 +1,6 @@
+TOPDIR = ..
+LIB = libmaple-io.a
+SRCS = core.c util.c msgqueue.c msgbuf.c
+EXTRA_CFLAGS = -O2 -fno-strict-aliasing -Wall -g -I/usr/local/include -I/home/btw/local/include
 
-LIB := libmaple-io.a
-OBJS := core.o util.o msgqueue.o msgbuf.o
-
-CFLAGS := -O2 -fno-strict-aliasing -Wall -g \
-          -I../include -I/home/btw/local/include -I/usr/local/include
-
-all: ${LIB}
-
-${LIB}: ${OBJS}
-	ar rcs ${LIB} ${OBJS}
-
-clean:
-	rm -f ${LIB} *.o
+-include ${TOPDIR}/Makefile.comm

@@ -1,14 +1,6 @@
-
+TOPDIR = ..
+EXTRA_CFLAGS = -g -O2 -fno-strict-aliasing -Wall
+SRCS = xswitch.c flow_table.c match.c action.c msg.c maple.c topo.c entity.c f.c
 LIB = libmaple-core.a
-OBJS = xswitch.o flow_table.o match.o action.o \
-       msg.o maple.o topo.o entity.o f.o
 
-CFLAGS = -I.. -I../include
-
-all: ${LIB}
-
-${LIB}: ${OBJS}
-	ar rcs ${LIB} ${OBJS}
-
-clean:
-	rm -f ${OBJS} ${LIB}
+include ${TOPDIR}/Makefile.comm
