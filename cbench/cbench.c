@@ -21,6 +21,10 @@
 #include "pof/pof_global.h"
 #include "openflow/openflow.h"
 
+#ifndef __unused
+#define __unused __attribute__((__unused__))
+#endif
+
 void
 accept_cb_func(struct sw *sw)
 {
