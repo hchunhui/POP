@@ -52,14 +52,7 @@ struct msgbuf {
 	void *data;		/* First byte actually in use. */
 	size_t size;		/* Number of bytes in use. */
 
-	void *l2;		/* Link-level header. */
-	void *l3;		/* Network-level header. */
-	void *l4;		/* Transport-level header. */
-	void *l7;		/* Application data. */
-
 	struct msgbuf *next;	/* Next in a list of msgbufs. */
-	void *private;		/* Private pointer for use by owner. */
-
 	struct sw *sw;
 };
 

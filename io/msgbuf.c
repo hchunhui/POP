@@ -31,7 +31,6 @@
  * derivatives without specific, written prior permission.
  */
 
-//#include <config.h>
 #include "msgbuf.h"
 #include <assert.h>
 #include <stdlib.h>
@@ -55,9 +54,7 @@ void msgbuf_use(struct msgbuf *b, void *base, size_t allocated)
 	b->base = b->data = base;
 	b->allocated = allocated;
 	b->size = 0;
-	b->l2 = b->l3 = b->l4 = b->l7 = NULL;
 	b->next = NULL;
-	b->private = NULL;
 }
 
 /* Initializes 'b' as an empty msgbuf with an initial capacity of 'size'
@@ -141,18 +138,6 @@ void msgbuf_prealloc_tailroom(struct msgbuf *b, size_t size)
 		b->base = new_base;
 		b->allocated = new_allocated;
 		b->data = (char *)b->data + base_delta;
-		if (b->l2) {
-			b->l2 = (char *)b->l2 + base_delta;
-		}
-		if (b->l3) {
-			b->l3 = (char *)b->l3 + base_delta;
-		}
-		if (b->l4) {
-			b->l4 = (char *)b->l4 + base_delta;
-		}
-		if (b->l7) {
-			b->l7 = (char *)b->l7 + base_delta;
-		}
 	}
 }
 
