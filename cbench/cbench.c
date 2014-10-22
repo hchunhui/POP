@@ -40,7 +40,7 @@ accept_cb_func(struct sw *sw)
 }
 
 void
-close_cb_func(struct sw *sw)
+close_cb_func(struct sw *sw __unused)
 {
 	printf("Closed.\n");
 }
