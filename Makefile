@@ -1,5 +1,5 @@
 
-SUBDIRS = io maple cbench maple
+SUBDIRS = io maple cbench main
 
 all:
 	@for d in ${SUBDIRS}; do \
