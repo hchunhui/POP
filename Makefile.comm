@@ -22,6 +22,6 @@ clean:
 	rm -f ${OBJS} ${LIB} ${PROG} .depends
 
 check-syntax:
-	$(CC) $(CFLAGS) -Wall -Wextra -fsyntax-only $(CHK_SOURCES)
+	${CC} ${CFLAGS} -Wall -Wextra -fsyntax-only ${SRCS}
 
 -include .depends

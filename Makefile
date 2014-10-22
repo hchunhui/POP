@@ -1,12 +1,18 @@
 
+SUBDIRS = io maple cbench maple
+
 all:
-	make -C io
-	make -C maple
-	make -C cbench
-	make -C main
+	@for d in ${SUBDIRS}; do \
+		make -C $${d}; \
+	done
+
+check-syntax:
+	@for d in ${SUBDIRS}; do \
+		make -C $${d} check-syntax; \
+	done
 
 clean:
-	make -C io clean
-	make -C maple clean
-	make -C cbench clean
-	make -C main clean
+	@for d in ${SUBDIRS}; do \
+		make -C $${d} clean; \
+	done
+
