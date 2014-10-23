@@ -214,7 +214,7 @@ struct msgbuf *msg_flow_table_add(struct flow_table *ft)
 		key_len += ft->fields[i].length;
 	}
 	mft->key_len = htons(u16(key_len));
-	printf("----key_len: %d, fields_num: %d\n", key_len, ft->fields_num);
+	fprintf(stderr, "----key_len: %d, fields_num: %d\n", key_len, ft->fields_num);
 	return msg;
 }
 
