@@ -4,6 +4,8 @@
 #include "xswitch-private.h"
 #include "topo.h"
 #include "entity.h"
+#include "discovery.h"
+#include "packet_in.h"
 
 static struct entity *hosts[100];
 static int num_hosts;
@@ -51,6 +53,8 @@ void topo_switch_up(struct xswitch *sw)
 		abort();
 	switches[num_switches] = e;
 	num_switches++;
+	lldp_flow_install(sw, 1);
+	lldp_packet_send(sw);
 	/* hack */
 	if(num_switches == 4) {
 		fprintf(stderr, "!!!hack hack hack!!!\n");
@@ -82,10 +86,23 @@ void topo_switch_up(struct xswitch *sw)
 		entity_add_link(s1, 4, s3, 4);
 	}
 }
-
+/*
+struct packet_in
+{
+	uint8_t *packet;
+	int packet_len;
+	dpid_t dpid;
+	port_t port;
+}*/
 void topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
-
+	struct packet_in pkt_in = {
+		packet,
+		packet_len,
+		in_port,
+		sw->dpid,
+	};
+	handle_lldp_packet_in(&pkt_in);
 }
 
 void topo_switch_down(struct xswitch *sw)
