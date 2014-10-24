@@ -7,7 +7,7 @@
 #include "topo.h"
 #include "entity.h"
 
-enum event_type { EV_R, EV_T };
+enum event_type { EV_R, EV_T, EV_RE, EV_IE };
 
 struct event
 {
@@ -22,6 +22,12 @@ struct event
 			value_t value;
 			bool test;
 		} t;
+		struct {
+			char name[32];
+		} re;
+		struct {
+			char name[32];
+		} ie;
 	} u;
 };
 
@@ -54,6 +60,24 @@ static void trace_T(const char *name, value_t value, bool result)
 	trace.num_events++;
 }
 
+static void trace_RE(const char *name)
+{
+	int i = trace.num_events;
+	trace.events[i].type = EV_RE;
+	strncpy(trace.events[i].u.re.name, name, 32);
+	trace.events[i].u.re.name[31] = 0;
+	trace.num_events++;
+}
+
+static void trace_IE(const char *name)
+{
+	int i = trace.num_events;
+	trace.events[i].type = EV_IE;
+	strncpy(trace.events[i].u.ie.name, name, 32);
+	trace.events[i].u.ie.name[31] = 0;
+	trace.num_events++;
+}
+
 static void trace_clear(void)
 {
 	trace.num_events = 0;
@@ -68,7 +92,7 @@ static void trace_mod_in_port(int in_port)
 	trace.events[0].u.r.value = value_from_8(in_port);
 }
 
-enum trace_tree_type { TT_E, TT_L, TT_V, TT_T };
+enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D };
 struct trace_tree_header
 {
 	enum trace_tree_type type;
@@ -104,6 +128,13 @@ struct trace_tree_T
 	char name[32];
 	value_t value;
 	struct trace_tree_header *t, *f;
+};
+
+struct trace_tree_D
+{
+	struct trace_tree_header h;
+	char name[32];
+	struct trace_tree_header *t;
 };
 
 static struct trace_tree_header *trace_tree_E(void)
@@ -150,12 +181,24 @@ static struct trace_tree_header *trace_tree_T(const char *name,
 	return (struct trace_tree_header *)t;
 }
 
+static struct trace_tree_header *trace_tree_D(const char *name,
+					      struct trace_tree_header *tt)
+{
+	struct trace_tree_D *t = malloc(sizeof *t);
+	t->h.type = TT_D;
+	strncpy(t->name, name, 32);
+	t->name[31] = 0;
+	t->t = tt;
+	return (struct trace_tree_header *)t;
+}
+
 static void trace_tree_free(struct trace_tree_header *t)
 {
 	int i;
 	struct trace_tree_V *tv;
 	struct trace_tree_T *tt;
 	struct trace_tree_L *tl;
+	struct trace_tree_D *td;
 	switch(t->type) {
 	case TT_E:
 		free(t);
@@ -175,6 +218,11 @@ static void trace_tree_free(struct trace_tree_header *t)
 		tt = (struct trace_tree_T *)t;
 		trace_tree_free(tt->t);
 		trace_tree_free(tt->f);
+		free(t);
+		break;
+	case TT_D:
+		td = (struct trace_tree_D *)t;
+		trace_tree_free(td->t);
 		free(t);
 		break;
 	}
@@ -205,9 +253,53 @@ static struct trace_tree_header *events_to_tree(struct event *events, int num_ev
 		case EV_R:
 			root = trace_tree_V(ev->u.r.name, ev->u.r.value, root);
 			break;
+		case EV_RE:
+			root = trace_tree_D(ev->u.re.name, root);
+			break;
+		case EV_IE:
+			break;
 		}
 	}
 	return root;
+}
+
+static void dump_tt(struct trace_tree_header *tree)
+{
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+	int j;
+	switch(tree->type) {
+	case TT_E:
+		fprintf(stderr, "(E)");
+		break;
+	case TT_V:
+		tv = (struct trace_tree_V *) tree;
+		fprintf(stderr, "(V %s ", tv->name);
+		for(j = 0; j < tv->num_branches; j++) {
+			fprintf(stderr, " ");
+			dump_tt(tv->branches[j].tree);
+		}
+		fprintf(stderr, ")");
+		break;
+	case TT_T:
+		tt = (struct trace_tree_T *) tree;
+		fprintf(stderr, "(T %s ", tt->name);
+		dump_tt(tt->t);
+		fprintf(stderr, " ");
+		dump_tt(tt->f);
+		fprintf(stderr, ")");
+		break;
+	case TT_D:
+		td = (struct trace_tree_D *) tree;
+		fprintf(stderr, "(D %s ", td->name);
+		dump_tt(td->t);
+		fprintf(stderr, ")");
+		break;
+	case TT_L:
+		fprintf(stderr, "(L)");
+		break;
+	}
 }
 
 static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, struct action *a)
@@ -228,10 +320,12 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 		struct event *ev = trace->events + i;
 		struct trace_tree_T *t_T;
 		struct trace_tree_V *t_V;
+		struct trace_tree_D *t_D;
 		switch((*t)->type) {
 		case TT_T:
 			t_T = *(struct trace_tree_T **) t;
 			/* ev->type == EV_T */
+			assert(ev->type == EV_T);
 			if(ev->u.t.test) {
 				if(t_T->t->type == TT_E) {
 					free(t_T->t);
@@ -253,6 +347,7 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 		case TT_V:
 			t_V = *(struct trace_tree_V **) t;
 			/* ev->type == EV_R */
+			assert(ev->type == EV_R);
 			for(j = 0; j < t_V->num_branches; j++) {
 				if(value_equ(t_V->branches[j].value, ev->u.r.value)) {
 					t = &(t_V->branches[j].tree);
@@ -270,18 +365,67 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 				return true;
 			}
 			break;
+		case TT_D:
+			/* ev->type == EV_RE */
+			assert(ev->type == EV_RE);
+			t_D = *(struct trace_tree_D **) t;
+			if(t_D->t->type == TT_E) {
+				free(t_D->t);
+				t_D->t = events_to_tree(ev + 1, num_events - i - 1, a);
+				return true;
+			} else {
+				t = &(t_D->t);
+			}
+			break;
 		case TT_L:
 		case TT_E:
 			break;
 		}
 	}
-
 	assert((*t)->type == TT_L);
 	t_L = *(struct trace_tree_L **) t;
 	n1 = action_num_actions(t_L->ac);
 	action_union(t_L->ac, a);
 	n2 = action_num_actions(t_L->ac);
 	return n1 != n2;
+}
+
+static bool invalidate_tt(struct trace_tree_header **tree, const char *name)
+{
+	int i;
+	bool b, b1;
+	struct trace_tree_header *t = *tree;
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+
+	switch(t->type) {
+	case TT_E:
+	case TT_L:
+		return false;
+	case TT_V:
+		tv = (struct trace_tree_V *)t;
+		b = false;
+		for(i = 0; i < tv->num_branches; i++) {
+			b1 = invalidate_tt(&(tv->branches[i].tree), name);
+			b = b || b1;
+		}
+		return b;
+	case TT_T:
+		tt = (struct trace_tree_T *)t;
+		b = invalidate_tt(&(tt->t), name);
+		b1 = invalidate_tt(&(tt->f), name);
+		return b || b1;
+	case TT_D:
+		td = (struct trace_tree_D *)t;
+		if(strcmp(td->name, name) == 0) {
+			trace_tree_free(td->t);
+			td->t = trace_tree_E();
+			return true;
+		}
+		return invalidate_tt(&(td->t), name);
+	}
+	abort();
 }
 
 static int __build_flow_table(struct xswitch *sw,
@@ -331,6 +475,7 @@ static int __build_flow_table(struct xswitch *sw,
 		match_free(maa);
 		return priority;
 	case TT_E:
+	case TT_D:
 		return priority;
 	}
 }
@@ -449,6 +594,57 @@ bool test_equal(struct packet *pkt, const char *field, value_t value)
 	return result;
 }
 
+struct env
+{
+	int num_pairs;
+	struct {
+		char name[32];
+		void *value;
+	} pairs[1024];
+};
+
+static int env_find_index(struct env *env, const char *name)
+{
+	int i;
+	for(i = 0; i < env->num_pairs; i++) {
+		if(strcmp(env->pairs[i].name, name) == 0)
+			return i;
+	}
+	return -1;
+}
+
+void *read_env(struct env *env, const char *name)
+{
+	int id = env_find_index(env, name);
+	if(id == -1)
+		return NULL;
+	trace_RE(name);
+	return env->pairs[id].value;
+}
+
+void write_env(struct env *env, const char *name, void *value)
+{
+	int id = env_find_index(env, name);
+	if(id == -1) {
+		id = env->num_pairs;
+		if(id >= 1024)
+			abort();
+		strncpy(env->pairs[id].name, name, 32);
+		env->pairs[id].name[31] = 0;
+		env->pairs[id].value = NULL;
+		env->num_pairs++;
+	}
+	if(env->pairs[id].value != value) {
+		trace_IE(name);
+		env->pairs[id].value = value;
+	}
+}
+
+void invalidate_env(struct env *env, const char *name)
+{
+	trace_IE(name);
+}
+
 static int init_entry(struct xswitch *sw, int prio)
 {
 	struct match *ma;
@@ -496,7 +692,8 @@ void maple_switch_up(struct xswitch *sw)
 	sw->hack_start_prio = init_entry(sw, sw->hack_start_prio);
 }
 
-struct route *f(struct packet *pk);
+struct route *f(struct packet *pk, struct env *env);
+static struct env env;
 
 void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
@@ -507,9 +704,13 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	struct msgbuf *msg;
 	char buf[128];
 
+	/* init */
 	trace_clear();
 
-	r = f(&pk);
+	/* run */
+	r = f(&pk, &env);
+
+	/* learn */
 	for(i = 0; i < r->num_edges; i++) {
 		dpid_t dpid = r->edges[i].dpid1;
 		int out_port = r->edges[i].out_port;
@@ -550,6 +751,8 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 					init_entry(cur_sw, cur_sw->hack_start_prio);
 
 				fprintf(stderr, "---- flow table for 0x%x ---\n", dpid);
+				dump_tt(cur_sw->trace_tree);
+				fprintf(stderr, "\n");
 				cur_sw->hack_start_prio =
 					build_flow_table(cur_sw, cur_sw->trace_tree, ma,
 							 cur_sw->hack_start_prio) + 1;
@@ -560,11 +763,43 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	}
 	route_free(r);
 
+	/* packet out */
 	action_dump(out_a, buf, 128);
 	fprintf(stderr, "dpid: 0x%x, packet_out_action: %s\n\n", sw->dpid, buf);
 	msg = msg_packet_out(in_port, packet, packet_len, out_a);
 	xswitch_send(sw, msg);
 	action_free(out_a);
+
+	/* invalidate */
+	int j, num_switches;
+	struct entity **switches = topo_get_switches(&num_switches);
+	for(j = 0; j < trace.num_events; j++) {
+		const char *name;
+		if(trace.events[j].type != EV_IE)
+			continue;
+		name = trace.events[j].u.ie.name;
+		fprintf(stderr, "invalidate \"%s\":\n", name);
+		for(i = 0; i < num_switches; i++) {
+			struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
+			struct trace_tree_header *tt = cur_sw->trace_tree;
+			if(invalidate_tt(&tt, name)) {
+				struct match *ma = match();
+				match_add(ma,
+					  flow_table_get_field_index(cur_sw->table0, "dl_type"),
+					  value_from_16(0x0800),
+					  value_from_16(0xffff));
+
+				cur_sw->hack_start_prio =
+					init_entry(cur_sw, cur_sw->hack_start_prio);
+
+				fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
+				cur_sw->hack_start_prio =
+					build_flow_table(cur_sw, cur_sw->trace_tree, ma,
+							 cur_sw->hack_start_prio) + 1;
+				match_free(ma);
+			}
+		}
+	}
 }
 
 void maple_switch_down(struct xswitch *sw)
