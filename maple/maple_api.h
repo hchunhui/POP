@@ -12,4 +12,9 @@ struct packet;
 value_t read_packet(struct packet *pkt, const char *field);
 bool test_equal(struct packet *pkt, const char *field, value_t value);
 
+struct env;
+void *read_env(struct env *env, const char *name);
+void write_env(struct env *env, const char *name, void *value);
+void invalidate_env(struct env *env, const char *name);
+
 #endif /* _MAPLE_API_H_ */
