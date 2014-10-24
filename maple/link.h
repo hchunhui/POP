@@ -82,7 +82,7 @@ int entity_get_adj_in_port(struct entity *e, int i)
 	return e->adjs[i].adj_in_port;
 }
 */
-edge_t 
+static inline edge_t 
 edge_new(dpid_t dpid1, int port1, dpid_t dpid2, int port2)
 {
 	edge_t e;
@@ -92,16 +92,19 @@ edge_new(dpid_t dpid1, int port1, dpid_t dpid2, int port2)
 	e.port2 = port2;
 	return e;
 }
+static inline
 int edge_equal(edge_t *e1, edge_t *e2)
 {
 	return e1->dpid1 == e2->dpid1 && e1->dpid2 == e2->dpid2 
 		&& e1->port1 == e2->port1 && e1->port2 == e2->port2;
 }
+static inline
 bool edge_valid(edge_t *e)
 {
 	return e->dpid1 != 0 && e->dpid2 != 0
 		&& e->port1 != 0 && e->port2 != 0;
 }
+static inline
 void route_init(route_t *route)
 {
 	route->len = 0;
@@ -109,6 +112,7 @@ void route_init(route_t *route)
 	route->rt = malloc(sizeof(edge_t)*20);
 	assert(route->rt != NULL);
 }
+static inline
 void route_init_size(route_t *route, int length)
 {
 	if (length <= 0)
@@ -118,12 +122,14 @@ void route_init_size(route_t *route, int length)
 	route->rt = malloc(sizeof(edge_t)*length);
 	assert(route->rt != NULL);
 }
+static inline
 void route_add_size(route_t *route)
 {
 	route->total_size <<= 1;
 	route->rt = realloc(route->rt, sizeof(edge_t)*route->total_size);
 	assert(route->rt != NULL);
 }
+static inline
 void route_add_edge(route_t *route, edge_t *e)
 {
 	assert(route->len <= route->total_size);
@@ -147,6 +153,7 @@ void route_add_edge(route_t *route, edge_t *e)
    * 1: update old link.
    * 2: add new link.
    */
+static inline
 uint8_t route_update_edge(route_t *route, edge_t *e)
 {
 	int i = 0;
@@ -172,23 +179,29 @@ uint8_t route_update_edge(route_t *route, edge_t *e)
 	}
 	return 2;
 }
+static inline
 void route_add_edges(route_t *route, edge_t *e, int len)
 {
-	for (int i=0; i<len; i++)
+	int i;
+	for (i=0; i<len; i++)
 		route_add_edge(route, &e[i]);
 }
+static inline
 void route_merge(route_t *rt1, route_t *rt2)
 {
 	route_add_edges(rt1, rt2->rt, rt2->len);
 }
+static inline
 void route_print(route_t *r)
 {
-	for (int i = 0; i < r->len; i ++)
+	int i;
+	for (i = 0; i < r->len; i ++)
 	{
 		printf("(%d, %d, %d, %d)\n", r->rt[i].dpid1, 
 			r->rt[i].port1, r->rt[i].port2, r->rt[i].dpid2);
 	}
 }
+static inline
 void route_destory(route_t *route)
 {
 	free(route->rt);

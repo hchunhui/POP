@@ -42,12 +42,13 @@ struct lldp_tlv {
 	uint16_t length;
 	uint8_t value[512];
 };
-
+static inline
 uint8_t
 lldp_tlv_get_type(struct lldp_tlv *tlv)
 {
 	return tlv->type;
 }
+static inline
 uint8_t
 lldp_tlv_get_length(struct lldp_tlv *tlv)
 {
