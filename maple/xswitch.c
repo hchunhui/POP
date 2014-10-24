@@ -18,14 +18,12 @@ void xswitch_send(struct xswitch *sw, struct msgbuf *b)
 }
 
 struct xswitch *xswitch_on_accept(struct sw *_sw)
-//struct xswitch *xswitch_on_accept(struct vconn *vconn)
 {
 	struct xswitch *sw;
 	struct msgbuf *msg;
 
 	sw = malloc(sizeof *sw);
 	sw->dpid = 0;
-	//sw->rconn = rconn_new_from_vconn("tcp", vconn);
 	sw->n_ports = 0;
 
 	_sw->xsw = sw;
@@ -73,7 +71,6 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 	msgbuf_delete(msg);
 }
 
-//void xswitch_on_close(struct xswitch *sw)
 void xswitch_on_close(struct sw *_sw)
 {
 	struct xswitch *sw = _sw->xsw;
@@ -112,32 +109,3 @@ void xswitch_down(struct xswitch *sw)
 	maple_switch_down(sw);
 	topo_switch_down(sw);
 }
-
-#if 0
-int xswitch_run(struct xswitch *sw)
-{
-	struct msgbuf *msg;
-
-	int retval = 0;
-	int retval2;
-
-	msg = rconn_recv(sw->rconn);
-	if(msg) {
-		xswitch_on_recv(sw, msg);
-		msgbuf_delete(msg);
-	} else {
-		retval = EAGAIN;
-	}
-	retval2 = rconn_run(sw->rconn);
-	if(retval == 0 || retval2 == 0)
-		return 0;
-	else
-		return retval2;
-}
-
-void xswitch_wait(struct xswitch *sw)
-{
-	rconn_run_wait(sw->rconn);
-	rconn_recv_wait(sw->rconn);
-}
-#endif
