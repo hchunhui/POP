@@ -7,7 +7,7 @@
 #include "topo.h"
 #include "entity.h"
 
-enum event_type { EV_R, EV_T, EV_RE, EV_IE };
+enum event_type { EV_R, EV_T, EV_RE };
 
 struct event
 {
@@ -25,9 +25,6 @@ struct event
 		struct {
 			char name[32];
 		} re;
-		struct {
-			char name[32];
-		} ie;
 	} u;
 };
 
@@ -35,6 +32,10 @@ struct trace
 {
 	int num_events;
 	struct event events[1024];
+	int num_inv_events;
+	struct {
+		char name[32];
+	} inv_events[1024];
 };
 
 static __thread struct trace trace = { 0 };
@@ -71,16 +72,16 @@ static void trace_RE(const char *name)
 
 static void trace_IE(const char *name)
 {
-	int i = trace.num_events;
-	trace.events[i].type = EV_IE;
-	strncpy(trace.events[i].u.ie.name, name, 32);
-	trace.events[i].u.ie.name[31] = 0;
-	trace.num_events++;
+	int i = trace.num_inv_events;
+	strncpy(trace.inv_events[i].name, name, 32);
+	trace.inv_events[i].name[31] = 0;
+	trace.num_inv_events++;
 }
 
 static void trace_clear(void)
 {
 	trace.num_events = 0;
+	trace.num_inv_events = 0;
 	trace_R("in_port", value_from_8(0));
 }
 
@@ -255,8 +256,6 @@ static struct trace_tree_header *events_to_tree(struct event *events, int num_ev
 			break;
 		case EV_RE:
 			root = trace_tree_D(ev->u.re.name, root);
-			break;
-		case EV_IE:
 			break;
 		}
 	}
@@ -773,11 +772,9 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	/* invalidate */
 	int j, num_switches;
 	struct entity **switches = topo_get_switches(&num_switches);
-	for(j = 0; j < trace.num_events; j++) {
+	for(j = 0; j < trace.num_inv_events; j++) {
 		const char *name;
-		if(trace.events[j].type != EV_IE)
-			continue;
-		name = trace.events[j].u.ie.name;
+		name = trace.inv_events[j].name;
 		fprintf(stderr, "invalidate \"%s\":\n", name);
 		for(i = 0; i < num_switches; i++) {
 			struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
