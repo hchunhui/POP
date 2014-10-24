@@ -84,8 +84,8 @@ void xswitch_on_close(struct sw *_sw)
 //--- message handlers
 void xswitch_up(struct xswitch *sw)
 {
-	topo_switch_up(sw);
 	maple_switch_up(sw);
+	topo_switch_up(sw);
 }
 
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
@@ -100,8 +100,8 @@ void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, i
 		fprintf(stderr, "%02x%c", packet[i], i%16==15 ? '\n' : ' ');
 	}
 	fprintf(stderr, "\n");
-	topo_packet_in(sw, in_port, packet, packet_len);
-	maple_packet_in(sw, in_port, packet, packet_len);
+	if (!topo_packet_in(sw, in_port, packet, packet_len))
+		maple_packet_in(sw, in_port, packet, packet_len);
 }
 
 void xswitch_down(struct xswitch *sw)

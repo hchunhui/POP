@@ -159,15 +159,20 @@ uint8_t route_update_edge(route_t *route, edge_t *e)
 	int i = 0;
 	for (; i<route->len; i++) {
 		if (route->rt[i].dpid1 == e->dpid1
+			&& route->rt[i].port1 == e->port1
+			&& route->rt[i].port2 == e->port2
+			&& route->rt[i].dpid2 == e->dpid2)
+			return 0;
+		if (route->rt[i].dpid1 == e->dpid2
+			&& route->rt[i].port1 == e->port2
+			&& route->rt[i].port2 == e->port1
+			&& route->rt[i].dpid2 == e->dpid1)
+			return 0;
+		if (route->rt[i].dpid1 == e->dpid1
 			&& route->rt[i].dpid2 == e->dpid2) {
-			if (route->rt[i].port1 == e->port1 
-				&& route->rt[i].port2 == e->port2)
-				return 0;
-			else {
 				route->rt[i].port1 = e->port1;
 				route->rt[i].port2 = e->port2;
 				return 1;
-			}
 		}
 	}
 	if (route->len == route->total_size)

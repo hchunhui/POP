@@ -69,8 +69,8 @@ lldp_pkt_construct(dpid_t dpid, port_t port, int *len/*OUT*/)
 	
 	// chassis_id_tlv
 	i = 14;
-	pkt[i++] = ((CHASSIS_ID_TLV << 9 | (8+sizeof(dpid_t))) >> 8) & 0xff;
-	pkt[i++] = (8+sizeof(dpid_t)) & 0xff;
+	pkt[i++] = ((CHASSIS_ID_TLV << 9 | (6+sizeof(dpid_t))) >> 8) & 0xff;
+	pkt[i++] = (6+sizeof(dpid_t)) & 0xff;
 	pkt[i++] = SUB_LOCAL;
 	pkt[i++] = 'd';
 	pkt[i++] = 'p';
@@ -82,8 +82,8 @@ lldp_pkt_construct(dpid_t dpid, port_t port, int *len/*OUT*/)
 	i += sizeof(dpid_t);
 
 	// port_id_tlv
-	pkt[i++] = ((PORT_ID_TLV << 9 | (3+sizeof(port_t))) >> 8) & 0xff;
-	pkt[i++] = (3+sizeof(port_t)) & 0xff;
+	pkt[i++] = ((PORT_ID_TLV << 9 | (1+sizeof(port_t))) >> 8) & 0xff;
+	pkt[i++] = (1+sizeof(port_t)) & 0xff;
 	pkt[i++] = PORT_SUB_PORT;
 	// host endian
 	memcpy(&pkt[i], &port, sizeof(port_t));
@@ -129,11 +129,12 @@ entities_add_new_link(route_t *route, edge_t *link)
 uint16_t
 lldp_tlv_next(const uint8_t *packet, struct lldp_tlv *tlv/*OUT*/, uint16_t offset)
 {
-	tlv->type = value_to_8(value_extract(packet, offset, 7));
-	tlv->length = value_to_16(value_extract(packet, offset+7, 9));
+	uint16_t v = value_to_16(value_extract(packet, offset, 16));
+	tlv->type = v >> 9;
+	tlv->length = v & 511;
 	assert((tlv->type < 9 && tlv->type >=0) || tlv->type == 127);
 	assert(tlv->length >= 0 && tlv->length < 512);
-	memcpy(tlv->value, packet + offset + 2, tlv->length);
+	memcpy(tlv->value, packet + offset/8 + 2, tlv->length);
 	return tlv->length + 2;
 }
 dpid_t
@@ -178,19 +179,26 @@ parse_lldp(const uint8_t *packet, edge_t *link/*OUT*/)
 	uint16_t port = 0;
 	uint8_t i = 0;
 	while(type != 0){
-		offset += lldp_tlv_next(packet, &tlv, offset);
+		offset += 8*lldp_tlv_next(packet, &tlv, offset);
 		type = lldp_tlv_get_type(&tlv);
+		printf("type: %d\n", type);
 		if (type == CHASSIS_ID_TLV){
 			if (i != 0)
+			{
 				return false;
+			}
 			dpid = chassis_id_tlv_parse_dpid(&tlv);
 		} else if (type == PORT_ID_TLV) {
 			if (i != 1)
+			{
 				return false;
+			}
 			port = port_id_tlv_parse_port(&tlv);
 		} else if (type == TTL_TLV) {
 			if (i != 2)
+			{
 				return false;
+			}
 		} else if ( i > 10) {
 			return false;
 		}
@@ -209,7 +217,10 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 	const uint8_t *packet = packet_in_get_packet(packet_in);
 	uint16_t length = packet_in_get_length(packet_in);
 	if (length < 14 + 14)
+	{
+		printf("length < 28\n");
 		return -1;
+	}
 	uint16_t port = packet_in_get_port(packet_in);
 	dpid_t dpid = packet_in_get_dpid(packet_in);
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
@@ -219,10 +230,16 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 	link.dpid2 = dpid;
 	link.port2 = port;
 	if (! parse_lldp(packet, &link))
+	{
+		printf("parse_lldp error\n");
 		return -3;
+	}
 	// route_add_edge(&links, &link);
 	if (! edge_valid(&link))
+	{
+		printf("edge_valid\n");
 		return -4;
+	}
 	uint8_t retval = route_update_edge(&links, &link);
 	switch (retval) {
 		case 0:
@@ -235,5 +252,7 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 			break;
 		default:;
 	}
+	printf("----------\n\n");
+	route_print(&links);
 	return 0;
 }

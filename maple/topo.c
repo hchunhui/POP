@@ -56,6 +56,7 @@ void topo_switch_up(struct xswitch *sw)
 	lldp_flow_install(sw, 1);
 	lldp_packet_send(sw);
 	/* hack */
+	/*
 	if(num_switches == 4) {
 		fprintf(stderr, "!!!hack hack hack!!!\n");
 		struct entity *s1 = topo_get_switch(1);
@@ -85,6 +86,7 @@ void topo_switch_up(struct xswitch *sw)
 		entity_add_link(s4, 3, s1, 3);
 		entity_add_link(s1, 4, s3, 4);
 	}
+	*/
 }
 /*
 struct packet_in
@@ -94,7 +96,7 @@ struct packet_in
 	dpid_t dpid;
 	port_t port;
 }*/
-void topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
+bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
 	struct packet_in pkt_in = {
 		packet,
@@ -102,7 +104,9 @@ void topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 		in_port,
 		sw->dpid,
 	};
-	handle_lldp_packet_in(&pkt_in);
+	if (handle_lldp_packet_in(&pkt_in)==-2)
+		return false;
+	return true;
 }
 
 void topo_switch_down(struct xswitch *sw)
