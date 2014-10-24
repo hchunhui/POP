@@ -1,0 +1,13 @@
+#!/bin/sh
+
+
+for i in `seq 1 4`; do
+	jail -r $i
+	ifconfig epair${i}a destroy
+done
+
+for i in `seq 5 9`; do
+	ifconfig epair${i}a destroy
+done
+
+killall -9 pofswitch

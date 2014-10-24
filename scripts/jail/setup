@@ -1,0 +1,39 @@
+#!/bin/sh
+
+trap "./destroy" INT
+
+for i in `seq 1 4`; do
+	jail -c persist vnet path=/ jid=$i
+	ifconfig epair$i create
+	ifconfig epair${i}a up
+	ifconfig epair${i}b link 00:00:00:00:00:0$i
+	ifconfig epair${i}b vnet $i
+	jexec $i ifconfig epair${i}b 10.0.0.$i up
+done
+
+for i in `seq 5 9`; do
+	ifconfig epair$i create
+	ifconfig epair${i}a up
+	ifconfig epair${i}b up
+done
+
+for host in `seq 1 4`; do
+	for i in `seq 1 4`; do
+		jexec $host arp -s 10.0.0.$i 00:00:00:00:00:0$i
+	done
+done
+
+for host in `seq 1 4`; do
+	sudo jexec $host arp -a
+done
+
+
+pofswitch --verbosity=mute --promisc --ip-addr=127.0.0.1 --device-id=1 --add-port=epair1a --add-port=epair5a --add-port=epair8b --add-port=epair9a --listen-port=7001 --log-file=/tmp/log/pof-s1.log &
+
+pofswitch --verbosity=mute --promisc --ip-addr=127.0.0.1 --device-id=2 --add-port=epair2a --add-port=epair5b --add-port=epair6a --listen-port=7002 --log-file=/tmp/log/pof-s2.log &
+
+pofswitch --verbosity=mute --promisc --ip-addr=127.0.0.1 --device-id=3 --add-port=epair3a --add-port=epair7a --add-port=epair6b --add-port=epair9b --listen-port=7003 --log-file=/tmp/log/pof-s3.log &
+
+pofswitch --verbosity=mute --promisc --ip-addr=127.0.0.1 --device-id=4 --add-port=epair4a --add-port=epair7b --add-port=epair8a --listen-port=7004 --log-file=/tmp/log/pof-s4.log
+
+#gdb pofswitch #--verbosity=mute --promisc --ip-addr=127.0.0.1 --device-id=4 --add-port=epair4a --add-port=epair7b --add-port=epair8a --listen-port=7004 --log-file=/tmp/log/pof-s4.log
