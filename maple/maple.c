@@ -593,53 +593,12 @@ bool test_equal(struct packet *pkt, const char *field, value_t value)
 	return result;
 }
 
-struct env
+void record(const char *name)
 {
-	int num_pairs;
-	struct {
-		char name[32];
-		void *value;
-	} pairs[1024];
-};
-
-static int env_find_index(struct env *env, const char *name)
-{
-	int i;
-	for(i = 0; i < env->num_pairs; i++) {
-		if(strcmp(env->pairs[i].name, name) == 0)
-			return i;
-	}
-	return -1;
-}
-
-void *read_env(struct env *env, const char *name)
-{
-	int id = env_find_index(env, name);
-	if(id == -1)
-		return NULL;
 	trace_RE(name);
-	return env->pairs[id].value;
 }
 
-void write_env(struct env *env, const char *name, void *value)
-{
-	int id = env_find_index(env, name);
-	if(id == -1) {
-		id = env->num_pairs;
-		if(id >= 1024)
-			abort();
-		strncpy(env->pairs[id].name, name, 32);
-		env->pairs[id].name[31] = 0;
-		env->pairs[id].value = NULL;
-		env->num_pairs++;
-	}
-	if(env->pairs[id].value != value) {
-		trace_IE(name);
-		env->pairs[id].value = value;
-	}
-}
-
-void invalidate_env(struct env *env, const char *name)
+void invalidate(const char *name)
 {
 	trace_IE(name);
 }
@@ -691,8 +650,7 @@ void maple_switch_up(struct xswitch *sw)
 	sw->hack_start_prio = init_entry(sw, sw->hack_start_prio);
 }
 
-struct route *f(struct packet *pk, struct env *env);
-static struct env env;
+struct route *f(struct packet *pk);
 
 void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
@@ -707,7 +665,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	trace_clear();
 
 	/* run */
-	r = f(&pk, &env);
+	r = f(&pk);
 
 	/* learn */
 	for(i = 0; i < r->num_edges; i++) {

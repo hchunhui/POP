@@ -145,7 +145,7 @@ static void get_switch(struct entity *host, struct entity **sw, int *port)
 	*port = adjs->adj_in_port;
 }
 
-struct route *f(struct packet *pkt, struct env *env)
+struct route *f(struct packet *pkt)
 {
 	int switches_num;
 	struct route *r, *rx;
