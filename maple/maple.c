@@ -657,9 +657,6 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	int i;
 	struct route *r;
 	struct packet pk = { packet, packet_len };
-	struct action *out_a = action();
-	struct msgbuf *msg;
-	char buf[128];
 
 	/* init */
 	trace_clear();
@@ -687,8 +684,11 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			if(cur_sw == NULL)
 				abort();
 
-			if(cur_sw == sw)
-				action_union(out_a, a);
+			if(r->edges[i].dpid2 == 0) {
+				struct msgbuf *mb;
+				mb = msg_packet_out(0, packet, packet_len, a);
+				xswitch_send(cur_sw, mb);
+			}
 
 			for(j = 0; j < r->num_edges; j++) {
 				if(r->edges[j].dpid2 == dpid)
@@ -719,13 +719,6 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 		}
 	}
 	route_free(r);
-
-	/* packet out */
-	action_dump(out_a, buf, 128);
-	fprintf(stderr, "dpid: 0x%x, packet_out_action: %s\n\n", sw->dpid, buf);
-	msg = msg_packet_out(in_port, packet, packet_len, out_a);
-	xswitch_send(sw, msg);
-	action_free(out_a);
 
 	/* invalidate */
 	int j, num_switches;
