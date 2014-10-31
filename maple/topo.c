@@ -6,7 +6,8 @@
 #include "entity.h"
 #include "discovery.h"
 #include "packet_in.h"
-
+// TODO next for delete
+// TODO delete
 static struct entity *hosts[100];
 static int num_hosts;
 static struct entity *switches[100];

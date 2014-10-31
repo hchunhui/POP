@@ -409,7 +409,7 @@ static void arp_request_packet_out(struct flood_node *fnode, const uint8_t *pkt,
 	action_free(out_ac);
 	xswitch_send(xsw, mb);
 }
-static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
+static void flood2(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
 {
 	struct nodeinfo *nodes;
 	struct entity **esws;
@@ -439,7 +439,7 @@ static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t po
 		arp_request_packet_out(&fnode, packet, length);
 	}
 }
-static void arp_reply_packet_out(struct xswitch *xsw, port_t port, const uint8_t *pkt, uint16_t len)
+static void port_packet_out(struct xswitch *xsw, port_t port, const uint8_t *pkt, uint16_t len)
 {
 	struct action *ac;
 	struct msgbuf *mb;
@@ -448,6 +448,31 @@ static void arp_reply_packet_out(struct xswitch *xsw, port_t port, const uint8_t
 	mb = msg_packet_out(0, pkt, len, ac);
 	action_free(ac);
 	xswitch_send(xsw, mb);
+}
+static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
+{
+	int i, j, swnum, numadjs;
+	struct entity **esw = topo_get_switches(&swnum);
+	struct xswitch *xsw;
+	const struct entity_adj *esw_adj;
+	uint8_t tports[MAX_PORT_NUM +1] = {0};// TODO max_port_num, port num
+	for (i = 0; i < MAX_ENTITY_NUM; i++){
+		if (esw[i] == NULL)
+			continue;
+		xsw = entity_get_xswitch(esw[i]);
+		esw_adj = entity_get_adjs(esw[i], &numadjs);
+		for (j = 0; j <= xsw->n_ports; j++)
+			tports[j] = 0;
+		for (j = 0; j < numadjs; j++) {
+			// printf("out_port: %d\n", esw_adj[j].out_port);
+			tports[esw_adj[j].out_port] = 1;
+		}
+		for (j = 1; j <= xsw->n_ports; j++) {
+			if (tports[j] == 0) {
+				port_packet_out(xsw, j, packet, length);
+			}
+		}
+	}
 }
 int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
 {
@@ -492,7 +517,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 			uint8_t *arp_reply_pkt;
 			struct action *out_a;
 			struct msgbuf *mb;
-			printf("----------send packet--%d, %d\n", dpid, port);
+			///// printf("----------send packet--%d, %d\n", dpid, port);
 
 			hinfo = entity_get_addr(eh1);
 			arp_reply_pkt = arp_reply_packet_construct(&hinfo, &arp, &len);
@@ -507,7 +532,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 			xsw = entity_get_xswitch(esw);
 			xswitch_send(xsw, mb);
 		} else {
-			/*
+			
 			//// not found, waiting for reply.
 			// save src host info.
 			// flood arp request.
@@ -526,7 +551,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 			// packet_out
 			flood(packet, length, dpid, port);
 			get_next_available_waiting_host();
-			*/
+		
 		}
 	} else if (arp.arp_op == ARPOP_REPLY) {
 		// TODO respond waiting host and move it from waiting hosts.
@@ -557,7 +582,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 		esw = ehadj[0].adj_entity;
 		sw_out_port = ehadj[0].adj_in_port;
 		xsw = entity_get_xswitch(esw);
-		arp_reply_packet_out(xsw, sw_out_port, packet, length);
+		port_packet_out(xsw, sw_out_port, packet, length);
 	}
 	return 0;
 }
@@ -597,13 +622,14 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 		// TODO
 		// struct host_info h = entity_get_addr(host);
 	}
+	/*
 	int hnum;
 	struct entity **hs = topo_get_hosts(&hnum);
 	printf("hnum. %d\n", hnum);
 	for (i = 0 ;i < hnum; i++) {
 		if (hs[i] != NULL)
 			printf("not nulllllll\n");
-	}
+	}*/
 }
 
 int handle_topo_packet_in(const struct packet_in *packet_in)

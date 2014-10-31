@@ -2,6 +2,8 @@
 #define _TOPO_H_
 #include "types.h"
 
+#define MAX_ENTITY_NUM 100
+
 struct xswitch;
 struct haddr;
 bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);

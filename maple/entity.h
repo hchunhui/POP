@@ -3,6 +3,8 @@
 
 #include "types.h"
 
+#define MAX_PORT_NUM 16
+
 struct xswitch;
 struct entity;
 enum entity_type { ENTITY_TYPE_HOST, ENTITY_TYPE_SWITCH };

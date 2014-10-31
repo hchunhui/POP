@@ -13,7 +13,7 @@ struct entity
 
 	int num_ports;
 	int num_adjs;
-	struct entity_adj adjs[16];
+	struct entity_adj adjs[MAX_PORT_NUM];
 };
 
 struct entity *entity_host(struct host_info addr)

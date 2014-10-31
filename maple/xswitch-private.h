@@ -15,7 +15,7 @@ struct xswitch
 	} state;
 	dpid_t dpid;
 	int n_ports;
-	// port number
+	//TODO port number
 	int hack_start_prio;
 	//struct rconn *rconn;
 	struct flow_table *table0;
