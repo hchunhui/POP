@@ -5,10 +5,31 @@
 #include <string.h>
 #define VALUE_LEN 8
 
+struct haddr {
+	uint8_t octet[6];
+};
 typedef struct {
 	uint8_t v[VALUE_LEN];
 } value_t;
 
+// value_t to haddr
+static inline struct haddr value_to_haddr(value_t v)
+{
+	struct haddr h;
+	int i;
+	for (i=0; i<6; i++)
+		h.octet[i] = v.v[i];
+	return h;
+}
+// haddr to value_t
+static inline value_t value_from_haddr(struct haddr *h)
+{
+	value_t v = {{0}};
+	int i;
+	for(i=0; i<6; i++)
+		v.v[i] = h->octet[i];
+	return v;
+}
 /* big endian value to native integer */
 static inline uint8_t value_to_8(value_t v)
 {

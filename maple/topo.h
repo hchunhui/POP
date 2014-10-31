@@ -3,6 +3,7 @@
 #include "types.h"
 
 struct xswitch;
+struct haddr;
 bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
 void topo_switch_up(struct xswitch *sw);
 void topo_switch_down(struct xswitch *sw);
@@ -11,4 +12,10 @@ struct entity **topo_get_hosts(int *pnum);
 struct entity **topo_get_switches(int *pnum);
 struct entity *topo_get_host(value_t addr);
 struct entity *topo_get_switch(dpid_t dpid);
+struct entity *topo_get_host_by_haddr(struct haddr addr);
+struct entity *topo_get_host_by_paddr(uint32_t addr);
+bool topo_add_host(struct entity *host);
+bool topo_add_switch(struct entity *sw);
+bool topo_del_host(struct entity *host);
+bool topo_del_switch(struct entity *sw);
 #endif

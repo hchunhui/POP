@@ -1,0 +1,154 @@
+discovery.c: In function ‘lldp_tlv_next’:
+discovery.c:140:11: warning: unused variable ‘v’ [-Wunused-variable]
+  uint16_t v = value_to_16(value_extract(packet, offset, 16));
+           ^
+discovery.c:141:1: warning: no return statement in function returning non-void [-Wreturn-type]
+ }
+ ^
+discovery.c: In function ‘arp_reply_packet_construct’:
+discovery.c:312:24: error: subscripted value is neither array nor pointer nor vector
+   pkt[i] = arp->arp_sha[i];
+                        ^
+discovery.c:313:27: error: subscripted value is neither array nor pointer nor vector
+   pkt[i+32] = arp->arp_sha[i];
+                           ^
+discovery.c:329:32: error: expected expression before ‘[’ token
+   pkt[28+i] = (arp->arp_tpa >> [(3-i)*8]) & 0xff;
+                                ^
+discovery.c:330:32: error: expected expression before ‘[’ token
+   pkt[38+i] = (arp->arp_spa >> [(3-i)*8]) & 0xff;
+                                ^
+discovery.c: At top level:
+discovery.c:335:2: error: unknown type name ‘entity’
+  entity *esw;
+  ^
+discovery.c:340:8: error: expected ‘;’, identifier or ‘(’ before ‘void’
+ static void flood_node_add_port(struct flood_node *fnode, port_t port)
+        ^
+In file included from spanning_tree.h:5:0,
+                 from discovery.h:16,
+                 from discovery.c:1:
+discovery.c: In function ‘flood_node_add_port’:
+discovery.c:342:9: error: ‘out_num’ undeclared (first use in this function)
+  assert(out_num < 16);
+         ^
+discovery.c:342:9: note: each undeclared identifier is reported only once for each function it appears in
+discovery.c: In function ‘arp_flow_install’:
+discovery.c:354:47: error: request for member ‘table0’ in something not a structure or union
+  index = flow_table_get_field_index(fnode->esw->table0, "in_port");
+                                               ^
+discovery.c:356:37: error: ‘in_port’ undeclared (first use in this function)
+   match_add(ma, index, value_from_8(in_port), value_from_8(0xff));
+                                     ^
+discovery.c:357:47: error: request for member ‘table0’ in something not a structure or union
+  index = flow_table_get_field_index(fnode->esw->table0, "dl_src");
+                                               ^
+discovery.c:360:47: error: request for member ‘table0’ in something not a structure or union
+  index = flow_table_get_field_index(fnode->esw->table0, "dl_type");
+                                               ^
+discovery.c:364:18: error: ‘out_num’ undeclared (first use in this function)
+  for (i = 0; i < out_num; i++)
+                  ^
+discovery.c:366:37: error: request for member ‘table0’ in something not a structure or union
+  msg = msg_flow_entry_add(fnode->esw->table0, prio, ma, ac);
+                                     ^
+discovery.c:369:2: warning: passing argument 1 of ‘entity_get_xswitch’ from incompatible pointer type [enabled by default]
+  xsw = entity_get_xswitch(fnode->esw);
+  ^
+In file included from discovery.h:7:0,
+                 from discovery.c:1:
+entity.h:40:17: note: expected ‘struct entity *’ but argument is of type ‘int *’
+ struct xswitch *entity_get_xswitch(struct entity *e);
+                 ^
+discovery.c: In function ‘arp_request_packet_out’:
+discovery.c:380:14: error: ‘out_a’ undeclared (first use in this function)
+  action_free(out_a);
+              ^
+discovery.c:381:2: warning: passing argument 1 of ‘free’ discards ‘const’ qualifier from pointer target type [enabled by default]
+  free(pkt);
+  ^
+In file included from discovery.h:5:0,
+                 from discovery.c:1:
+/usr/include/stdlib.h:483:13: note: expected ‘void *’ but argument is of type ‘const uint8_t *’
+ extern void free (void *__ptr) __THROW;
+             ^
+discovery.c:382:15: error: ‘sw’ undeclared (first use in this function)
+  xswitch_send(sw, mb);
+               ^
+discovery.c: In function ‘flood’:
+discovery.c:399:13: warning: assignment from incompatible pointer type [enabled by default]
+   fnode.esw = esws[i];
+             ^
+discovery.c:401:19: error: expected expression before ‘uint8_t’
+   fnode.in_port = uint8_t(nodes[i].in_port);
+                   ^
+discovery.c:409:3: error: incompatible type for argument 1 of ‘arp_flow_install’
+   arp_flow_install(fnode, srchaddr, 2);
+   ^
+discovery.c:346:13: note: expected ‘struct flood_node *’ but argument is of type ‘struct flood_node’
+ static void arp_flow_install(struct flood_node *fnode, value_t srchaddr, int prio)
+             ^
+discovery.c:411:3: error: incompatible type for argument 1 of ‘arp_request_packet_out’
+   arp_request_packet_out(fnode, packet, length);
+   ^
+discovery.c:372:13: note: expected ‘struct flood_node *’ but argument is of type ‘struct flood_node’
+ static void arp_request_packet_out(struct flood_node *fnode, const uint8_t *pkt, uint16_t len)
+             ^
+discovery.c: In function ‘handle_arp_packet_in’:
+discovery.c:456:20: error: ‘ARP_REQUEST’ undeclared (first use in this function)
+  if (arp.arp_op == ARP_REQUEST) {
+                    ^
+discovery.c:499:27: error: ‘ARP_REPLY’ undeclared (first use in this function)
+  } else if (arp.arp_op == ARP_REPLY) {
+                           ^
+discovery.c:523:9: warning: assignment discards ‘const’ qualifier from pointer target type [enabled by default]
+   ehadj = entity_get_adjs(ewait, &adjnum);
+         ^
+discovery.c:527:7: warning: assignment from incompatible pointer type [enabled by default]
+   xsw = entity_get_xswitch(esw);
+       ^
+discovery.c:528:3: warning: passing argument 1 of ‘arp_reply_packet_out’ from incompatible pointer type [enabled by default]
+   arp_reply_packet_out(xsw, sw_out_port, packet, length);
+   ^
+discovery.c:414:13: note: expected ‘struct xswitch *’ but argument is of type ‘struct entity *’
+ static void arp_reply_packet_out(struct xswitch *xsw, port_t port, uint8_t *pkt, uint16_t len)
+             ^
+discovery.c:528:3: warning: passing argument 3 of ‘arp_reply_packet_out’ discards ‘const’ qualifier from pointer target type [enabled by default]
+   arp_reply_packet_out(xsw, sw_out_port, packet, length);
+   ^
+discovery.c:414:13: note: expected ‘uint8_t *’ but argument is of type ‘const uint8_t *’
+ static void arp_reply_packet_out(struct xswitch *xsw, port_t port, uint8_t *pkt, uint16_t len)
+             ^
+discovery.c:429:18: warning: variable ‘ehhdr’ set but not used [-Wunused-but-set-variable]
+  struct etherhdr ehhdr;
+                  ^
+discovery.c: In function ‘update_hosts’:
+discovery.c:545:59: error: expected ‘)’ before ‘;’ token
+    psrc_addr = value_to_32(value_extract(packet, 28*8, 32);
+                                                           ^
+discovery.c:567:1: error: expected ‘;’ before ‘}’ token
+ }
+ ^
+discovery.c:590:1: error: expected declaration or statement at end of input
+ }
+ ^
+discovery.c:537:11: warning: variable ‘psrc_addr’ set but not used [-Wunused-but-set-variable]
+  uint32_t psrc_addr = 0;
+           ^
+discovery.c:536:19: warning: unused variable ‘hinfo’ [-Wunused-variable]
+  struct host_info hinfo;
+                   ^
+discovery.c:535:15: warning: variable ‘hsrc_addr’ set but not used [-Wunused-but-set-variable]
+  struct haddr hsrc_addr;
+               ^
+discovery.c:534:17: warning: unused variable ‘esw’ [-Wunused-variable]
+  struct entity *esw;
+                 ^
+discovery.c:533:17: warning: unused variable ‘host’ [-Wunused-variable]
+  struct entity *host;
+                 ^
+discovery.c: In function ‘handle_arp_packet_in’:
+discovery.c:530:1: warning: control reaches end of non-void function [-Wreturn-type]
+ }
+ ^
+make: *** [discovery.o] Error 1

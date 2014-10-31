@@ -8,14 +8,15 @@ struct entity
 	enum entity_type type;
 	union {
 		struct xswitch *xs;
-		value_t addr;
+		struct host_info addr;
 	} u;
 
+	int num_ports;
 	int num_adjs;
 	struct entity_adj adjs[16];
 };
 
-struct entity *entity_host(value_t addr)
+struct entity *entity_host(struct host_info addr)
 {
 	struct entity *e = malloc(sizeof(struct entity));
 	e->type = ENTITY_TYPE_HOST;
@@ -69,7 +70,7 @@ dpid_t entity_get_dpid(struct entity *e)
 	return e->u.xs->dpid;
 }
 
-value_t entity_get_addr(struct entity *e)
+struct host_info entity_get_addr(struct entity *e)
 {
 	assert(e->type == ENTITY_TYPE_HOST);
 	return e->u.addr;
