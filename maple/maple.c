@@ -424,7 +424,7 @@ static bool invalidate_tt(struct trace_tree_header **tree, const char *name)
 		}
 		return invalidate_tt(&(td->t), name);
 	}
-	abort();
+	assert(0);
 }
 
 static int __build_flow_table(struct xswitch *sw,
@@ -477,6 +477,7 @@ static int __build_flow_table(struct xswitch *sw,
 	case TT_D:
 		return priority;
 	}
+	assert(0);
 }
 
 static int build_flow_table(struct xswitch *sw,
@@ -681,8 +682,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 
 			action_add(a, AC_OUTPUT, out_port);
 
-			if(cur_sw == NULL)
-				abort();
+			assert(cur_sw);
 
 			if(r->edges[i].dpid2 == 0) {
 				struct msgbuf *mb;
