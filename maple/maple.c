@@ -6,6 +6,7 @@
 #include "maple_api.h"
 #include "topo.h"
 #include "entity.h"
+#include "packet_parser.h"
 
 enum event_type { EV_R, EV_T, EV_RE };
 
@@ -547,47 +548,20 @@ void route_union(struct route *r1, struct route *r2)
 	}
 }
 
-struct packet
-{
-	const uint8_t *pkt;
-	int pkt_len;
+struct packet {
+	struct packet_parser *pp;
 };
-
-static value_t get_value(struct packet *pk, const char *field)
-{
-	value_t v = {{0}};
-	const uint8_t *pkt = pk->pkt;
-	assert(pk->pkt_len >= 38);
-
-	if(strcmp(field, "dl_dst") == 0)
-		v = value_extract(pkt, 0, 48);
-	else if(strcmp(field, "dl_src") == 0)
-		v = value_extract(pkt, 48, 48);
-	else if(strcmp(field, "dl_type") == 0)
-		v = value_extract(pkt, 96, 16);
-	else if(strcmp(field, "nw_proto") == 0)
-		v = value_extract(pkt, 112+64+8, 8);
-	else if(strcmp(field, "nw_src") == 0)
-		v = value_extract(pkt, 112+96, 32);
-	else if(strcmp(field, "nw_dst") == 0)
-		v = value_extract(pkt, 112+128, 32);
-	else if(strcmp(field, "tp_src") == 0)
-		v = value_extract(pkt, 112+160, 16);
-	else if(strcmp(field, "tp_dst") == 0)
-		v = value_extract(pkt, 112+176, 16);
-	return v;
-}
 
 value_t read_packet(struct packet *pkt, const char *field)
 {
-	value_t v = get_value(pkt, field);
+	value_t v = packet_parser_read(pkt->pp, field);
 	trace_R(field, v);
 	return v;
 }
 
 bool test_equal(struct packet *pkt, const char *field, value_t value)
 {
-	value_t v = get_value(pkt, field);
+	value_t v = packet_parser_read(pkt->pp, field);
 	bool result = value_equ(v, value);
 	trace_T(field, value, result);
 	return result;
@@ -656,13 +630,15 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 {
 	int i;
 	struct route *r;
-	struct packet pk = { packet, packet_len };
+	struct packet pk;
 
 	/* init */
 	trace_clear();
 
 	/* run */
+	pk.pp = packet_parser(packet, packet_len);
 	r = f(&pk);
+	packet_parser_free(pk.pp);
 
 	/* learn */
 	for(i = 0; i < r->num_edges; i++) {
