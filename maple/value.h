@@ -201,7 +201,7 @@ static inline value_t value_from_64l(uint64_t x)
 	return v;
 }
 
-static inline value_t value_extract(const uint8_t *buf, uint16_t offset, uint16_t length)
+static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 {
 	value_t v = {{0}};
 	uint8_t tmp[VALUE_LEN+1];
