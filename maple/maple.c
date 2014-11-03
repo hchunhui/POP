@@ -552,6 +552,16 @@ struct packet {
 	struct packet_parser *pp;
 };
 
+void pull_header(struct packet *pkt)
+{
+	packet_parser_pull(pkt->pp);
+}
+
+const char *read_header_type(struct packet *pkt)
+{
+	return packet_parser_read_type(pkt->pp);
+}
+
 value_t read_packet(struct packet *pkt, const char *field)
 {
 	value_t v = packet_parser_read(pkt->pp, field);

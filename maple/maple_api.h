@@ -9,6 +9,8 @@ void route_add_edge(struct route *r, dpid_t dpid1, int out_port, dpid_t dpid2, i
 void route_union(struct route *r1, struct route *r2);
 
 struct packet;
+void pull_header(struct packet *pkt);
+const char *read_header_type(struct packet *pkt);
 value_t read_packet(struct packet *pkt, const char *field);
 bool test_equal(struct packet *pkt, const char *field, value_t value);
 
