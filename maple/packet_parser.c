@@ -34,8 +34,7 @@ struct header *header(const char *name)
 void header_add_field(struct header *h, const char *name, int offset, int length)
 {
 	int i = h->num_fields;
-	if(i >= 100)
-		abort();
+	assert(i < 100);
 	strncpy(h->fields[i].name, name, 32);
 	h->fields[i].name[31] = 0;
 	h->fields[i].offset = offset;
@@ -56,14 +55,13 @@ void header_set_sel(struct header *h, const char *name)
 			h->sel_idx = i;
 			return;
 		}
-	abort();
+	assert(0);
 }
 
 void header_add_next(struct header *h, value_t v, struct header *nh)
 {
 	int i = h->num_next;
-	if(i >= 100)
-		abort();
+	assert(i < 100);
 	h->next[i].v = v;
 	h->next[i].h = nh;
 	h->num_next++;
@@ -119,22 +117,20 @@ void packet_parser_reset(struct packet_parser *pp)
 void packet_parser_pull(struct packet_parser *pp)
 {
 	int i = pp->current->sel_idx;
-	if(i >= 0) {
-		int j;
-		value_t v = value_extract(pp->head,
-					  pp->current->fields[i].offset,
-					  pp->current->fields[i].length);
-		for(j = 0; j < pp->current->num_next; j++) {
-			if(value_equ(pp->current->next[j].v, v)) {
-				pp->head += pp->current->length;
-				pp->current = pp->current->next[j].h;
-				if(pp->head > pp->data + pp->length)
-					abort();
-				return;
-			}
+	assert(i >= 0);
+	int j;
+	value_t v = value_extract(pp->head,
+				  pp->current->fields[i].offset,
+				  pp->current->fields[i].length);
+	for(j = 0; j < pp->current->num_next; j++) {
+		if(value_equ(pp->current->next[j].v, v)) {
+			pp->head += pp->current->length;
+			pp->current = pp->current->next[j].h;
+			assert(pp->head <= pp->data + pp->length);
+			return;
 		}
 	}
-	abort();
+	assert(0);
 }
 
 value_t packet_parser_read(struct packet_parser *pp, const char *field)
@@ -148,7 +144,7 @@ value_t packet_parser_read(struct packet_parser *pp, const char *field)
 			return value_extract(pp->head, offset, length);
 		}
 	}
-	abort();
+	assert(0);
 }
 
 const char *packet_parser_read_type(struct packet_parser *pp)
