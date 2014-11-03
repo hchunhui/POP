@@ -10,6 +10,6 @@ void packet_parser_free(struct packet_parser *pp);
 void packet_parser_reset(struct packet_parser *pp);
 void packet_parser_pull(struct packet_parser *pp);
 value_t packet_parser_read(struct packet_parser *pp, const char *field);
-void packet_parser_read_type(struct packet_parser *pp, char *buf, int len);
+const char *packet_parser_read_type(struct packet_parser *pp);
 
 #endif /* _PACKET_PARSER_H_ */
