@@ -5,6 +5,7 @@
 #include <string.h>
 #include <assert.h>
 #include "packet_parser.h"
+#include "spec_parser.h"
 
 /* symbol table entry */
 struct entry {
@@ -461,7 +462,7 @@ static int parse(struct parse_ctx *pctx)
 #undef CTX
 
 /* Interface */
-struct header *parse_string(char *s, int length)
+struct header *spec_parser_string(char *s, int length)
 {
 	int i;
 	int ret;
@@ -484,15 +485,17 @@ struct header *parse_string(char *s, int length)
 	return ctx.curr_h;
 }
 
-/* For test */
-#if 1
-int main(int argc, char *argv[])
+struct header *spec_parser_file(char *filename)
 {
 	FILE *fp;
 	int size;
 	char *s;
 	struct header *h;
-	fp = fopen("scripts/header.spec", "r");
+	fp = fopen(filename, "r");
+	if(!fp) {
+		fprintf(stderr, "Unable to open file: %s.\n", filename);
+		return NULL;
+	}
 	fseek(fp, 0, SEEK_END);
 	size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
@@ -500,12 +503,21 @@ int main(int argc, char *argv[])
 	fread(s, size, 1, fp);
 	s[size] = 0;
 	fclose(fp);
-	h = parse_string(s, size);
+	h = spec_parser_string(s, size);
+	free(s);
+	return h;
+}
+
+/* For test */
+#if 1
+int main(int argc, char *argv[])
+{
+	struct header *h;
+	h = spec_parser_file("scripts/header.spec");
 	if(h)
 		printf("accept, start is %s.\n", header_get_name(h));
 	else
 		printf("reject.\n");
-	free(s);
 	return 0;
 }
 #endif
