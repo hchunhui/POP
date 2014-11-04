@@ -3,7 +3,15 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <assert.h>
 #include "packet_parser.h"
+
+/* symbol table entry */
+struct entry {
+	struct header *h;
+	int ref;
+	bool decl;
+};
 
 /* Tokens */
 enum token {
@@ -38,6 +46,11 @@ struct parse_ctx {
 	enum token tok;        // current token
 	unsigned long long val;// attribute for current token
 	char buf[80];          // attribute for current token
+
+	struct entry symtab[100];
+	int tabsize;
+	struct header *curr_h;
+	int curr_offset;
 };
 
 /* Get next char from input buffer */
@@ -244,12 +257,56 @@ Syntax for Packet Header Spec:
   cases ::= e | CASE NUMBER COL IDENT SCOL cases
 */
 
+static struct entry *symtab_find(struct parse_ctx *pctx, char *name)
+{
+	int i;
+	for(i = 0; i < pctx->tabsize; i++)
+		if(strcmp(name, header_get_name(pctx->symtab[i].h)) == 0)
+			return pctx->symtab + i;
+	return NULL;
+}
+
+static void symtab_enter(struct parse_ctx *pctx, struct header *h)
+{
+	int i = pctx->tabsize;
+	assert(i < 100);
+	pctx->symtab[i].h = h;
+	pctx->symtab[i].ref = 0;
+	pctx->symtab[i].decl = true;
+	pctx->tabsize++;
+}
+
 D(cases)
 {
 	if(T(T_CASE)) {
+		unsigned long long val;
+		struct entry *e;
+		int slen;
 		M(T_NUMBER);
+		val = CTX->val;
 		M(T_COL);
 		M(T_IDENT);
+		e = symtab_find(CTX, CTX->buf);
+		if(!e) {
+			fprintf(stderr, "Header %s not found.\n", CTX->buf);
+			return 2;
+		}
+		slen = header_get_sel_length(CTX->curr_h);
+		e->ref++;
+		if(slen <= 8)
+			header_add_next(CTX->curr_h, value_from_8(val), e->h);
+		else if(slen == 16)
+			header_add_next(CTX->curr_h, value_from_16(val), e->h);
+		else if(slen == 32)
+			header_add_next(CTX->curr_h, value_from_32(val), e->h);
+		else if(slen == 48)
+			header_add_next(CTX->curr_h, value_from_48(val), e->h);
+		else if(slen == 64)
+			header_add_next(CTX->curr_h, value_from_64(val), e->h);
+		else {
+			fprintf(stderr, "Unable to handle length: %d\n", slen);
+			return 2;
+		}
 		M(T_SCOL);
 		P(cases);
 		return 0;
@@ -264,6 +321,7 @@ D(next)
 		M(T_SELECT);
 		M(T_LP);
 		M(T_IDENT);
+		header_set_sel(CTX->curr_h, CTX->buf);
 		M(T_RP);
 		M(T_BEGIN);
 		P(cases);
@@ -279,9 +337,11 @@ D(length)
 	if(T(T_LENGTH)) {
 		M(T_COL);
 		M(T_NUMBER);
+		header_set_length(CTX->curr_h, CTX->val);
 		M(T_SCOL);
 		return 0;
 	} else {
+		header_set_length(CTX->curr_h, CTX->curr_offset);
 		return 0;
 	}
 }
@@ -293,8 +353,15 @@ D(items)
 		strcpy(name, CTX->buf);
 		M(T_COL);
 		if(T(T_NUMBER)) {
+			header_add_field(CTX->curr_h,
+					 name,
+					 CTX->curr_offset, CTX->val);
+			CTX->curr_offset += CTX->val;
 		} else {
 			M(T_STAR);
+			header_add_field(CTX->curr_h,
+					 name,
+					 CTX->curr_offset, 0);
 		}
 		M(T_SCOL);
 		P(items);
@@ -320,9 +387,32 @@ D(headers)
 		M(T_IDENT);
 		strcpy(name, CTX->buf);
 		if(T(T_SCOL)) {
+			struct entry *e = symtab_find(CTX, name);
+			if(!e) {
+				struct header *h = header(name);
+				symtab_enter(CTX, h);
+			}
 			P(headers);
 			return 0;
 		} else {
+			struct entry *e = symtab_find(CTX, name);
+			if(!e) {
+				struct header *h = header(name);
+				symtab_enter(CTX, h);
+				e = symtab_find(CTX, name);
+				e->decl = false;
+				CTX->curr_h = h;
+				CTX->curr_offset = 0;
+			} else {
+				if(e->decl) {
+					e->decl = false;
+					CTX->curr_h = e->h;
+					CTX->curr_offset = 0;
+				} else {
+					fprintf(stderr, "Conflict header %s.\n", name);
+					return 2;
+				}
+			}
 			M(T_BEGIN);
 			P(fields);
 			P(length);
@@ -338,8 +428,12 @@ D(headers)
 
 D(start)
 {
+	struct entry *e;
 	M(T_START);
 	M(T_IDENT);
+	e = symtab_find(CTX, CTX->buf);
+	e->ref++;
+	CTX->curr_h = e->h;
 	M(T_SCOL);
 	return 0;
 }
@@ -367,15 +461,27 @@ static int parse(struct parse_ctx *pctx)
 #undef CTX
 
 /* Interface */
-int parse_string(char *s, int length)
+struct header *parse_string(char *s, int length)
 {
+	int i;
+	int ret;
 	struct parse_ctx ctx;
 	ctx.data = s;
 	ctx.curr = ctx.data;
 	ctx.length = length;
 	ctx.row = 1;
 	ctx.col = 0;
-	return parse(&ctx);
+	ctx.tabsize = 0;
+	ret = parse(&ctx);
+	if(ret)
+		return NULL;
+	for(i = 0; i < ctx.tabsize; i++)
+		if(ctx.symtab[i].ref == 0) {
+			fprintf(stderr, "Warning: Defined but not used Header %s.\n",
+				header_get_name(ctx.symtab[i].h));
+			header_free(ctx.symtab[i].h);
+		}
+	return ctx.curr_h;
 }
 
 /* For test */
@@ -385,7 +491,8 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	int size;
 	char *s;
-	fp = fopen("test", "r");
+	struct header *h;
+	fp = fopen("scripts/header.spec", "r");
 	fseek(fp, 0, SEEK_END);
 	size = ftell(fp);
 	fseek(fp, 0, SEEK_SET);
@@ -393,7 +500,11 @@ int main(int argc, char *argv[])
 	fread(s, size, 1, fp);
 	s[size] = 0;
 	fclose(fp);
-	printf("ret: %d\n", parse_string(s, size));
+	h = parse_string(s, size);
+	if(h)
+		printf("accept, start is %s.\n", header_get_name(h));
+	else
+		printf("reject.\n");
 	free(s);
 	return 0;
 }
