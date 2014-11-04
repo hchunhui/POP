@@ -15,7 +15,7 @@ const char *header_get_name(struct header *h);
 void header_free(struct header *h);
 
 struct packet_parser;
-struct packet_parser *packet_parser(const uint8_t *data, int length);
+struct packet_parser *packet_parser(struct header *spec, const uint8_t *data, int length);
 void packet_parser_free(struct packet_parser *pp);
 void packet_parser_reset(struct packet_parser *pp);
 void packet_parser_pull(struct packet_parser *pp);

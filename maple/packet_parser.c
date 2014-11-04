@@ -83,22 +83,6 @@ void header_free(struct header *h)
 	free(h);
 }
 
-static struct header *build_header()
-{
-	struct header *eth = header("ethernet");
-	struct header *ipv4 = header("ipv4");
-	header_add_field(eth, "dl_dst", 0, 48);
-	header_add_field(eth, "dl_src", 48, 48);
-	header_add_field(eth, "dl_type", 96, 16);
-	header_set_length(eth, 14);
-	header_set_sel(eth, "dl_type");
-	header_add_next(eth, value_from_16(0x0800), ipv4);
-	header_add_field(ipv4, "nw_src", 96, 32);
-	header_add_field(ipv4, "nw_dst", 128, 32);
-	header_set_length(ipv4, 20);
-	return eth;
-}
-
 struct packet_parser
 {
 	struct header *start;
@@ -108,13 +92,13 @@ struct packet_parser
 	int length;
 };
 
-struct packet_parser *packet_parser(const uint8_t *data, int length)
+struct packet_parser *packet_parser(struct header *spec, const uint8_t *data, int length)
 {
 	struct packet_parser *pp = malloc(sizeof(struct packet_parser));
 	pp->head = data;
 	pp->data = data;
 	pp->length = length;
-	pp->start = build_header();
+	pp->start = spec;
 	pp->current = pp->start;
 	return pp;
 }

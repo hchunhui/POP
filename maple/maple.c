@@ -7,6 +7,7 @@
 #include "topo.h"
 #include "entity.h"
 #include "packet_parser.h"
+#include "spec_parser.h"
 
 enum event_type { EV_R, EV_T, EV_RE };
 
@@ -642,11 +643,18 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	struct route *r;
 	struct packet pk;
 
+	/* XXX: hack */
+	static struct header *header_spec;
+	if(!header_spec) {
+		header_spec = spec_parser_file("scripts/header.spec");
+		assert(header_spec);
+	}
+
 	/* init */
 	trace_clear();
 
 	/* run */
-	pk.pp = packet_parser(packet, packet_len);
+	pk.pp = packet_parser(header_spec, packet, packet_len);
 	r = f(&pk);
 	packet_parser_free(pk.pp);
 

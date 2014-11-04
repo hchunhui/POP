@@ -513,7 +513,7 @@ struct header *spec_parser_file(char *filename)
 }
 
 /* For test */
-#if 1
+#if 0
 int main(int argc, char *argv[])
 {
 	struct header *h;
