@@ -342,7 +342,11 @@ D(length)
 		M(T_SCOL);
 		return 0;
 	} else {
-		header_set_length(CTX->curr_h, CTX->curr_offset);
+		if(CTX->curr_offset%8) {
+			fprintf(stderr, "Bad header length: %d bits.\n", CTX->curr_offset);
+			return 2;
+		}
+		header_set_length(CTX->curr_h, CTX->curr_offset/8);
 		return 0;
 	}
 }
