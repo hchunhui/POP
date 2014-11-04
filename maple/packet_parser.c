@@ -58,6 +58,12 @@ void header_set_sel(struct header *h, const char *name)
 	assert(0);
 }
 
+int header_get_sel_length(struct header *h)
+{
+	assert(h->sel_idx >= 0);
+	return h->fields[h->sel_idx].length;
+}
+
 void header_add_next(struct header *h, value_t v, struct header *nh)
 {
 	int i = h->num_next;
@@ -65,6 +71,16 @@ void header_add_next(struct header *h, value_t v, struct header *nh)
 	h->next[i].v = v;
 	h->next[i].h = nh;
 	h->num_next++;
+}
+
+const char *header_get_name(struct header *h)
+{
+	return h->name;
+}
+
+void header_free(struct header *h)
+{
+	free(h);
 }
 
 static struct header *build_header()
