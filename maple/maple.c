@@ -609,28 +609,8 @@ static int init_entry(struct xswitch *sw, int prio)
 
 void maple_switch_up(struct xswitch *sw)
 {
-	struct msgbuf *msg;
 	/* init trace tree */
 	sw->trace_tree = trace_tree_E();
-
-	/* init match fields */
-	sw->table0 = flow_table(0, FLOW_TABLE_TYPE_MM, 10);
-	flow_table_add_field(sw->table0, "in_port", MATCH_FIELD_METADATA, 16, 8);
-	flow_table_add_field(sw->table0, "dl_dst", MATCH_FIELD_PACKET, 0, 48);
-	flow_table_add_field(sw->table0, "dl_src", MATCH_FIELD_PACKET, 48, 48);
-	flow_table_add_field(sw->table0, "dl_type", MATCH_FIELD_PACKET, 96, 16);
-	/* match_field 不够用了，暂时不要nw_proto */
-	/* flow_table_add_field(sw->table0, "nw_proto", MATCH_FIELD_PACKET, 112+64+8, 8); */
-	flow_table_add_field(sw->table0, "nw_src", MATCH_FIELD_PACKET, 112+96, 32);
-	flow_table_add_field(sw->table0, "nw_dst", MATCH_FIELD_PACKET, 112+128, 32);
-	flow_table_add_field(sw->table0, "tp_src", MATCH_FIELD_PACKET, 112+160, 16);
-	flow_table_add_field(sw->table0, "tp_dst", MATCH_FIELD_PACKET, 112+176, 16);
-
-	/* create table */
-	msg = msg_flow_table_add(sw->table0);
-	xswitch_send(sw, msg);
-	sw->hack_start_prio = 0;
-
 	/* init entry */
 	sw->hack_start_prio = init_entry(sw, sw->hack_start_prio);
 }
