@@ -75,7 +75,8 @@ struct action
 	int num_actions;
 	struct {
 		enum action_type type;
-		int arg;
+		int arg1;
+		int arg2;
 	} a[ACTION_NUM_ACTIONS];
 };
 

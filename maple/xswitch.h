@@ -32,10 +32,11 @@ void match_free(struct match *m);
 
 
 /* action */
-enum action_type { AC_DROP, AC_PACKET_IN, AC_OUTPUT };
+enum action_type { AC_DROP, AC_PACKET_IN, AC_OUTPUT, AC_GOTO_TABLE };
 struct action *action(void);
 struct action *action_copy(struct action *a);
 void action_add(struct action *a, enum action_type type, int arg);
+void action_add2(struct action *a, enum action_type type, int arg1, int arg2);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);

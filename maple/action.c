@@ -10,13 +10,19 @@ struct action *action(void)
 	return a;
 }
 
-void action_add(struct action *a, enum action_type type, int arg)
+void action_add2(struct action *a, enum action_type type, int arg1, int arg2)
 {
 	int n = a->num_actions;
 	assert(n < ACTION_NUM_ACTIONS);
 	a->a[n].type = type;
-	a->a[n].arg = arg;
+	a->a[n].arg1 = arg1;
+	a->a[n].arg2 = arg2;
 	a->num_actions++;
+}
+
+void action_add(struct action *a, enum action_type type, int arg1)
+{
+	action_add2(a, type, arg1, 0);
 }
 
 void action_free(struct action *m)
@@ -42,11 +48,12 @@ void action_union(struct action *a1, struct action *a2)
 	for(j = 0; j < a2->num_actions; j++) {
 		for(i = 0; i < a1->num_actions; i++) {
 			if(a1->a[i].type == a2->a[j].type &&
-			   a1->a[i].arg == a2->a[j].arg)
+			   a1->a[i].arg1 == a2->a[j].arg1 &&
+			   a1->a[i].arg2 == a2->a[j].arg2)
 				break;
 		}
 		if(i >= a1->num_actions)
-			action_add(a1, a2->a[j].type, a2->a[j].arg);
+			action_add2(a1, a2->a[j].type, a2->a[j].arg1, a2->a[j].arg2);
 	}
 }
 
@@ -55,10 +62,21 @@ void action_dump(struct action *a, char *buf, int n)
 	int i;
 	int offset = 0;
 	for(i = 0; i < a->num_actions; i++)
-		if (a->a[i].type == AC_DROP)
+		switch(a->a[i].type) {
+		case AC_DROP:
 			offset += snprintf(buf + offset, n - offset, "DROP ");
-		else if (a->a[i].type == AC_PACKET_IN)
+			break;
+		case AC_PACKET_IN:
 			offset += snprintf(buf + offset, n - offset, "PACKET_IN ");
-		else
-			offset += snprintf(buf + offset, n - offset, "OUTPUT %d ", a->a[i].arg);
+			break;
+		case AC_OUTPUT:
+			offset += snprintf(buf + offset, n - offset, "OUTPUT %d ", a->a[i].arg1);
+			break;
+		case AC_GOTO_TABLE:
+			offset += snprintf(buf + offset, n - offset, "GOTO_TABLE %d off %d ",
+					   a->a[i].arg1, a->a[i].arg2);
+			break;
+		default:
+			offset += snprintf(buf + offset, n - offset, "unknown ");
+		}
 }
