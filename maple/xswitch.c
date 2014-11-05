@@ -11,6 +11,11 @@
 
 #include "io/sw.h"
 
+void xswitch_init(void)
+{
+	maple_init();
+}
+
 void xswitch_send(struct xswitch *sw, struct msgbuf *b)
 {
 	b->sw = sw->sw;

@@ -9,6 +9,8 @@
 #include "packet_parser.h"
 #include "spec_parser.h"
 
+static struct header *header_spec;
+
 enum event_type { EV_R, EV_T, EV_RE };
 
 struct event
@@ -607,6 +609,13 @@ static int init_entry(struct xswitch *sw, int prio)
 	return prio + 1;
 }
 
+void maple_init(void)
+{
+	fprintf(stderr, "loading header spec...\n");
+	header_spec = spec_parser_file("scripts/header.spec");
+	assert(header_spec);
+}
+
 void maple_switch_up(struct xswitch *sw)
 {
 	/* init trace tree */
@@ -622,13 +631,6 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	int i;
 	struct route *r;
 	struct packet pk;
-
-	/* XXX: hack */
-	static struct header *header_spec;
-	if(!header_spec) {
-		header_spec = spec_parser_file("scripts/header.spec");
-		assert(header_spec);
-	}
 
 	/* init */
 	trace_clear();
