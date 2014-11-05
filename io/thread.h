@@ -2,8 +2,8 @@
  * Author: Tiwei Bie (btw@mail.ustc.edu.cn)
  */
 
-#ifndef MAPLE_SMP_H_
-#define MAPLE_SMP_H_
+#ifndef MAPLE_IO_THREAD_H
+#define MAPLE_IO_THREAD_H
 
 #if defined(__linux__) || defined(__linux)
 #include <sched.h>
@@ -42,6 +42,17 @@ static inline int bind_cpu(int cpuid)
 	}
 
 	return (0);
+}
+
+/* ========================================================================= */
+
+static inline void thread_setname(const char *name)
+{
+#ifdef __FreeBSD__
+        pthread_set_name_np(pthread_self(), name);
+#elif defined(__linux__)
+        pthread_setname_np(pthread_self(), name);
+#endif
 }
 
 #endif

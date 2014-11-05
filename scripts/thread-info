@@ -1,0 +1,3 @@
+#!/bin/sh
+
+ps -ao command,pid | \grep -E '^./cbench/cbench' | awk '{print $2}' | xargs procstat -w 1 -t

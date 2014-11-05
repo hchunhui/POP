@@ -82,6 +82,9 @@ again:
 	retval = read(fd, rx->data + size, want_bytes);
 	//retval = recv(fd, rx->data + size, want_bytes, MSG_DONTWAIT);
 	if (retval < 0) {
+		if (errno == ECONNRESET) /* closed connection */
+			return (0);
+
 		if (errno != EAGAIN)
 			fprintf(stderr, "failed to recv from remote: %s\n",
 				strerror(errno));

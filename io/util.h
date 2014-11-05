@@ -40,6 +40,26 @@ adjust_bufsize(int fd)
 }
 
 static inline int
+make_fd_block(int fd)
+{
+	int ret = 0;
+
+	ret = fcntl(fd, F_GETFL, 0);
+	if (ret == -1) {
+		perror("fcntl(F_GETFL)");
+		return (ret);
+	}
+
+	ret = fcntl(fd, F_SETFL, ret & (~O_NONBLOCK));
+	if (ret == -1) {
+		perror("fcntl(F_SETFL)");
+		return (ret);
+	}
+
+	return (ret);
+}
+
+static inline int
 make_fd_nonblock(int fd)
 {
 	int ret = 0;

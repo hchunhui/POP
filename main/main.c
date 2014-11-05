@@ -3,8 +3,11 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include <netinet/in.h>
+
+#include "param.h"
 
 #include "io/msgbuf.h"
 #include "io/io.h"
@@ -15,6 +18,9 @@
 extern struct xswitch *xswitch_on_accept(struct sw *_sw);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
 extern void xswitch_on_close(struct sw *_sw);
+
+int realtime = 0;
+int verbose  = 0;
 
 void
 accept_cb_func(struct sw *sw)
@@ -34,12 +40,42 @@ void
 recv_cb_func(struct msgbuf *msg)
 {
 	xswitch_on_recv(msg->sw->xsw, msg);
-	//msgbuf_delete(msg); // XXX 谁来释放？
+}
+
+static void
+usage(const char *prgname)
+{
+	fprintf(stderr, "%s [-t] [-v] [-p 6633]"
+			"\t-t      Run as real-time thread\n"
+			"\t-v      Verbose\n"
+			"\t-p PORT Specify the server port\n",
+			prgname);
+	exit(EXIT_FAILURE);
 }
 
 int
-main(void)
+main(int argc, char **argv)
 {
+	int ch;
+
+	while ((ch = getopt(argc, argv, "p:tv")) != -1) {
+		switch (ch) {
+		case 't':
+			realtime = 1;
+			break;
+		case 'v':
+			verbose = 1;
+			break;
+		case 'p':
+			sscanf(optarg, "%d", &server_port);
+			break;
+		default:
+			usage(argv[0]);
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
 	init_io_module();
 
 #if 0
@@ -52,8 +88,7 @@ main(void)
 		}
 	}
 #else
-	while (1)
-		;
+	pause();
 #endif
 
 	fini_io_module();
