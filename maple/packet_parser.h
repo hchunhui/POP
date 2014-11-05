@@ -12,6 +12,7 @@ void header_set_sel(struct header *h, const char *name);
 int header_get_sel_length(struct header *h);
 void header_add_next(struct header *h, value_t v, struct header *nh);
 const char *header_get_name(struct header *h);
+struct flow_table *header_make_flow_table(struct header *h, int tid);
 void header_free(struct header *h);
 
 struct packet_parser;

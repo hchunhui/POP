@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <assert.h>
+#include "xswitch.h"
 #include "packet_parser.h"
 
 struct header {
@@ -76,6 +77,18 @@ void header_add_next(struct header *h, value_t v, struct header *nh)
 const char *header_get_name(struct header *h)
 {
 	return h->name;
+}
+
+struct flow_table *header_make_flow_table(struct header *h, int tid)
+{
+	int i;
+	struct flow_table *ft = flow_table(tid, FLOW_TABLE_TYPE_MM, 1024);
+	flow_table_add_field(ft, "in_port", MATCH_FIELD_METADATA, 16, 8);
+	for(i = 0; i < h->num_fields; i++)
+		if(h->fields[i].length != 0)
+			flow_table_add_field(ft, h->fields[i].name, MATCH_FIELD_PACKET,
+					     h->fields[i].offset, h->fields[i].length);
+	return ft;
 }
 
 void header_free(struct header *h)
