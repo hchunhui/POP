@@ -22,6 +22,7 @@ void flow_table_free(struct flow_table *ft);
 void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length);
 int flow_table_get_field_index(struct flow_table *ft, const char *name);
+int flow_table_get_tid(struct flow_table *ft);
 
 
 /* match */

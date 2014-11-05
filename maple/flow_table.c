@@ -40,3 +40,8 @@ int flow_table_get_field_index(struct flow_table *ft, const char *name)
 			return i;
 	return -1;
 }
+
+int flow_table_get_tid(struct flow_table *ft)
+{
+	return ft->tid;
+}
