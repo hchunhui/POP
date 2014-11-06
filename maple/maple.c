@@ -455,7 +455,7 @@ static int __build_flow_table(struct xswitch *sw,
 		for(i = 0; i < tv->num_branches; i++) {
 			maa = match_copy(ma);
 			match_add(maa,
-				  flow_table_get_field_index(sw->table0, tv->name),
+				  tv->name,
 				  tv->branches[i].value,
 				  value_from_64(0xffffffffffffffffull));
 			priority = __build_flow_table(sw, tv->branches[i].tree, maa, priority, ac_pi);
@@ -467,7 +467,7 @@ static int __build_flow_table(struct xswitch *sw,
 		priority = __build_flow_table(sw, tt->f, ma, priority, ac_pi);
 		maa = match_copy(ma);
 		match_add(maa,
-			  flow_table_get_field_index(sw->table0, tt->name),
+			  tt->name,
 			  tt->value,
 			  value_from_64(0xffffffffffffffffull));
 		action_dump(ac_pi, buf, 128);
@@ -595,11 +595,8 @@ static int init_entry(struct xswitch *sw, int prio)
 	struct match *ma;
 	struct msgbuf *msg;
 	struct action *ac;
-	int idx;
 	ma = match();
-	idx = flow_table_get_field_index(sw->table0, "dl_type");
-	if(idx >= 0)
-		match_add(ma, idx, value_from_16(0x0800), value_from_16(0xffff));
+	match_add(ma, "dl_type", value_from_16(0x0800), value_from_16(0xffff));
 	ac = action();
 	action_add(ac, AC_PACKET_IN, 0);
 	msg = msg_flow_entry_add(sw->table0, prio, ma, ac);
@@ -676,7 +673,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			if(augment_tt(&(cur_sw->trace_tree), &trace, a)) {
 				struct match *ma = match();
 				match_add(ma,
-					  flow_table_get_field_index(cur_sw->table0, "dl_type"),
+					  "dl_type",
 					  value_from_16(0x0800),
 					  value_from_16(0xffff));
 
@@ -709,7 +706,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			if(invalidate_tt(&tt, name)) {
 				struct match *ma = match();
 				match_add(ma,
-					  flow_table_get_field_index(cur_sw->table0, "dl_type"),
+					  "dl_type",
 					  value_from_16(0x0800),
 					  value_from_16(0xffff));
 

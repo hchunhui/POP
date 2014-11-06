@@ -9,12 +9,12 @@ struct match *match(void)
 	return m;
 }
 
-void match_add(struct match *m, int index, value_t value, value_t mask)
+void match_add(struct match *m, const char *name, value_t value, value_t mask)
 {
 	int n = m->fields_num;
 	assert(n < FLOW_TABLE_NUM_FIELDS);
-	assert(index >= 0);
-	m->m[n].index = index;
+	strncpy(m->m[n].name, name, MATCH_FIELD_NAME_LEN);
+	m->m[n].name[MATCH_FIELD_NAME_LEN - 1] = 0;
 	m->m[n].value = value;
 	m->m[n].mask = mask;
 	m->fields_num++;

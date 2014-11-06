@@ -300,16 +300,15 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 		memset(mfe->match[i].mask, 0, POF_MAX_FIELD_LENGTH_IN_BYTE);
 	}
 	for(i = 0; i < ma->fields_num; i++) {
-		if(ma->m[i].index >= 0 && ma->m[i].index < ft->fields_num) {
-			int idx = ma->m[i].index;
-			int bytes = (ft->fields[idx].length + 7) / 8;
-			memcpy(mfe->match[idx].value,
-			       ma->m[i].value.v,
-			       bytes);
-			memcpy(mfe->match[idx].mask,
-			       ma->m[i].mask.v,
-			       bytes);
-		}
+		int idx = flow_table_get_field_index(ft, ma->m[i].name);
+		assert(idx >= 0);
+		int bytes = (ft->fields[idx].length + 7) / 8;
+		memcpy(mfe->match[idx].value,
+		       ma->m[i].value.v,
+		       bytes);
+		memcpy(mfe->match[idx].mask,
+		       ma->m[i].mask.v,
+		       bytes);
 	}
 	mfe->instruction_num = fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a);
 	return msg;

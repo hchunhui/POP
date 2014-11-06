@@ -61,7 +61,7 @@ struct match
 {
 	int fields_num;
 	struct {
-		int index;
+		char name[MATCH_FIELD_NAME_LEN];
 		value_t value;
 		value_t mask;
 	} m[FLOW_TABLE_NUM_FIELDS];

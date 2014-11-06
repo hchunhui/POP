@@ -28,7 +28,7 @@ int flow_table_get_tid(struct flow_table *ft);
 /* match */
 struct match *match(void);
 struct match *match_copy(struct match *m);
-void match_add(struct match *m, int index, value_t value, value_t mask);
+void match_add(struct match *m, const char *name, value_t value, value_t mask);
 void match_free(struct match *m);
 
 
