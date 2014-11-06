@@ -111,6 +111,7 @@ static void init_table0(struct xswitch *sw)
 void xswitch_up(struct xswitch *sw)
 {
 	init_table0(sw);
+	sw->next_table_id = 1;
 	topo_switch_up(sw);
 	maple_switch_up(sw);
 }

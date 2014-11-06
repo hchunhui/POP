@@ -48,6 +48,11 @@ void header_set_length(struct header *h, int length)
 	h->length = length;
 }
 
+int header_get_length(struct header *h)
+{
+	return h->length;
+}
+
 void header_set_sel(struct header *h, const char *name)
 {
 	int i;
@@ -57,6 +62,12 @@ void header_set_sel(struct header *h, const char *name)
 			return;
 		}
 	assert(0);
+}
+
+const char *header_get_sel(struct header *h)
+{
+	assert(h->sel_idx >= 0);
+	return h->fields[h->sel_idx].name;
 }
 
 int header_get_sel_length(struct header *h)
@@ -83,7 +94,6 @@ struct flow_table *header_make_flow_table(struct header *h, int tid)
 {
 	int i;
 	struct flow_table *ft = flow_table(tid, FLOW_TABLE_TYPE_MM, 1024);
-	flow_table_add_field(ft, "in_port", MATCH_FIELD_METADATA, 16, 8);
 	for(i = 0; i < h->num_fields; i++)
 		if(h->fields[i].length != 0)
 			flow_table_add_field(ft, h->fields[i].name, MATCH_FIELD_PACKET,
@@ -127,7 +137,10 @@ void packet_parser_reset(struct packet_parser *pp)
 	pp->current = pp->start;
 }
 
-void packet_parser_pull(struct packet_parser *pp)
+void packet_parser_pull(struct packet_parser *pp,
+			struct header **old_spec,
+			value_t *sel_value,
+			struct header **new_spec)
 {
 	int i = pp->current->sel_idx;
 	assert(i >= 0);
@@ -135,11 +148,14 @@ void packet_parser_pull(struct packet_parser *pp)
 	value_t v = value_extract(pp->head,
 				  pp->current->fields[i].offset,
 				  pp->current->fields[i].length);
+	*old_spec = pp->current;
+	*sel_value = v;
 	for(j = 0; j < pp->current->num_next; j++) {
 		if(value_equ(pp->current->next[j].v, v)) {
 			pp->head += pp->current->length;
 			pp->current = pp->current->next[j].h;
 			assert(pp->head <= pp->data + pp->length);
+			*new_spec = pp->current;
 			return;
 		}
 	}

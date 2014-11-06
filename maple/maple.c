@@ -11,7 +11,7 @@
 
 static struct header *header_spec;
 
-enum event_type { EV_R, EV_T, EV_RE };
+enum event_type { EV_R, EV_T, EV_RE, EV_G };
 
 struct event
 {
@@ -29,6 +29,10 @@ struct event
 		struct {
 			char name[32];
 		} re;
+		struct {
+			struct header *spec;
+			int move_length;
+		} g;
 	} u;
 };
 
@@ -82,11 +86,21 @@ static void trace_IE(const char *name)
 	trace.num_inv_events++;
 }
 
+static void trace_G(struct header *spec, int move_length)
+{
+	int i = trace.num_events;
+	trace.events[i].type = EV_G;
+	trace.events[i].u.g.spec = spec;
+	trace.events[i].u.g.move_length = move_length;
+	trace.num_events++;
+}
+
 static void trace_clear(void)
 {
 	trace.num_events = 0;
 	trace.num_inv_events = 0;
 	trace_R("in_port", value_from_8(0));
+	trace_G(header_spec, 0);
 }
 
 static void trace_mod_in_port(int in_port)
@@ -97,7 +111,7 @@ static void trace_mod_in_port(int in_port)
 	trace.events[0].u.r.value = value_from_8(in_port);
 }
 
-enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D };
+enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D, TT_G };
 struct trace_tree_header
 {
 	enum trace_tree_type type;
@@ -139,6 +153,16 @@ struct trace_tree_D
 {
 	struct trace_tree_header h;
 	char name[32];
+	struct trace_tree_header *t;
+};
+
+struct trace_tree_G
+{
+	struct trace_tree_header h;
+	struct flow_table *ft;
+	struct header *spec;
+	int move_length;
+	int hack_start_prio;
 	struct trace_tree_header *t;
 };
 
@@ -197,6 +221,20 @@ static struct trace_tree_header *trace_tree_D(const char *name,
 	return (struct trace_tree_header *)t;
 }
 
+static struct trace_tree_header *trace_tree_G(struct header *spec,
+					      int move_length,
+					      struct trace_tree_header *tt)
+{
+	struct trace_tree_G *t = malloc(sizeof *t);
+	t->h.type = TT_G;
+	t->ft = NULL;
+	t->spec = spec;
+	t->move_length = move_length;
+	t->hack_start_prio = 0;
+	t->t = tt;
+	return (struct trace_tree_header *)t;
+}
+
 static void trace_tree_free(struct trace_tree_header *t)
 {
 	int i;
@@ -204,6 +242,7 @@ static void trace_tree_free(struct trace_tree_header *t)
 	struct trace_tree_T *tt;
 	struct trace_tree_L *tl;
 	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
 	switch(t->type) {
 	case TT_E:
 		free(t);
@@ -228,6 +267,13 @@ static void trace_tree_free(struct trace_tree_header *t)
 	case TT_D:
 		td = (struct trace_tree_D *)t;
 		trace_tree_free(td->t);
+		free(t);
+		break;
+	case TT_G:
+		tg = (struct trace_tree_G *)t;
+		trace_tree_free(tg->t);
+		if(tg->ft)
+			flow_table_free(tg->ft);
 		free(t);
 		break;
 	}
@@ -261,6 +307,9 @@ static struct trace_tree_header *events_to_tree(struct event *events, int num_ev
 		case EV_RE:
 			root = trace_tree_D(ev->u.re.name, root);
 			break;
+		case EV_G:
+			root = trace_tree_G(ev->u.g.spec, ev->u.g.move_length, root);
+			break;
 		}
 	}
 	return root;
@@ -271,6 +320,7 @@ static void dump_tt(struct trace_tree_header *tree)
 	struct trace_tree_V *tv;
 	struct trace_tree_T *tt;
 	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
 	int j;
 	switch(tree->type) {
 	case TT_E:
@@ -299,6 +349,11 @@ static void dump_tt(struct trace_tree_header *tree)
 		dump_tt(td->t);
 		fprintf(stderr, ")");
 		break;
+	case TT_G:
+		tg = (struct trace_tree_G *) tree;
+		fprintf(stderr, "(G %s ", header_get_name(tg->spec));
+		dump_tt(tg->t);
+		fprintf(stderr, ")");
 	case TT_L:
 		fprintf(stderr, "(L)");
 		break;
@@ -324,6 +379,7 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 		struct trace_tree_T *t_T;
 		struct trace_tree_V *t_V;
 		struct trace_tree_D *t_D;
+		struct trace_tree_G *t_G;
 		switch((*t)->type) {
 		case TT_T:
 			t_T = *(struct trace_tree_T **) t;
@@ -380,6 +436,18 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 				t = &(t_D->t);
 			}
 			break;
+		case TT_G:
+			/* ev->type == EV_G */
+			assert(ev->type == EV_G);
+			t_G = *(struct trace_tree_G **) t;
+			if(t_G->t->type == TT_E) {
+				free(t_G->t);
+				t_G->t = events_to_tree(ev + 1, num_events - i - 1, a);
+				return true;
+			} else {
+				t = &(t_G->t);
+			}
+			break;
 		case TT_L:
 		case TT_E:
 			break;
@@ -401,6 +469,7 @@ static bool invalidate_tt(struct trace_tree_header **tree, const char *name)
 	struct trace_tree_V *tv;
 	struct trace_tree_T *tt;
 	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
 
 	switch(t->type) {
 	case TT_E:
@@ -427,6 +496,9 @@ static bool invalidate_tt(struct trace_tree_header **tree, const char *name)
 			return true;
 		}
 		return invalidate_tt(&(td->t), name);
+	case TT_G:
+		tg = (struct trace_tree_G *)t;
+		return invalidate_tt(&(tg->t), name);
 	}
 	abort();
 }
@@ -439,6 +511,7 @@ static int __build_flow_table(struct xswitch *sw,
 	struct trace_tree_L *tl;
 	struct trace_tree_V *tv;
 	struct trace_tree_T *tt;
+	struct trace_tree_G *tg;
 	struct msgbuf *msg;
 	struct match *maa;
 	char buf[128];
@@ -477,6 +550,10 @@ static int __build_flow_table(struct xswitch *sw,
 		priority = __build_flow_table(sw, tt->t, maa, priority + 1, ac_pi);
 		match_free(maa);
 		return priority;
+	case TT_G:
+		tg = (struct trace_tree_G *)tree;
+		
+		return __build_flow_table(sw, tg->t, ma, priority, ac_pi);
 	case TT_E:
 	case TT_D:
 		return priority;
@@ -557,7 +634,12 @@ struct packet {
 
 void pull_header(struct packet *pkt)
 {
-	packet_parser_pull(pkt->pp);
+	value_t sel_value;
+	struct header *old_spec, *new_spec;
+	/* XXX: hack */
+	packet_parser_pull(pkt->pp, &old_spec, &sel_value, &new_spec);
+	trace_R(header_get_sel(old_spec), sel_value);
+	trace_G(new_spec, header_get_length(old_spec));
 }
 
 const char *read_header_type(struct packet *pkt)

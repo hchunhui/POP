@@ -16,6 +16,7 @@ struct xswitch
 	dpid_t dpid;
 	int n_ports;
 	int hack_start_prio;
+	int next_table_id;
 	//struct rconn *rconn;
 	struct flow_table *table0;
 	struct trace_tree_header *trace_tree;
