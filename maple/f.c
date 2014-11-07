@@ -1,4 +1,6 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
@@ -145,6 +147,13 @@ static void get_switch(struct entity *host, struct entity **sw, int *port)
 	*port = adjs->adj_in_port;
 }
 
+static bool is_unicast_addr(value_t addr)
+{
+	return (addr.v[0] & 1) == 0;
+}
+
+#define TEST_MULTICAST
+//#define TEST_PULL_HEADER
 struct route *f(struct packet *pkt)
 {
 	int switches_num;
@@ -152,31 +161,62 @@ struct route *f(struct packet *pkt)
 	struct entity *src, *dst1, *dst2;
 	int src_port, dst1_port, dst2_port;
 	struct nodeinfo *visited;
-	/* inspect packet */
-	struct entity *hsrc = topo_get_host(read_packet(pkt, "dl_src"));
-	struct entity *hdst1 = topo_get_host(read_packet(pkt, "dl_dst"));
-	struct entity *hdst2 = topo_get_host(value_from_48(3));
+	struct entity *hsrc = NULL, *hdst1 = NULL, *hdst2 = NULL;
 	struct entity **switches = topo_get_switches(&switches_num);
-	assert(hsrc && hdst1 && hdst2);
+	value_t mac;
+
+	/* inspect packet */
+	printf("current header: %s\n", read_header_type(pkt));
+	mac = read_packet(pkt, "dl_src");
+	if(is_unicast_addr(mac))
+		hsrc = topo_get_host(mac);
+	else
+		return route();
+
+	mac = read_packet(pkt, "dl_dst");
+	if(is_unicast_addr(mac))
+		hdst1 = topo_get_host(mac);
+	else
+		return route();
+
+	assert(hsrc && hdst1);
+
+#ifdef TEST_PULL_HEADER
+	pull_header(pkt);
+	printf("next header: %s\n", read_header_type(pkt));
+	value_t v = read_packet(pkt, "nw_src");
+	printf("src_addr: %d.%d.%d.%d\n", v.v[0], v.v[1], v.v[2], v.v[3]);
+	v = read_packet(pkt, "nw_dst");
+	printf("dst_addr: %d.%d.%d.%d\n", v.v[0], v.v[1], v.v[2], v.v[3]);
+#endif
+
 
 	/* find connected switch */
 	get_switch(hsrc, &src, &src_port);
 	get_switch(hdst1, &dst1, &dst1_port);
-	get_switch(hdst2, &dst2, &dst2_port);
+
 
 	/* calculate spanning tree */
 	visited = get_tree(src, src_port, switches, switches_num);
+
 
 	/* get route */
 	r = route();
 	rx = get_route(dst1, dst1_port, visited, switches, switches_num);
 	route_union(r, rx);
 	route_free(rx);
+
+#ifdef TEST_MULTICAST
+	hdst2 = topo_get_host(value_from_48(3));
+	assert(hdst2);
+	get_switch(hdst2, &dst2, &dst2_port);
 	if(src != dst2) {
 		rx = get_route(dst2, dst2_port, visited, switches, switches_num);
 		route_union(r, rx);
 		route_free(rx);
 	}
+#endif
+
 	free(visited);
 	return r;
 }
