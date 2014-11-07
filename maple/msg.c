@@ -131,6 +131,9 @@ static int fill_action(struct pof_action *ma, int num, struct action *a)
 			ao = (void *)(ma[idx].action_data);
 			ao->portId_type = 0;
 			ao->outputPortId.value = htonl(a->a[i].arg1);
+			ao->metadata_offset = htons(0);
+			ao->metadata_len = htons(0);
+			ao->packet_offset = htons(0);
 			idx++;
 			break;
 		default:
