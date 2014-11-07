@@ -94,6 +94,7 @@ struct flow_table *header_make_flow_table(struct header *h, int tid)
 {
 	int i;
 	struct flow_table *ft = flow_table(tid, FLOW_TABLE_TYPE_MM, 1024);
+	flow_table_add_field(ft, "in_port", MATCH_FIELD_METADATA, 16, 8);
 	for(i = 0; i < h->num_fields; i++)
 		if(h->fields[i].length != 0)
 			flow_table_add_field(ft, h->fields[i].name, MATCH_FIELD_PACKET,

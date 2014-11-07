@@ -99,16 +99,7 @@ static void trace_clear(void)
 {
 	trace.num_events = 0;
 	trace.num_inv_events = 0;
-	trace_R("in_port", value_from_8(0));
 	trace_G(header_spec, 0);
-}
-
-static void trace_mod_in_port(int in_port)
-{
-	assert(trace.num_events > 0);
-	assert(trace.events[0].type == EV_R);
-	assert(strcmp(trace.events[0].u.r.name, "in_port") == 0);
-	trace.events[0].u.r.value = value_from_8(in_port);
 }
 
 enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D, TT_G };
@@ -503,7 +494,22 @@ static bool invalidate_tt(struct trace_tree_header **tree, const char *name)
 	abort();
 }
 
-static int __build_flow_table(struct xswitch *sw,
+static void init_entry(struct xswitch *sw, struct flow_table *ft, int *hack_start_prio)
+{
+	struct match *ma;
+	struct msgbuf *msg;
+	struct action *ac;
+	ma = match();
+	ac = action();
+	action_add(ac, AC_PACKET_IN, 0);
+	msg = msg_flow_entry_add(ft, *hack_start_prio, ma, ac);
+	(*hack_start_prio)++;
+	match_free(ma);
+	action_free(ac);
+	xswitch_send(sw, msg);
+}
+
+static int __build_flow_table(struct xswitch *sw, struct flow_table *ft,
 			      struct trace_tree_header *tree, struct match *ma, int priority,
 			      struct action *ac_pi)
 {
@@ -514,13 +520,16 @@ static int __build_flow_table(struct xswitch *sw,
 	struct trace_tree_G *tg;
 	struct msgbuf *msg;
 	struct match *maa;
-	char buf[128];
+	struct action *a;
+	char buf[128], buf2[128];
 	switch(tree->type) {
 	case TT_L:
 		tl = (struct trace_tree_L *)tree;
-		action_dump(tl->ac, buf, 128);
-		fprintf(stderr, "%2d : _MATCH_, %s\n", priority, buf);
-		msg = msg_flow_entry_add(sw->table0, priority, ma, tl->ac);
+		match_dump(ma, buf, 128);
+		action_dump(tl->ac, buf2, 128);
+		fprintf(stderr, "tid %d: %2d, %s, %s\n",
+			flow_table_get_tid(ft), priority, buf, buf2);
+		msg = msg_flow_entry_add(ft, priority, ma, tl->ac);
 		xswitch_send(sw, msg);
 		return priority + 1;
 	case TT_V:
@@ -531,44 +540,70 @@ static int __build_flow_table(struct xswitch *sw,
 				  tv->name,
 				  tv->branches[i].value,
 				  value_from_64(0xffffffffffffffffull));
-			priority = __build_flow_table(sw, tv->branches[i].tree, maa, priority, ac_pi);
+			priority = __build_flow_table(sw, ft, tv->branches[i].tree, maa, priority, ac_pi);
 			match_free(maa);
 		}
 		return priority;
 	case TT_T:
 		tt = (struct trace_tree_T *)tree;
-		priority = __build_flow_table(sw, tt->f, ma, priority, ac_pi);
+		priority = __build_flow_table(sw, ft, tt->f, ma, priority, ac_pi);
 		maa = match_copy(ma);
 		match_add(maa,
 			  tt->name,
 			  tt->value,
 			  value_from_64(0xffffffffffffffffull));
 		action_dump(ac_pi, buf, 128);
-		fprintf(stderr, "%2d : BARRIER, %s\n", priority, buf);
+		fprintf(stderr, "tid %d: %2d, BARRIER, %s\n",
+			flow_table_get_tid(ft), priority, buf);
 		msg = msg_flow_entry_add(sw->table0, priority, maa, ac_pi);
 		xswitch_send(sw, msg);
-		priority = __build_flow_table(sw, tt->t, maa, priority + 1, ac_pi);
+		priority = __build_flow_table(sw, ft, tt->t, maa, priority + 1, ac_pi);
 		match_free(maa);
 		return priority;
 	case TT_G:
 		tg = (struct trace_tree_G *)tree;
-		
-		return __build_flow_table(sw, tg->t, ma, priority, ac_pi);
+		if(tg->ft == NULL) {
+			int tid = sw->next_table_id++;
+			// add a new table
+			tg->ft = header_make_flow_table(tg->spec, tid);
+			msg = msg_flow_table_add(tg->ft);
+			xswitch_send(sw, msg);
+		}
+		// insert GOTO_TABLE into orig table
+		a = action();
+		action_add2(a, AC_GOTO_TABLE, flow_table_get_tid(tg->ft), tg->move_length);
+
+		match_dump(ma, buf, 128);
+		action_dump(a, buf2, 128);
+		fprintf(stderr, "tid %d: %2d, %s, %s\n",
+			flow_table_get_tid(ft), priority, buf, buf2);
+
+		msg = msg_flow_entry_add(ft, priority, ma, a);
+		xswitch_send(sw, msg);
+		action_free(a);
+
+		init_entry(sw, tg->ft, (&tg->hack_start_prio));
+		maa = match();
+		tg->hack_start_prio =
+			__build_flow_table(sw, tg->ft, tg->t, maa, tg->hack_start_prio, ac_pi);
+		match_free(maa);
+		return priority + 1;
 	case TT_E:
 	case TT_D:
 		return priority;
 	}
+	assert(0);
 }
 
-static int build_flow_table(struct xswitch *sw,
-			    struct trace_tree_header *tree, struct match *ma, int priority)
+static void build_flow_table(struct xswitch *sw, struct trace_tree_header *tree)
 {
-	int ret;
+	struct match *ma = match();
 	struct action *ac_pi = action();
 	action_add(ac_pi, AC_PACKET_IN, 0);
-	ret = __build_flow_table(sw, tree, ma, priority, ac_pi);
+	sw->hack_start_prio =
+		__build_flow_table(sw, sw->table0, tree, ma, sw->hack_start_prio, ac_pi) + 1;
 	action_free(ac_pi);
-	return ret;
+	match_free(ma);
 }
 
 struct route
@@ -672,22 +707,6 @@ void invalidate(const char *name)
 	trace_IE(name);
 }
 
-static int init_entry(struct xswitch *sw, int prio)
-{
-	struct match *ma;
-	struct msgbuf *msg;
-	struct action *ac;
-	ma = match();
-	match_add(ma, "dl_type", value_from_16(0x0800), value_from_16(0xffff));
-	ac = action();
-	action_add(ac, AC_PACKET_IN, 0);
-	msg = msg_flow_entry_add(sw->table0, prio, ma, ac);
-	match_free(ma);
-	action_free(ac);
-	xswitch_send(sw, msg);
-	return prio + 1;
-}
-
 void maple_init(void)
 {
 	fprintf(stderr, "loading header spec...\n");
@@ -700,10 +719,19 @@ void maple_switch_up(struct xswitch *sw)
 	/* init trace tree */
 	sw->trace_tree = trace_tree_E();
 	/* init entry */
-	sw->hack_start_prio = init_entry(sw, sw->hack_start_prio);
+	init_entry(sw, sw->table0, &(sw->hack_start_prio));
 }
 
 struct route *f(struct packet *pk);
+
+static void mod_in_port(int in_port)
+{
+	int i = trace.num_events - 1;
+	assert(i >= 0);
+	assert(trace.events[i].type == EV_R);
+	assert(strcmp(trace.events[i].u.r.name, "in_port") == 0);
+	trace.events[i].u.r.value = value_from_8(in_port);
+}
 
 void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
@@ -717,6 +745,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	/* run */
 	pk.pp = packet_parser(header_spec, packet, packet_len);
 	r = f(&pk);
+	trace_R("in_port", value_from_8(0));
 	packet_parser_free(pk.pp);
 
 	/* learn */
@@ -750,25 +779,14 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 					break;
 			}
 			assert(j < r->num_edges);
-			trace_mod_in_port(r->edges[j].in_port);
+			mod_in_port(r->edges[j].in_port);
 
 			if(augment_tt(&(cur_sw->trace_tree), &trace, a)) {
-				struct match *ma = match();
-				match_add(ma,
-					  "dl_type",
-					  value_from_16(0x0800),
-					  value_from_16(0xffff));
-
-				cur_sw->hack_start_prio =
-					init_entry(cur_sw, cur_sw->hack_start_prio);
-
 				fprintf(stderr, "---- flow table for 0x%x ---\n", dpid);
 				dump_tt(cur_sw->trace_tree);
 				fprintf(stderr, "\n");
-				cur_sw->hack_start_prio =
-					build_flow_table(cur_sw, cur_sw->trace_tree, ma,
-							 cur_sw->hack_start_prio) + 1;
-				match_free(ma);
+				init_entry(cur_sw, cur_sw->table0, &(cur_sw->hack_start_prio));
+				build_flow_table(cur_sw, cur_sw->trace_tree);
 			}
 			action_free(a);
 		}
@@ -786,20 +804,9 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 			struct trace_tree_header *tt = cur_sw->trace_tree;
 			if(invalidate_tt(&tt, name)) {
-				struct match *ma = match();
-				match_add(ma,
-					  "dl_type",
-					  value_from_16(0x0800),
-					  value_from_16(0xffff));
-
-				cur_sw->hack_start_prio =
-					init_entry(cur_sw, cur_sw->hack_start_prio);
-
+				init_entry(cur_sw, cur_sw->table0, &(cur_sw->hack_start_prio));
 				fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
-				cur_sw->hack_start_prio =
-					build_flow_table(cur_sw, cur_sw->trace_tree, ma,
-							 cur_sw->hack_start_prio) + 1;
-				match_free(ma);
+				build_flow_table(cur_sw, cur_sw->trace_tree);
 			}
 		}
 	}
