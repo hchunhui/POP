@@ -61,6 +61,7 @@ void action_dump(struct action *a, char *buf, int n)
 {
 	int i;
 	int offset = 0;
+	offset += snprintf(buf + offset, n - offset, "ACTION: ");
 	for(i = 0; i < a->num_actions; i++)
 		switch(a->a[i].type) {
 		case AC_DROP:
