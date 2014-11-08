@@ -158,10 +158,16 @@ struct route *f(struct packet *pkt)
 	struct entity *hdst1 = topo_get_host(read_packet(pkt, "dl_dst"));
 //	struct entity *hdst2 = topo_get_host(value_from_48(3));
 	struct entity **switches = topo_get_switches(&switches_num);
-	if (hsrc != NULL)
+
+	r = route();
+	if (hsrc == NULL){
 		printf("aaaaaaaaaaaaaa\n");
-	if (hdst1 != NULL)
+		return r;
+	}
+	if (hdst1 == NULL){
 		printf("bbbbbbbbbbbbb\n");
+		return r;
+	}
 // 	assert(hsrc && hdst1 && hdst2);
 
 	/* find connected switch */
@@ -173,7 +179,6 @@ struct route *f(struct packet *pkt)
 	visited = get_tree(src, src_port, switches, switches_num);
 
 	/* get route */
-	r = route();
 	rx = get_route(dst1, dst1_port, visited, switches, switches_num);
 	route_union(r, rx);
 	route_free(rx);

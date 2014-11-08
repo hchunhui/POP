@@ -16,8 +16,9 @@ struct entity *topo_get_host(value_t addr);
 struct entity *topo_get_switch(dpid_t dpid);
 struct entity *topo_get_host_by_haddr(struct haddr addr);
 struct entity *topo_get_host_by_paddr(uint32_t addr);
-bool topo_add_host(struct entity *host);
-bool topo_add_switch(struct entity *sw);
-bool topo_del_host(struct entity *host);
-bool topo_del_switch(struct entity *sw);
+int topo_add_host(struct entity *e);
+int topo_add_switch(struct entity *e);
+int topo_del_host(struct entity *e);
+int topo_del_switch(struct entity *e);
+void topo_print();
 #endif

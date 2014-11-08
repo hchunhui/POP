@@ -103,7 +103,10 @@ void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, i
 	if (!topo_packet_in(sw, in_port, packet, packet_len))
 		maple_packet_in(sw, in_port, packet, packet_len);
 }
-
+void xswitch_port_down(struct xswitch *sw, uint32_t port)
+{
+	topo_switch_port_down(sw, port);
+}
 void xswitch_down(struct xswitch *sw)
 {
 	maple_switch_down(sw);

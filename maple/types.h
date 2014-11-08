@@ -11,5 +11,6 @@
 #include "value.h"
 
 typedef uint32_t dpid_t;
+typedef uint16_t port_t;
 
 #endif /* _TYPES_H_ */

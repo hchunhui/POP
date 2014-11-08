@@ -4,7 +4,7 @@
 // parse LLDP packet
 // send LLDP packet
 
-static route_t links = {0};
+// static route_t links = {0};
 static struct entity *arp_waiting_hosts[20];
 static int next_available_waiting_host;
 
@@ -140,7 +140,7 @@ entities_update_old_link(edge_t *link)
 	uint16_t port1 = link->port1;
 	struct entity *e2 = topo_get_switch(dpid2);
 	entity_add_link(e1, port1, e2, port2);
-}*/
+}
 static void
 entities_add_new_link(route_t *route, edge_t *link)
 {
@@ -152,7 +152,7 @@ entities_add_new_link(route_t *route, edge_t *link)
 	struct entity *e2 = topo_get_switch(dpid2);
 	entity_add_link(e1, port1, e2, port2);
 }
-
+*/
 // return length of the tlv
 static uint16_t
 lldp_tlv_next(const uint8_t *packet, struct lldp_tlv *tlv/*OUT*/, uint16_t offset)
@@ -240,8 +240,8 @@ parse_lldp(const uint8_t *packet, edge_t *link/*OUT*/)
 int
 handle_lldp_packet_in(const struct packet_in *packet_in)
 {
-	if (links.total_size == 0)
-		route_init(&links);
+	//if (links.total_size == 0)
+	//	route_init(&links);
 	const uint8_t *packet = packet_in_get_packet(packet_in);
 	uint16_t length = packet_in_get_length(packet_in);
 	if (length < 14 + 14)
@@ -268,6 +268,10 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 		printf("edge_valid\n");
 		return -4;
 	}
+	struct entity *e1 = topo_get_switch(link.dpid1);
+	struct entity *e2 = topo_get_switch(link.dpid2);
+	entity_add_link(e1, link.port1, e2, link.port2);
+#if 0
 	uint8_t retval = route_update_edge(&links, &link);
 	switch (retval) {
 		case 0:
@@ -283,6 +287,7 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 	}
 	printf("----------\n\n");
 	route_print(&links);
+#endif
 	return 0;
 }
 struct etherhdr {
@@ -616,7 +621,7 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 	assert(esw != NULL);
 	if (host == NULL) {
 		host = entity_host(hinfo);
-		if (topo_add_host(host))
+		if (topo_add_host(host) >= 0)
 			entity_add_link(host, 1, esw, port);
 	} else {
 		// TODO
@@ -647,14 +652,17 @@ int handle_topo_packet_in(const struct packet_in *packet_in)
 	printf("eth type:%x\n", eth_type);
 	if (eth_type == LLDP_TYPE) {
 		handle_lldp_packet_in(packet_in);
+		topo_print();
 		return -3;
 	} else if (eth_type == ETHERTYPE_ARP) {
 		update_hosts(packet, length, dpid, port);
 		handle_arp_packet_in(packet, length, dpid, port);
+		topo_print();
 		return -4;
 	} else {
 		// TODO
-		update_hosts(packet, length, dpid, port);
+		// update_hosts(packet, length, dpid, port);
+		// topo_print();
 		return -2;
 	}
 }

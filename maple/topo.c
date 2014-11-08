@@ -12,7 +12,7 @@ static struct entity *hosts[100];
 static int num_hosts;
 static struct entity *switches[100];
 static int num_switches;
-
+/*
 static int next_num(struct entity **e)
 {
 	int i;
@@ -21,60 +21,66 @@ static int next_num(struct entity **e)
 			return i;
 	return i;
 }
-
-bool topo_add_host(struct entity *e)
+*/
+void topo_print()
 {
 	int i;
-	for (i=0; i<100; i++)
+	printf("\n\nSwitches--------------\n");
+	for (i=0; i<num_switches; i++) {
+		entity_print(switches[i]);
+	}
+	printf("\n\nHosts--------------\n");
+	for (i=0; i<num_hosts; i++) {
+		entity_print(hosts[i]);
+	}
+}
+int topo_add_host(struct entity *e)
+{
+	int i;
+	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e)
-			return true;
-	if(num_hosts >= 100)
-		return false;
-	hosts[num_hosts] = e;
-	num_hosts = next_num(hosts);
-	return true;
+			return i;
+	if (num_hosts >= 100)
+		return -1;
+	hosts[num_hosts++] = e;
+	return (num_hosts-1);
 }
-bool topo_add_switch(struct entity *e)
+int topo_add_switch(struct entity *e)
 {
 	int i;
-	for (i=0; i<100; i++)
+	for (i=0; i<num_switches; i++)
 		if (switches[i] == e)
-			return true;
+			return i;
 	if(num_switches >= 100)
-		return false;
-	switches[num_switches] = e;
-	num_switches = next_num(switches);
-	return true;
+		return -1;
+	switches[num_switches++] = e;
+	return (num_switches - 1);
 }
-bool topo_del_host(struct entity *e)
+int topo_del_host(struct entity *e)
 {
 	int i;
-	for (i=0; i<100; i++)
+	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e) {
-			hosts[i] = NULL;
+			num_hosts --;
 			entity_free(e);
-			break;
+			if (i != num_hosts)
+				hosts[i] = hosts[num_hosts];
+			return i;
 		}
-	if (i < num_hosts)
-		num_hosts = i;
-	if (i > 100)
-		return false;
-	return true;
+	return -1;
 }
-bool topo_del_switch(struct entity *e)
+int topo_del_switch(struct entity *e)
 {
 	int i;
-	for (i=0; i<100; i++)
+	for (i=0; i < num_switches; i++)
 		if (switches[i] == e) {
-			switches[i] = NULL;
+			num_switches --;
 			entity_free(e);
-			break;
+			if (i != num_switches)
+				switches[i] = switches[num_switches];
+			return i;
 		}
-	if (i < num_switches)
-		num_switches = i;
-	if (i > 100)
-		return false;
-	return true;
+	return -1;
 }
 struct entity *topo_get_host_by_haddr(struct haddr addr)
 {
@@ -140,8 +146,7 @@ void topo_switch_up(struct xswitch *sw)
 	struct entity *e = entity_switch(sw);
 	if(num_switches >= 100)
 		abort();
-	switches[num_switches] = e;
-	num_switches = next_num(switches);
+	switches[num_switches++] = e;
 	lldp_flow_install(sw, 2);
 	lldp_packet_send(sw);
 	arp_default_flow_install(sw, 1);
@@ -201,20 +206,64 @@ bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 	return true;
 }
 
-void topo_switch_down(struct xswitch *sw)
+void topo_switch_port_down(struct xswitch *sw, port_t port)
 {
-	int i, j;
-	for(i = 0; i < num_switches; i++) {
-		if(entity_get_xswitch(switches[i]) == sw) {
-			entity_free(switches[i]);
-			num_switches = next_num(switches);
-			switches[i] = switches[num_switches];
-			/* hack */
-			for(j = 0; j < num_hosts; j++)
-				entity_free(hosts[j]);
-			num_hosts = 0;
-			return;
+	int i;
+	port_t sw_port;
+	struct entity *esw;
+	struct xswitch *xsw;
+	printf("lallalallalallalalalallalalalalala\n");
+	for (i = 0; i < num_hosts; i++) {
+		esw = entity_host_get_adj_switch(hosts[i], &sw_port);
+		xsw = entity_get_xswitch(esw);
+		if (xsw == sw && sw_port == port) {
+			entity_port_down(esw, port);
+			entity_free(hosts[i]);
+			num_hosts --;
+			if (i != num_hosts)
+				hosts[i] = hosts[num_hosts];
 		}
 	}
-	abort();
+}
+void topo_switch_down(struct xswitch *sw)
+{
+	printf("-----switch down--------\n");
+	int i, j;
+	int num_adjs;
+	struct entity_adj *e_adjs;
+	port_t sw_port;
+	for(i = 0; i < num_switches; i++) {
+		if(entity_get_xswitch(switches[i]) == sw) {
+			e_adjs = entity_get_adjs(switches[i], &num_adjs);
+			for (j = 0; j < num_hosts; j++) {
+				// printf("e: %p  sw_port=%p\n", hosts[j], &sw_port);
+				if(entity_host_get_adj_switch(hosts[j], &sw_port) == switches[i]) {
+				// int ret = entity_host_get_adj_switch(hosts[j], &sw_port);
+				// printf("ret = %016x\n", ret);
+				// if(ret == switches[i]) {
+					entity_free(hosts[j]);
+					num_hosts --;
+					if (j != num_hosts)
+						hosts[j] = hosts[num_hosts];
+				}
+			}
+			for (j = 0; j < num_adjs; j++) {
+				if(ENTITY_TYPE_SWITCH == entity_get_type(e_adjs[j].adj_entity)) {
+					entity_port_down(e_adjs[j].adj_entity, e_adjs[j].adj_in_port);
+				}
+			}
+			// free hosts
+			entity_free(switches[i]);
+			num_switches --;
+			if (i != num_switches)
+				switches[i] = switches[num_switches];
+			/* hack */
+			// for(j = 0; j < num_hosts; j++)
+			//	entity_free(hosts[j]);
+			// num_hosts = 0;
+			break;
+		}
+	// abort();
+	}
+	topo_print();
 }
