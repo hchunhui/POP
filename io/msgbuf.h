@@ -31,8 +31,8 @@
  * derivatives without specific, written prior permission.
  */
 
-#ifndef XPBUF_H
-#define XPBUF_H 1
+#ifndef MAPLE_IO_MSGBUF_H
+#define MAPLE_IO_MSGBUF_H
 
 #include <stddef.h>
 

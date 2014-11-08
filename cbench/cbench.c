@@ -11,6 +11,7 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 
 #include <netinet/in.h>
 
@@ -24,6 +25,9 @@
 #ifndef __unused
 #define __unused __attribute__((__unused__))
 #endif
+
+int realtime = 0;
+int verbose  = 0;
 
 void
 accept_cb_func(struct sw *sw)
@@ -54,7 +58,6 @@ void
 recv_cb_func(struct msgbuf *msg)
 {
 	struct pof_header *p = (struct pof_header *)msg->data;
-	//struct sw *sw = msg->sw;
 
 	if (p->type == OFPT_PACKET_IN) {
 		p->type = OFPT_PACKET_OUT;
@@ -69,9 +72,10 @@ recv_cb_func(struct msgbuf *msg)
 	struct sw *sw = msg->sw;
 
 	if (p->type == OFPT_PACKET_IN) {
-		struct msgbuf *mod = msgbuf_new(1024); // XXX
-		mod->sw = sw;
-		struct ofp_flow_mod *ofm = (struct ofp_flow_mod *)mod->data;
+		struct msgbuf *msg = msgbuf_new(sizeof(struct ofp_flow_mod));
+		struct ofp_flow_mod *ofm = (struct ofp_flow_mod *)msg->data;
+
+		msg->sw = sw;
 
 		/*
 		 * Refer: ryu/ryu/ofproto/ofproto_v1_0_parser.py
@@ -93,15 +97,30 @@ recv_cb_func(struct msgbuf *msg)
 		ofm->flags = 0;
 		//ofm->actions array is 0 length.
 
-		send_msgbuf(mod);
+		send_msgbuf(msg);
 	}
 	msgbuf_delete(msg);
 }
 #endif
 
 int
-main(void)
+main(int argc, char **argv)
 {
+	int ch;
+
+	while ((ch = getopt(argc, argv, "tv?")) != -1) {
+		switch (ch) {
+		case 't':
+			realtime = 1;
+			break;
+		case 'v':
+			verbose = 1;
+			break;
+		}
+	}
+	argc -= optind;
+	argv += optind;
+
 	init_io_module();
 
 #if 0
@@ -114,8 +133,7 @@ main(void)
 		}
 	}
 #else
-	while (1)
-		;
+	pause();
 #endif
 
 	fini_io_module();

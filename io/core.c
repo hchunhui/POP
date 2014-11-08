@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <err.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -18,8 +19,10 @@
 
 #include <ev.h>
 
+#include "param.h"
+
 #include "util.h"
-#include "smp.h"
+#include "thread.h"
 
 #include "io.h"
 #include "sw.h"
@@ -28,12 +31,10 @@
 
 #include "pof/pof_global.h"
 
-//#define TEST_LOAD_BALANCE
-
 static pthread_t io_thread[NR_IO_THREADS];
 static int sockfd = 0;
 
-static int server_port = 6633;
+int server_port = 6633;
 
 extern void accept_cb_func(struct sw *sw);
 extern void close_cb_func(struct sw *sw);
@@ -42,7 +43,9 @@ static void
 txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
 {
 	struct sw *sw = w->data;
+#if 0
 	int cpuid = sw->cpuid;
+#endif
 
 	/*
 	 * XXX: 一定要使用: revents，而不是 w->events!
@@ -67,14 +70,12 @@ txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
 		if (ret == 0) {
 			/* Handle the closed fds */
 			msgbuf_delete(msg);
-			close(w->fd);
-			ev_io_stop(loop, w);
-			close_cb_func(sw);
-			free(w);
-			return;
+			goto closed;
 		}
 		msg->sw = w->data;
-		//printf("length1: %d\n", ((struct pof_header *)msg->data)->length);
+#ifdef DEBUG
+		printf("length1: %d\n", ((struct pof_header *)msg->data)->length);
+#endif
 
 #if 0
 		if (enqueue(&recv_queue[cpuid], msg) != 0) {
@@ -83,7 +84,7 @@ txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
 		}
 #else
 		void recv_cb_func(struct msgbuf *msg);
-		recv_cb_func(msg); // XXX 谁free这个msg。
+		recv_cb_func(msg);
 #endif
 	}
 
@@ -97,11 +98,29 @@ txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
 		while ((msg = msgqueue_dequeue(&sw->send_queue)) != NULL) {
 			int ret = write(w->fd, msg->data, ntohs(
 			      ((struct pof_header *)msg->data)->length));
-			assert(ret != -1);
+			if (ret == -1 && (errno == EPIPE ||
+					  errno == ECONNRESET)) {
+				/* Handle the closed fds */
+				msgbuf_delete(msg);
+				goto closed;
+			}
+			if (ret == -1) {
+				// XXX Handle failed writes
+				printf("errno: %d %s\n", errno, strerror(errno));
+				exit(EXIT_FAILURE);
+			}
 			assert(ret == ntohs(((struct pof_header *)msg->data)->length));
 			msgbuf_delete(msg);
 		}
 	}
+
+	return;
+
+closed:
+	close(w->fd);
+	ev_io_stop(loop, w);
+	close_cb_func(sw);
+	free(w);
 }
 
 struct accept_ctx {
@@ -125,6 +144,23 @@ accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 	if (!(revents & EV_READ))
 		return;
 
+#ifdef TEST_THUNDERING_HERD
+	/*
+	 * nc 127.0.0.1 6633
+	 */
+	printf("Wakeup\n");
+#endif
+
+	addrlen = sizeof(sin);
+	newfd = accept(w->fd, (struct sockaddr *)&sin, &addrlen);
+	if (newfd < 0) {
+		if (errno == EWOULDBLOCK || errno == EAGAIN)
+			return;
+		fprintf(stderr, "Failed to accept(): %s\n",
+			strerror(errno));
+		exit(EXIT_FAILURE);
+	}
+
 #ifdef TEST_LOAD_BALANCE
 	ctx->count++;
 
@@ -132,16 +168,9 @@ accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 		printf("pthread %d: %d\n", ctx->cpuid, ctx->count);
 #endif
 
-	addrlen = sizeof(sin);
-	newfd = accept(w->fd, (struct sockaddr *)&sin, &addrlen);
-	if (newfd < 0) {
-		fprintf(stderr, "Failed to accept(): %s\n",
-			strerror(errno));
-		exit(EXIT_FAILURE);
-	}
-
-	adjust_bufsize(newfd);
+	//adjust_bufsize(newfd);
 	//make_fd_nonblock(newfd);
+	make_fd_block(newfd);
 
 	new_watcher = malloc(sizeof(*new_watcher));
 	assert(new_watcher != NULL);
@@ -161,18 +190,24 @@ accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 }
 
 static void *
-routine(void *arg)
+io_routine(void *arg)
 {
 	int cpuid = (int)(intptr_t)arg;
 	struct ev_loop *loop;
+	struct accept_ctx *ctx;
 	ev_io listen_watcher;
+	char thread_name[64];
 
-	//bind_cpu(cpuid);
+	sprintf(thread_name, "io-routine %d",  cpuid);
+	thread_setname(thread_name);
+
+	// XXX: don't use cpu0 (which will be used by kernel)
+	bind_cpu(cpuid + 1);
 
 	loop = ev_loop_new(EVFLAG_AUTO);
 
 	ev_io_init(&listen_watcher, accept_cb, sockfd, EV_READ);
-	struct accept_ctx *ctx = malloc(sizeof(*ctx));
+	ctx = malloc(sizeof(*ctx));
 	assert(ctx != NULL);
 	ctx->cpuid = cpuid;
 #ifdef TEST_LOAD_BALANCE
@@ -194,30 +229,24 @@ create_server(void)
 	int yes = 1;
 
 	fd = socket(PF_INET, SOCK_STREAM, 0);
-	if (fd < 0) {
-		perror("socket");
-		exit(EXIT_FAILURE);
-	}
+	if (fd < 0)
+		err(EXIT_FAILURE, "socket");
 
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0) {
-		perror("setsockopt(SO_REUSEADDR)");
-		exit(EXIT_FAILURE);
-	}
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes)) < 0)
+		err(EXIT_FAILURE, "setsockopt(SO_REUSEADDR)");
 
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = INADDR_ANY;
 	sin.sin_port = htons(server_port);
 
-	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-		perror("bind");
-		exit(EXIT_FAILURE);
-	}
+	if (bind(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1)
+		err(EXIT_FAILURE, "bind");
 
-	if (listen(fd, 5) == -1) {
-		perror("listen");
-		exit(EXIT_FAILURE);
-	}
+	if (listen(fd, 100000) == -1)
+		err(EXIT_FAILURE, "listen");
+
+	make_fd_nonblock(fd);
 
 	return (fd);
 }
@@ -234,20 +263,40 @@ init_server(void)
 int
 init_io_module(void)
 {
+	pthread_attr_t attr;
+	struct sched_param param;
 	int i;
+
+	signal(SIGPIPE, SIG_IGN);
 
 	sockfd = create_server();
 	init_server();
 
-	for (i = 0; i < NR_IO_THREADS; i++) {
-		if (pthread_create(&io_thread[i], NULL, routine,
-				   (void *)(intptr_t)i) != 0) {
-			perror("pthread_create");
-			exit(EXIT_FAILURE);
-		}
+	thread_setname("main routine");
+
+	if (pthread_attr_init(&attr) != 0)
+		err(EXIT_FAILURE, "pthread_attr_init");
+
+	if (pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED) != 0)
+		err(EXIT_FAILURE, "pthread_attr_setinheritsched");
+
+	if (realtime) {
+		if (pthread_attr_setschedpolicy(&attr, SCHED_FIFO) != 0)
+			err(EXIT_FAILURE, "pthread_attr_setschedpolicy");
+
+		param.sched_priority = 1;
+		if (pthread_attr_setschedparam(&attr, &param) != 0)
+			err(EXIT_FAILURE, "pthread_attr_setschedparam");
 	}
 
-	printf("I/O engine is up.\n");
+	for (i = 0; i < NR_IO_THREADS; i++) {
+		if (pthread_create(&io_thread[i], &attr, io_routine,
+				   (void *)(intptr_t)i) != 0)
+			err(EXIT_FAILURE, "pthread_create");
+	}
+
+	if (verbose)
+		printf("I/O engine is up.\n");
 
 	return (0);
 }
@@ -258,9 +307,8 @@ fini_io_module(void)
 	int i;
 
 	for (i = 0; i < NR_IO_THREADS; i++) {
-		if (pthread_join(io_thread[i], NULL) != 0) {
-			perror("pthread_join");
-			exit(EXIT_FAILURE);
-		}
+		if (pthread_join(io_thread[i], NULL) != 0)
+			err(EXIT_FAILURE, "pthread_join");
 	}
 }
+
