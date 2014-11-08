@@ -13,7 +13,7 @@
 #include "lldp.h"
 #include "xswitch.h"
 #include "xswitch-private.h"
-#include "spanning_tree.h"
+// #include "spanning_tree.h"
 
 #define ETHERTYPE_IP 0x0800
 #define ETHERTYPE_ARP 0x0806

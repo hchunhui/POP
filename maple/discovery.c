@@ -368,6 +368,7 @@ struct flood_node {
 	uint8_t in_port;
 	port_t out_port[16];
 };
+#if 0
 static void flood_node_add_port(struct flood_node *fnode, port_t port)
 {
 	assert(fnode->out_num < 16);
@@ -444,6 +445,7 @@ static void flood2(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t p
 		arp_request_packet_out(&fnode, packet, length);
 	}
 }
+#endif
 static void port_packet_out(struct xswitch *xsw, port_t port, const uint8_t *pkt, uint16_t len)
 {
 	struct action *ac;
@@ -484,7 +486,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 	int i;
 	struct entity *eh1;
 	struct host_info hinfo;
-	struct etherhdr ehhdr;
+	// struct etherhdr ehhdr;
 	struct arp_header arp;
 	struct entity *esw;
 	struct xswitch *xsw;
@@ -493,11 +495,12 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 	if (length < 14 + 28)
 		return -11;
 	// parse arp
+	/*
 	for (i=0; i<6; i++){
 		ehhdr.ether_dhost[i] = packet[i];
 		ehhdr.ether_shost[i+6] = packet[i+6];
 	}
-	ehhdr.ether_type = ETHERTYPE_ARP;
+	ehhdr.ether_type = ETHERTYPE_ARP;*/
 	arp.arp_hrd = value_to_16(value_extract(packet, 14*8, 16));
 	arp.arp_pro = value_to_16(value_extract(packet, 16*8, 16));
 	arp.arp_hln = packet[18];

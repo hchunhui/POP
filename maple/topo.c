@@ -230,7 +230,7 @@ void topo_switch_down(struct xswitch *sw)
 	printf("-----switch down--------\n");
 	int i, j;
 	int num_adjs;
-	struct entity_adj *e_adjs;
+	const struct entity_adj *e_adjs;
 	port_t sw_port;
 	for(i = 0; i < num_switches; i++) {
 		if(entity_get_xswitch(switches[i]) == sw) {
