@@ -15,6 +15,7 @@
 #endif
 extern int pthread_setaffinity_np(pthread_t __th, size_t __cpusetsize,
                                   __const cpu_set_t *__cpuset);
+extern int pthread_setname_np(pthread_t thread, const char *name);
 
 #define cpuset_t	cpu_set_t
 
