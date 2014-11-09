@@ -318,7 +318,7 @@ static void dump_tt(struct trace_tree_header *tree)
 		break;
 	case TT_V:
 		tv = (struct trace_tree_V *) tree;
-		fprintf(stderr, "(V %s ", tv->name);
+		fprintf(stderr, "(V %s", tv->name);
 		for(j = 0; j < tv->num_branches; j++) {
 			fprintf(stderr, " ");
 			dump_tt(tv->branches[j].tree);
