@@ -47,6 +47,6 @@ struct entity *entity_host_get_adj_switch(struct entity *e, port_t *sw_port);
 const struct entity_adj *entity_get_adjs(struct entity *e, int *pnum);
 void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2);
 void entity_print(struct entity *e);
-void entity_port_down(struct entity *e, port_t port);
+void entity_adj_down(struct entity *e, port_t port);
 
 #endif /* _ENTITY_H_ */

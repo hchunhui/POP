@@ -596,11 +596,13 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 }
 static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_t port)
 {
-	struct entity *host;
+	struct entity *host, *phost;
 	struct entity *esw;
+	struct entity *oldesw;
 	struct haddr hsrc_addr;
 	struct host_info hinfo;
 	uint32_t psrc_addr = 0;
+	port_t sw_port;
 	int i;
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
 	for (i = 0; i < 6; i++)
@@ -615,20 +617,43 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 			psrc_addr = value_to_32(value_extract(packet, 26*8, 32));
 			break;
 		default:
+			// return;
 			break;
 	}
 	hinfo.haddr = hsrc_addr;
 	hinfo.paddr = psrc_addr;
-	host = topo_get_host_by_haddr(hsrc_addr);
 	esw = topo_get_switch(dpid);
 	assert(esw != NULL);
-	if (host == NULL) {
+	host = topo_get_host_by_haddr(hsrc_addr);
+	phost = topo_get_host_by_paddr(psrc_addr);
+	if (host != phost) {
+		// delete the hhost and the phsot, add a new host
+		if (host != NULL) {
+			oldesw = entity_host_get_adj_switch(host, &sw_port);
+			topo_del_host(host);
+			entity_adj_down(oldesw, sw_port);
+		}
+		if (phost != NULL) {
+			oldesw = entity_host_get_adj_switch(phost, &sw_port);
+			topo_del_host(phost);
+			entity_adj_down(oldesw, sw_port);
+		}
+		host = entity_host(hinfo);
+		if (topo_add_host(host) >= 0)
+			entity_add_link(host, 1, esw, port);
+	} else if (host == NULL) {
 		host = entity_host(hinfo);
 		if (topo_add_host(host) >= 0)
 			entity_add_link(host, 1, esw, port);
 	} else {
-		// TODO
-		// struct host_info h = entity_get_addr(host);
+		oldesw = entity_host_get_adj_switch(host, &sw_port);
+		if (oldesw == esw)
+			return;
+		entity_adj_down(oldesw, sw_port);
+		topo_del_host(host);
+		host = entity_host(hinfo);
+		if (topo_add_host(host) >= 0)
+			entity_add_link(host, 1, esw, port);
 	}
 	/*
 	int hnum;

@@ -105,7 +105,7 @@ struct entity *entity_host_get_adj_switch(struct entity *e, port_t *sw_port)
 //      printf("e %p\n", e->adjs[0].adj_entity);
         return e->adjs[0].adj_entity;
 }
-void entity_port_down(struct entity *e, port_t port)
+void entity_adj_down(struct entity *e, port_t port)
 {
         int i;
         if (e->type == ENTITY_TYPE_HOST)

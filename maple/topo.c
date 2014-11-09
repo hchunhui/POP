@@ -212,12 +212,11 @@ void topo_switch_port_down(struct xswitch *sw, port_t port)
 	port_t sw_port;
 	struct entity *esw;
 	struct xswitch *xsw;
-	printf("lallalallalallalalalallalalalalala\n");
 	for (i = 0; i < num_hosts; i++) {
 		esw = entity_host_get_adj_switch(hosts[i], &sw_port);
 		xsw = entity_get_xswitch(esw);
 		if (xsw == sw && sw_port == port) {
-			entity_port_down(esw, port);
+			entity_adj_down(esw, port);
 			entity_free(hosts[i]);
 			num_hosts --;
 			if (i != num_hosts)
@@ -249,7 +248,7 @@ void topo_switch_down(struct xswitch *sw)
 			}
 			for (j = 0; j < num_adjs; j++) {
 				if(ENTITY_TYPE_SWITCH == entity_get_type(e_adjs[j].adj_entity)) {
-					entity_port_down(e_adjs[j].adj_entity, e_adjs[j].adj_in_port);
+					entity_adj_down(e_adjs[j].adj_entity, e_adjs[j].adj_in_port);
 				}
 			}
 			// free hosts
