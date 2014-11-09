@@ -15,6 +15,8 @@
 
 #include <netinet/in.h>
 
+#include "param.h"
+
 #include "io/msgbuf.h"
 #include "io/sw.h"
 #include "io/io.h"
@@ -121,8 +123,8 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	async_send = 0;
 	init_io_module();
-
 #if 0
 	while (1) {
 		struct msgbuf *msg;
@@ -132,8 +134,6 @@ main(int argc, char **argv)
 			recv_cb_func(msg);
 		}
 	}
-#else
-	pause();
 #endif
 
 	fini_io_module();

@@ -12,6 +12,10 @@ struct sw {
 	struct msgqueue send_queue;
 	int cpuid; /* The id of the cpu on which this
 		      switch will be processed */
+	struct ev_async *async_watcher;
+	int async_pending;
+	struct worker *worker;
+
 	struct xswitch *xsw;
 };
 
@@ -23,6 +27,7 @@ new_sw(int cpuid)
 
 	msgqueue_init(&sw->send_queue);
 	sw->cpuid = cpuid;
+	sw->async_pending = 0;
 
 	return (sw);
 }

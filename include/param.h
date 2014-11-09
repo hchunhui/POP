@@ -4,5 +4,6 @@
 extern int verbose;
 extern int realtime;
 extern int server_port;
+extern int async_send;
 
 #endif

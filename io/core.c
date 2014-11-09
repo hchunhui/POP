@@ -24,6 +24,7 @@
 #include "util.h"
 #include "thread.h"
 
+#include "io_int.h"
 #include "io.h"
 #include "sw.h"
 #include "msgqueue.h"
@@ -31,21 +32,20 @@
 
 #include "pof/pof_global.h"
 
-static pthread_t io_thread[NR_IO_THREADS];
+static struct master master;
+static struct worker workers[NR_WORKERS] __attribute__((aligned(64)));
 static int sockfd = 0;
 
 int server_port = 6633;
+int async_send = 1;
 
 extern void accept_cb_func(struct sw *sw);
 extern void close_cb_func(struct sw *sw);
 
 static void
-txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
+rxtx_cb(struct ev_loop *loop, ev_io *w, int revents)
 {
 	struct sw *sw = w->data;
-#if 0
-	int cpuid = sw->cpuid;
-#endif
 
 	/*
 	 * XXX: 一定要使用: revents，而不是 w->events!
@@ -112,46 +112,93 @@ txrx_cb(struct ev_loop *loop, ev_io *w, int revents)
 			assert(ret == ntohs(((struct pof_header *)msg->data)->length));
 			msgbuf_delete(msg);
 		}
+
+		if (async_send) {
+			sw->async_pending = 0;
+			ev_io_stop(loop, w);
+			w->events = EV_READ;
+			ev_io_start(loop, w);
+		}
 	}
 
 	return;
 
 closed:
-	close(w->fd);
-	ev_io_stop(loop, w);
 	close_cb_func(sw);
+	close(w->fd);
+
+	ev_io_stop(loop, w);
+	if (async_send)
+		ev_async_stop(loop, sw->async_watcher);
+
 	free(w);
+	if (async_send)
+		free(sw->async_watcher);
+	free(sw);
 }
 
-struct accept_ctx {
-	int cpuid;
-#ifdef TEST_LOAD_BALANCE
-	int count;
-#endif
-};
+static void
+cq_init(struct cq_head *cq)
+{
+	pthread_mutex_init(&cq->lock, NULL);
+	cq->head = NULL;
+	cq->tail = NULL;
+}
+
+static struct cq_item *
+cq_pop(struct cq_head *cq)
+{
+	struct cq_item *item;
+
+	pthread_mutex_lock(&cq->lock);
+	item = cq->head;
+	if (item != NULL) {
+		cq->head = item->next;
+		if (cq->head == NULL)
+			cq->tail = NULL;
+	}
+	pthread_mutex_unlock(&cq->lock);
+
+	return (item);
+}
+
+static void
+cq_push(struct cq_head *cq, struct cq_item *item)
+{
+	item->next = NULL;
+
+	pthread_mutex_lock(&cq->lock);
+	if (cq->head == NULL)
+		cq->head = item;
+	else
+		cq->tail->next = item;
+	cq->tail = item;
+	pthread_mutex_unlock(&cq->lock);
+}
+
+static void
+dispatch_conn(int fd)
+{
+	static int round_robin = 0;
+	struct cq_item *item = malloc(sizeof(*item));
+	struct worker *worker = &workers[round_robin++ % NR_WORKERS];
+
+	assert(item != NULL);
+	item->fd = fd;
+
+	cq_push(&worker->new_conn_queue, item);
+	ev_async_send(worker->loop, &worker->async_watcher);
+}
 
 static void
 accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 {
 	int newfd;
-	ev_io *new_watcher;
 	struct sockaddr_in sin;
-	socklen_t addrlen;
-	struct accept_ctx *ctx = w->data;
-	int cpuid = ctx->cpuid;
-	struct sw *sw;
+	socklen_t addrlen = sizeof(sin);
 
-	if (!(revents & EV_READ))
-		return;
+	assert(revents & EV_READ);
 
-#ifdef TEST_THUNDERING_HERD
-	/*
-	 * nc 127.0.0.1 6633
-	 */
-	printf("Wakeup\n");
-#endif
-
-	addrlen = sizeof(sin);
 	newfd = accept(w->fd, (struct sockaddr *)&sin, &addrlen);
 	if (newfd < 0) {
 		if (errno == EWOULDBLOCK || errno == EAGAIN)
@@ -161,64 +208,116 @@ accept_cb(struct ev_loop *loop, ev_io *w, int revents)
 		exit(EXIT_FAILURE);
 	}
 
-#ifdef TEST_LOAD_BALANCE
-	ctx->count++;
-
-	if (ctx->count % 100 == 0)
-		printf("pthread %d: %d\n", ctx->cpuid, ctx->count);
-#endif
-
 	//adjust_bufsize(newfd);
 	//make_fd_nonblock(newfd);
 	make_fd_block(newfd);
 
-	new_watcher = malloc(sizeof(*new_watcher));
-	assert(new_watcher != NULL);
+	dispatch_conn(newfd);
+}
 
-	sw = new_sw(cpuid);
-	new_watcher->data = sw;
+static void
+async_send_cb(struct ev_loop *loop, ev_async *w, int revents)
+{
+	ev_io *rxtx_watcher = w->data;
 
+	ev_io_stop(loop, rxtx_watcher);
+	rxtx_watcher->events |= EV_WRITE;
+	ev_io_start(loop, rxtx_watcher);
+}
+
+static void
+async_accept_cb(struct ev_loop *loop, ev_async *w, int revents)
+{
+	struct worker *me = w->data;
+	ev_io *rxtx_watcher;
+	struct ev_async *async_watcher;
+	struct sw *sw;
+	struct cq_item *item;
+
+	item = cq_pop(&me->new_conn_queue);
+	if (item == NULL)
+		return;
+
+	sw = new_sw(me->cpuid);
+	sw->worker = me;
+
+	rxtx_watcher = malloc(sizeof(*rxtx_watcher));
+	assert(rxtx_watcher != NULL);
+	rxtx_watcher->data = sw;
+
+	if (async_send) {
+		async_watcher = malloc(sizeof(*async_watcher));
+		assert(async_watcher != NULL);
+		async_watcher->data = rxtx_watcher;
+
+		sw->async_watcher = async_watcher;
+	}
+
+	ev_io_init(rxtx_watcher, rxtx_cb, item->fd, EV_READ|EV_WRITE);
+	ev_io_start(loop, rxtx_watcher);
+
+	if (async_send) {
+		ev_async_init(async_watcher, async_send_cb);
+		ev_async_start(loop, async_watcher);
+	}
+
+	free(item);
 	accept_cb_func(sw);
-
-	ev_io_init(new_watcher, txrx_cb, newfd, EV_READ|EV_WRITE);
-	ev_io_start(loop, new_watcher);
-
-#ifdef DEBUG
-	static int accept_count = 0;
-	printf("accpet %d connections\n", ++accept_count);
-#endif
 }
 
 static void *
-io_routine(void *arg)
+worker_thread(void *arg)
 {
-	int cpuid = (int)(intptr_t)arg;
-	struct ev_loop *loop;
-	struct accept_ctx *ctx;
-	ev_io listen_watcher;
-	char thread_name[64];
+	struct worker *me = arg;
+	char thread_name[32];
 
-	sprintf(thread_name, "io-routine %d",  cpuid);
+	sprintf(thread_name, "worker %d", me->cpuid);
 	thread_setname(thread_name);
 
-	// XXX: don't use cpu0 (which will be used by kernel)
-	bind_cpu(cpuid + 1);
+	bind_cpu(me->cpuid);
 
-	loop = ev_loop_new(EVFLAG_AUTO);
+	ev_loop(me->loop, 0);
+	return (NULL);
+}
 
-	ev_io_init(&listen_watcher, accept_cb, sockfd, EV_READ);
-	ctx = malloc(sizeof(*ctx));
-	assert(ctx != NULL);
-	ctx->cpuid = cpuid;
-#ifdef TEST_LOAD_BALANCE
-	ctx->count = 0;
-#endif
-	listen_watcher.data = ctx;
-	ev_io_start(loop, &listen_watcher);
+static void
+setup_worker(struct worker *me)
+{
+	me->loop = ev_loop_new(0);
+	assert(me->loop != NULL);
 
-	ev_run(loop, 0);
+	cq_init(&me->new_conn_queue);
+
+	me->async_watcher.data = me;
+	ev_async_init(&me->async_watcher, async_accept_cb);
+	ev_async_start(me->loop, &me->async_watcher);
+}
+
+static void *
+master_thread(void *arg)
+{
+	struct master *me = arg;
+	char thread_name[32];
+
+	sprintf(thread_name, "master");
+	thread_setname(thread_name);
+
+	bind_cpu(NR_WORKERS);
+
+	ev_loop(me->loop, 0);
 
 	return (NULL);
+}
+
+static void
+setup_master(struct master *me)
+{
+	me->loop = ev_loop_new(0);
+	assert(me->loop != NULL);
+
+	me->listen_watcher.data = me;
+	ev_io_init(&me->listen_watcher, accept_cb, sockfd, EV_READ);
+	ev_io_start(me->loop, &me->listen_watcher);
 }
 
 static int
@@ -256,21 +355,16 @@ init_server(void)
 {
 	int i;
 
-	for (i = 0; i < NR_IO_THREADS; i++)
+	for (i = 0; i < NR_WORKERS; i++)
 		msgqueue_init(&recv_queue[i]);
 }
 
-int
-init_io_module(void)
+static void
+init_thread(void)
 {
 	pthread_attr_t attr;
 	struct sched_param param;
 	int i;
-
-	signal(SIGPIPE, SIG_IGN);
-
-	sockfd = create_server();
-	init_server();
 
 	thread_setname("main routine");
 
@@ -289,11 +383,31 @@ init_io_module(void)
 			err(EXIT_FAILURE, "pthread_attr_setschedparam");
 	}
 
-	for (i = 0; i < NR_IO_THREADS; i++) {
-		if (pthread_create(&io_thread[i], &attr, io_routine,
-				   (void *)(intptr_t)i) != 0)
+	setup_master(&master);
+	if (pthread_create(&master.pthread, &attr, master_thread,
+			   &master) != 0)
+		err(EXIT_FAILURE, "pthread_create");
+
+	for (i = 0; i < NR_WORKERS; i++) {
+		workers[i].cpuid = i;
+		setup_worker(&workers[i]);
+	}
+
+	for (i = 0; i < NR_WORKERS; i++) {
+		if (pthread_create(&workers[i].pthread, &attr, worker_thread,
+				   &workers[i]) != 0)
 			err(EXIT_FAILURE, "pthread_create");
 	}
+}
+
+int
+init_io_module(void)
+{
+	signal(SIGPIPE, SIG_IGN);
+
+	sockfd = create_server();
+	init_server();
+	init_thread();
 
 	if (verbose)
 		printf("I/O engine is up.\n");
@@ -306,8 +420,11 @@ fini_io_module(void)
 {
 	int i;
 
-	for (i = 0; i < NR_IO_THREADS; i++) {
-		if (pthread_join(io_thread[i], NULL) != 0)
+	if (pthread_join(master.pthread, NULL) != 0)
+		err(EXIT_FAILURE, "pthread_join");
+
+	for (i = 0; i < NR_WORKERS; i++) {
+		if (pthread_join(workers[i].pthread, NULL) != 0)
 			err(EXIT_FAILURE, "pthread_join");
 	}
 }
