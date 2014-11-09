@@ -4,11 +4,13 @@
 
 #include <stdio.h>
 #include "io.h"
+#include "io_int.h"
 #include "sw.h"
 #include "msgbuf.h"
 #include "msgqueue.h"
+#include "param.h"
 
-struct msgqueue recv_queue[NR_IO_THREADS] __attribute__((aligned(64)));
+struct msgqueue recv_queue[NR_WORKERS] __attribute__((aligned(64)));
 
 void
 msgqueue_init(struct msgqueue *queue)
@@ -69,7 +71,15 @@ recv_msgbuf(int cpuid)
 int
 send_msgbuf(struct msgbuf *msg)
 {
-	return (msgqueue_enqueue(&msg->sw->send_queue, msg));
+	struct sw *sw = msg->sw;
+
+	msgqueue_enqueue(&sw->send_queue, msg);
+	if (async_send && !sw->async_pending) {
+		sw->async_pending = 1;
+		ev_async_send(sw->worker->loop, sw->async_watcher);
+	}
+
+	return (0);
 }
 
 /* ------------------------------------------------------------------------ */

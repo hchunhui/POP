@@ -15,7 +15,7 @@ struct msgqueue {
 	struct msgbuf *tail;
 };
 
-extern struct msgqueue recv_queue[NR_IO_THREADS];
+extern struct msgqueue recv_queue[NR_WORKERS];
 
 void msgqueue_init(struct msgqueue *queue);
 int msgqueue_enqueue(struct msgqueue *queue, struct msgbuf *p);
