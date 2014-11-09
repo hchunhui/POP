@@ -99,7 +99,6 @@ static void trace_clear(void)
 {
 	trace.num_events = 0;
 	trace.num_inv_events = 0;
-	trace_G(header_spec, 0);
 }
 
 enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D, TT_G };
@@ -744,6 +743,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 
 	/* run */
 	pk.pp = packet_parser(header_spec, packet, packet_len);
+	trace_G(header_spec, 0);
 	r = f(&pk);
 	trace_R("in_port", value_from_8(0));
 	packet_parser_free(pk.pp);
