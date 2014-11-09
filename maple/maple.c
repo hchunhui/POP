@@ -344,6 +344,7 @@ static void dump_tt(struct trace_tree_header *tree)
 		fprintf(stderr, "(G %s ", header_get_name(tg->spec));
 		dump_tt(tg->t);
 		fprintf(stderr, ")");
+		break;
 	case TT_L:
 		fprintf(stderr, "(L)");
 		break;
