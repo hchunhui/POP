@@ -397,6 +397,9 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			p->desc.of_enable = POFE_ENABLE;
 			xswitch_send(sw, rmsg);
 		}
+		// handle_port_status(uint32_t state, uint32_t port_id);
+		if (ps->desc.state == POFPS_LINK_DOWN)
+			xswitch_port_down(sw, ps->desc.port_id);
 		break;
 	default:
 		fprintf(stderr, "POF packet ignored\n");

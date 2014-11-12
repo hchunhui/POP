@@ -15,6 +15,7 @@ struct xswitch
 	} state;
 	dpid_t dpid;
 	int n_ports;
+	//TODO port number
 	int hack_start_prio;
 	//struct rconn *rconn;
 	struct flow_table *table0;
@@ -26,7 +27,7 @@ struct xswitch
 void xswitch_up(struct xswitch *sw);
 void xswitch_down(struct xswitch *sw);
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
-
+void xswitch_port_down(struct xswitch *sw, uint32_t port);
 
 /* msg */
 void msg_process(struct xswitch *sw, const struct msgbuf *msg);

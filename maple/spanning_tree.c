@@ -1,17 +1,4 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include "types.h"
-#include "maple_api.h"
-#include "topo.h"
-#include "entity.h"
-
-struct nodeinfo
-{
-	int parent;
-	int parent_out_port;
-	int in_port;
-};
+#include "spanning_tree.h"
 
 // simple int queue;
 struct queue {
@@ -59,7 +46,7 @@ static int find_index(struct entity **es, int num, struct entity *e)
 			return i;
 	return -1;
 }
-
+/*
 static struct route *get_route(struct entity *dst, int dst_port,
 			       struct nodeinfo *visited,
 			       struct entity **switches, int switches_num)
@@ -88,8 +75,8 @@ static struct route *get_route(struct entity *dst, int dst_port,
 	route_add_edge(r, 0, 0, second_dpid, visited[second].in_port);
 	return r;
 }
-
-static struct nodeinfo *get_tree(struct entity *src, int src_port,
+*/
+struct nodeinfo *spanning_tree_init(struct entity *src, int src_port,
 				 struct entity **switches, int switches_num)
 {
 	struct nodeinfo *visited = malloc(sizeof(struct nodeinfo)*switches_num);
@@ -136,7 +123,7 @@ static struct nodeinfo *get_tree(struct entity *src, int src_port,
 	queue_free(q);
 	return visited;
 }
-
+/*
 static void get_switch(struct entity *host, struct entity **sw, int *port)
 {
 	const struct entity_adj *adjs;
@@ -150,43 +137,36 @@ struct route *f(struct packet *pkt)
 {
 	int switches_num;
 	struct route *r, *rx;
-	struct entity *src, *dst1;
+	struct entity *src, *dst1, *dst2;
 	int src_port, dst1_port, dst2_port;
 	struct nodeinfo *visited;
-	/* inspect packet */
+	// inspect packet 
 	struct entity *hsrc = topo_get_host(read_packet(pkt, "dl_src"));
 	struct entity *hdst1 = topo_get_host(read_packet(pkt, "dl_dst"));
-//	struct entity *hdst2 = topo_get_host(value_from_48(3));
+	struct entity *hdst2 = topo_get_host(value_from_48(3));
 	struct entity **switches = topo_get_switches(&switches_num);
+	assert(hsrc && hdst1 && hdst2);
 
-	r = route();
-	if (hsrc == NULL){
-		printf("aaaaaaaaaaaaaa\n");
-		return r;
-	}
-	if (hdst1 == NULL){
-		printf("bbbbbbbbbbbbb\n");
-		return r;
-	}
-// 	assert(hsrc && hdst1 && hdst2);
-
-	/* find connected switch */
+	// find connected switch 
 	get_switch(hsrc, &src, &src_port);
 	get_switch(hdst1, &dst1, &dst1_port);
-//	get_switch(hdst2, &dst2, &dst2_port);
+	get_switch(hdst2, &dst2, &dst2_port);
 
-	/* calculate spanning tree */
+	// calculate spanning tree 
 	visited = get_tree(src, src_port, switches, switches_num);
 
-	/* get route */
+	// get route 
+	r = route();
 	rx = get_route(dst1, dst1_port, visited, switches, switches_num);
 	route_union(r, rx);
 	route_free(rx);
-/*	if(src != dst2) {
+	if(src != dst2) {
 		rx = get_route(dst2, dst2_port, visited, switches, switches_num);
 		route_union(r, rx);
 		route_free(rx);
-	}*/
+	}
 	free(visited);
 	return r;
 }
+*/
+
