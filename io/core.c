@@ -59,7 +59,7 @@ rxtx_cb(struct ev_loop *loop, ev_io *w, int revents)
 		struct msgbuf *msg;
 		int ret;
 
-		msg = msgbuf_new(1024); // XXX
+		msg = msgbuf_new(2048); // XXX
 		assert(msg != NULL);
 
 		ret = recv_packet(w->fd, msg);
