@@ -435,6 +435,7 @@ static int __build_flow_table(struct xswitch *sw,
 	struct trace_tree_L *tl;
 	struct trace_tree_V *tv;
 	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
 	struct msgbuf *msg;
 	struct match *maa;
 	char buf[128];
@@ -473,8 +474,10 @@ static int __build_flow_table(struct xswitch *sw,
 		priority = __build_flow_table(sw, tt->t, maa, priority + 1, ac_pi);
 		match_free(maa);
 		return priority;
-	case TT_E:
 	case TT_D:
+		td = (struct trace_tree_D *)tree;
+		return __build_flow_table(sw, td->t, ma, priority, ac_pi);
+	case TT_E:
 		return priority;
 	}
 	assert(0);
