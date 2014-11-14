@@ -15,4 +15,5 @@ bool test_equal(struct packet *pkt, const char *field, value_t value);
 void record(const char *name);
 void invalidate(const char *name);
 
+uint16_t get_packet_data(struct packet *pkt, const char *data_type, uint8_t *buf, const size_t maxlen);
 #endif /* _MAPLE_API_H_ */

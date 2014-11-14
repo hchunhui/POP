@@ -6,6 +6,7 @@
 #include "maple_api.h"
 #include "topo.h"
 #include "entity.h"
+#include "igmp.h"
 
 enum event_type { EV_R, EV_T, EV_RE };
 
@@ -557,6 +558,56 @@ struct packet
 	int pkt_len;
 };
 
+/* get_packet_data:author gehu, 2014-10-29
+ * 从pk中读取相关数据，data_type分别为：
+ *						ip_packet:获取整个IP数据报内容，包含包头；
+ *						igmp_packet:获取igmp_packet包头和数据内容；
+ *						icmp_packet:获取icmp_packet包头和数据内容；
+ *						tcp_packet:获取tcp包头和内容；
+ *					 	udp_packet:获取udp包头和内容；
+ *从pk中读取packet的一个内部包，可以为网络层的包，或者传输层的包。
+ *	正确读出数据后返回读出的字节数，否则返回0；
+ */
+uint16_t get_packet_data(struct packet *pk, const char *data_type, uint8_t *buf, const size_t maxlen)
+{
+	value_t v = {{0}};
+	const uint8_t *pkt = pk->pkt;
+	uint16_t size = 0;
+	if(strcmp(data_type, "ip_packet") == 0){
+		uint16_t offset;
+		offset = 14;
+		v = value_extract(pkt, 112 + 16, 16);
+		size = value_to_16(v);	//IP报文总长度
+
+		assert(maxlen >= size);
+		memcpy(buf, pkt + offset, size);
+		return size;
+	}else if(strcmp(data_type, "icmp_packet") == 0){
+		/*TODO*/
+		return 0;
+	}else if(strcmp(data_type, "igmp_packet") == 0 || strcmp(data_type, "igmp") == 0){
+		uint16_t offset;
+		v = value_extract(pk->pkt, 112 + 16, 16);
+		size = value_to_16(v);	//IP报文总长度
+
+		v = value_extract(pkt, 112, 8); //
+		uint16_t iphlen = (value_to_8(v) & 0x0f) * 4;
+		offset = 14 + iphlen;
+
+		//IGMP报文长度为IP报文的数据部分
+		size -= iphlen;
+		assert(maxlen > size);
+		memcpy(buf, pkt + offset, size);
+		return size;
+	}else if(strcmp(data_type, "tcp_packet") == 0){
+		/*TODO*/
+	}else if(strcmp(data_type, "udp_packet") == 0){
+		/*TODO*/
+	}
+
+	return size;
+}
+
 static value_t get_value(struct packet *pk, const char *field)
 {
 	value_t v = {{0}};
@@ -639,11 +690,11 @@ void maple_switch_up(struct xswitch *sw)
 	flow_table_add_field(sw->table0, "dl_src", MATCH_FIELD_PACKET, 48, 48);
 	flow_table_add_field(sw->table0, "dl_type", MATCH_FIELD_PACKET, 96, 16);
 	/* match_field 不够用了，暂时不要nw_proto */
-	/* flow_table_add_field(sw->table0, "nw_proto", MATCH_FIELD_PACKET, 112+64+8, 8); */
+	flow_table_add_field(sw->table0, "nw_proto", MATCH_FIELD_PACKET, 112+64+8, 8);
 	flow_table_add_field(sw->table0, "nw_src", MATCH_FIELD_PACKET, 112+96, 32);
 	flow_table_add_field(sw->table0, "nw_dst", MATCH_FIELD_PACKET, 112+128, 32);
-	flow_table_add_field(sw->table0, "tp_src", MATCH_FIELD_PACKET, 112+160, 16);
-	flow_table_add_field(sw->table0, "tp_dst", MATCH_FIELD_PACKET, 112+176, 16);
+	/*flow_table_add_field(sw->table0, "tp_src", MATCH_FIELD_PACKET, 112+160, 16);
+	flow_table_add_field(sw->table0, "tp_dst", MATCH_FIELD_PACKET, 112+176, 16);*/
 
 	/* create table */
 	msg = msg_flow_table_add(sw->table0);
@@ -655,7 +706,7 @@ void maple_switch_up(struct xswitch *sw)
 }
 
 struct route *f(struct packet *pk);
-
+struct route *f_igmp(struct packet *pkt);
 void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
 	int i;
@@ -666,7 +717,12 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	trace_clear();
 
 	/* run */
-	r = f(&pk);
+	/*call f*/
+	printf("call f\n");
+	if(is_igmp(&pk))
+		r = f_igmp(&pk);
+	else
+		r = f(&pk);
 
 	/* learn */
 	for(i = 0; i < r->num_edges; i++) {

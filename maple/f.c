@@ -6,6 +6,8 @@
 #include "topo.h"
 #include "entity.h"
 
+#include "igmp.h"
+
 struct nodeinfo
 {
 	int parent;
@@ -148,45 +150,56 @@ static void get_switch(struct entity *host, struct entity **sw, int *port)
 
 struct route *f(struct packet *pkt)
 {
+	int i;
 	int switches_num;
 	struct route *r, *rx;
-	struct entity *src, *dst1;
-	int src_port, dst1_port, dst2_port;
+	struct entity *src, *dst;
+	int src_port, dst_port;
 	struct nodeinfo *visited;
+
 	/* inspect packet */
 	struct entity *hsrc = topo_get_host(read_packet(pkt, "dl_src"));
-	struct entity *hdst1 = topo_get_host(read_packet(pkt, "dl_dst"));
-//	struct entity *hdst2 = topo_get_host(value_from_48(3));
+	value_t dl_dst_v = read_packet(pkt, "dl_dst");
 	struct entity **switches = topo_get_switches(&switches_num);
 
+	/* init route */
 	r = route();
-	if (hsrc == NULL){
-		printf("aaaaaaaaaaaaaa\n");
-		return r;
-	}
-	if (hdst1 == NULL){
-		printf("bbbbbbbbbbbbb\n");
-		return r;
-	}
-// 	assert(hsrc && hdst1 && hdst2);
-
-	/* find connected switch */
-	get_switch(hsrc, &src, &src_port);
-	get_switch(hdst1, &dst1, &dst1_port);
-//	get_switch(hdst2, &dst2, &dst2_port);
-
 	/* calculate spanning tree */
+	get_switch(hsrc, &src, &src_port);
 	visited = get_tree(src, src_port, switches, switches_num);
 
-	/* get route */
-	rx = get_route(dst1, dst1_port, visited, switches, switches_num);
-	route_union(r, rx);
-	route_free(rx);
-/*	if(src != dst2) {
-		rx = get_route(dst2, dst2_port, visited, switches, switches_num);
+	/* 如果是单播，则只有一个源地址，一个目的地址；如果是多播，则有多个目标地址，此时应当查组，往组内所有成员发包 */
+	if(dl_dst_v.v[0] == 0x01 && dl_dst_v.v[1] == 0x00 && dl_dst_v.v[2] == 0x5e){ /* 多播mac地址为：01-00-5e-×-×-×形式 */
+		value_t nw_dst_v = read_packet(pkt, "nw_dst");
+		uint32_t groupid = value_to_32(nw_dst_v); //组地址
+		record("igmp_record");
+		uint32_t ngroup_member = get_origin_len(groupid); //目标组的成员个数
+		uint32_t *buffer = (uint32_t *)malloc(sizeof(uint32_t) * ngroup_member);
+		get_group_maddrs(groupid, buffer, ngroup_member); //获取一个组的所有成员到buffer里
+
+		for(i = 0; i < ngroup_member; i++){
+			uint32_t nw_dst = buffer[i];
+			struct entity *hdst = topo_get_host_by_paddr(nw_dst);
+			/* find connected switch */
+			get_switch(hdst, &dst, &dst_port);
+
+			assert(hsrc && hdst);
+			/* get and union route */
+			rx = get_route(dst, dst_port, visited, switches, switches_num);
+			route_union(r, rx);
+			route_free(rx);
+		}
+	}else{ /* 单播 */
+		struct entity *hdst = topo_get_host(dl_dst_v); //dst mac
+		assert(hsrc && hdst);
+		/* find connected switch */
+		get_switch(hdst, &dst, &dst_port);
+		/* get route */
+		rx = get_route(dst, dst_port, visited, switches, switches_num);
 		route_union(r, rx);
 		route_free(rx);
-	}*/
+	}
+
 	free(visited);
 	return r;
 }
