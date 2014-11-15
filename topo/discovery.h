@@ -11,8 +11,8 @@
 #include "topo.h"
 #include "packet_in.h"
 #include "lldp.h"
-#include "xswitch.h"
-#include "xswitch-private.h"
+#include "xswitch/xswitch.h"
+#include "xswitch/xswitch-private.h"
 // #include "spanning_tree.h"
 
 #define ETHERTYPE_IP 0x0800

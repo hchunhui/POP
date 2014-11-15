@@ -1,17 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "xswitch-private.h"
-#include "maple.h"
-#include "maple_api.h"
-#include "topo.h"
-#include "entity.h"
+#include "xswitch/xswitch-private.h"
+#include "topo/topo.h"
+#include "topo/entity.h"
 
+#include "maple.h"
 #include "packet_parser.h"
 #include "spec_parser.h"
 
-#include "igmp.h"
-
+#include "maple_api.h"
 
 static struct header *header_spec;
 

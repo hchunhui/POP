@@ -10,7 +10,7 @@ ${LIB}: .depends ${OBJS}
 	${AR} rcs ${LIB} ${OBJS}
 
 ${PROG}: .depends ${OBJS}
-	${CC} ${OBJS} -o ${PROG} ${CFLAGS} ${LDFLAGS}
+	${CC} -Wl,--start-group ${OBJS} -Wl,--end-group -o ${PROG} ${CFLAGS} ${LDFLAGS}
 
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@

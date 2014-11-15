@@ -3,8 +3,8 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "topo.h"
-#include "entity.h"
+#include "topo/topo.h"
+#include "topo/entity.h"
 
 #include "igmp.h"
 

@@ -1,7 +1,6 @@
 #ifndef _IGMP_H_
 #define _IGMP_H_
 
-#include "maple.h"
 #include "maple_api.h"
 #include "types.h"
 #include "value.h"

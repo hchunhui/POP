@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "entity.h"
-#include "xswitch-private.h"
+#include "xswitch/xswitch-private.h"
 
 struct entity
 {

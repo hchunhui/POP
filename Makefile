@@ -1,5 +1,5 @@
 
-SUBDIRS = io maple cbench main
+SUBDIRS = io xswitch maple topo apps cbench main
 
 all:
 	@for d in ${SUBDIRS}; do \

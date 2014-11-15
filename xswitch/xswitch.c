@@ -6,8 +6,8 @@
 #include "xswitch-private.h"
 #include "io/msgbuf.h"
 
-#include "maple.h"
-#include "topo.h"
+#include "maple/maple.h"
+#include "topo/topo.h"
 
 #include "io/sw.h"
 

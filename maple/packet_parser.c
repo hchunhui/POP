@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <assert.h>
-#include "xswitch.h"
+#include "xswitch/xswitch.h"
 #include "packet_parser.h"
 
 struct header {

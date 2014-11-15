@@ -1,6 +1,6 @@
 TOPDIR = ..
 EXTRA_CFLAGS = -g -O2 -Wall
-SRCS = packet_parser.c spec_parser.c maple.c
-LIB = libmaple.a
+SRCS = f.c igmp.c
+LIB = libapps.a
 
 include ${TOPDIR}/Makefile.comm
