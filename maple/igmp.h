@@ -87,7 +87,6 @@ struct igmpv3_query{
 	uint32_t src[0];
 };
 
-bool is_igmp(struct packet *pkt); //判断是否为igmp包
 uint32_t get_gtb_num(); //组表表项数目
 bool lookup_groupid(uint32_t groupid);	//查组地址
 bool lookup_origin_addr(uint32_t groupid, uint32_t origin_addr); //查（组地址，源地址）

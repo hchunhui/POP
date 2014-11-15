@@ -343,9 +343,9 @@ void clean_origin_address(uint32_t origin_addr){
 /********* Group Table End ***************************************/
 
 /*checksum calculate, return the host order*/
-uint16_t checksum(uint8_t *buff, uint16_t len){
+uint16_t checksum(const uint8_t *buff, int len){
 	int count = len >> 1;
-	uint16_t *data = (uint16_t *)buff;
+	const uint16_t *data = (const uint16_t *)buff;
 	uint32_t csum = 0;
 
 	int i;
@@ -362,26 +362,14 @@ uint16_t checksum(uint8_t *buff, uint16_t len){
 	return ~(low + high);
 }
 
-uint8_t buffer[MAX_PACKET_SIZE];
-bool is_igmp(struct packet *pkt){
-	/*判断是否为igmp包*/
-	value_t v = {{0}};
-	v = value_from_8(2);  //igmp协议号
-	if(test_equal(pkt, "nw_proto", v)){
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:test_equal(pkt, \"nw_proto\", v):true", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
-		return true;
-	}
-
-	return false;
-}
 struct route *f_igmp(struct packet *pkt){
 	int i;
+	const uint8_t *buffer;
+	int len;
+
 	/*get src ip*/
 	value_t v = {{0}};
+	assert(strcmp(read_header_type(pkt), "ipv4") == 0);
 	v = read_packet(pkt, "nw_src");
 /*write to log*/
 	log_buf_len = 0;
@@ -397,7 +385,7 @@ struct route *f_igmp(struct packet *pkt){
 /*write to log end*/
 
 	//判断IGMP的版本
-	uint16_t len = get_packet_data(pkt, "igmp_packet", buffer, MAX_PACKET_SIZE);
+	buffer = read_payload(pkt, &len);
 /*write to log*/
 	log_buf_len = 0;
 	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:get_packet_data, len=%d", __FILE__, __LINE__, len);

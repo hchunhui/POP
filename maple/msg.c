@@ -82,37 +82,98 @@ static struct msgbuf *make_echo_reply(uint32_t xid)
 	return msg;
 }
 
-static void fill_action(struct pof_action *ma, int num, struct action *a)
+static uint8_t u8(int x)
+{
+	assert(x >= 0 && x < 256);
+	return (uint8_t) x;
+}
+
+static uint16_t u16(int x)
+{
+	assert(x >= 0 && x < 65536);
+	return (uint16_t) x;
+}
+
+static uint32_t u32(int x)
+{
+	assert(x >= 0);
+	return (uint32_t) x;
+}
+
+static int fill_action(struct pof_action *ma, int num, struct action *a)
 {
 	struct pof_action_packet_in *ap;
 	struct pof_action_drop *ad;
 	struct pof_action_output *ao;
-	int i;
+	int i, idx;
 	assert(a->num_actions <= num);
 
+	idx = 0;
 	for(i = 0; i < a->num_actions; i++) {
 		switch(a->a[i].type) {
 		case AC_DROP:
-			ma[i].type = htons(POFAT_DROP);
-			ma[i].len = htons(4 + sizeof(*ad));
-			ad = (void *)(ma[i].action_data);
+			ma[idx].type = htons(POFAT_DROP);
+			ma[idx].len = htons(4 + sizeof(*ad));
+			ad = (void *)(ma[idx].action_data);
 			ad->reason_code = htonl(POFR_ACTION);
+			idx++;
 			break;
 		case AC_PACKET_IN:
-			ma[i].type = htons(POFAT_PACKET_IN);
-			ma[i].len = htons(4 + sizeof(*ap));
-			ap = (void *)(ma[i].action_data);
+			ma[idx].type = htons(POFAT_PACKET_IN);
+			ma[idx].len = htons(4 + sizeof(*ap));
+			ap = (void *)(ma[idx].action_data);
 			ap->reason_code = htonl(POFR_ACTION);
+			idx++;
 			break;
 		case AC_OUTPUT:
-			ma[i].type = htons(POFAT_OUTPUT);
-			ma[i].len = htons(4 + sizeof(*ao));
-			ao = (void *)(ma[i].action_data);
+			ma[idx].type = htons(POFAT_OUTPUT);
+			ma[idx].len = htons(4 + sizeof(*ao));
+			ao = (void *)(ma[idx].action_data);
 			ao->portId_type = 0;
-			ao->outputPortId.value = htonl(a->a[i].arg);
+			ao->outputPortId.value = htonl(a->a[i].arg1);
+			ao->metadata_offset = htons(0);
+			ao->metadata_len = htons(0);
+			ao->packet_offset = htons(0);
+			idx++;
+			break;
+		default:
+			assert(a->a[i].type == AC_GOTO_TABLE);
 			break;
 		}
 	}
+	return idx;
+}
+
+static int fill_instruction(struct pof_instruction *mi, int num, struct action *a)
+{
+	int i, idx;
+	struct pof_instruction_apply_actions *ia;
+	struct pof_instruction_goto_table *gt;
+	assert(a->num_actions <= num);
+
+	// fill action first
+	mi[0].type = htons(POFIT_APPLY_ACTIONS);
+	mi[0].len = htons(8 + sizeof(*ia));
+	ia = (void *)(mi[0].instruction_data);
+	ia->action_num = fill_action(ia->action, POF_MAX_ACTION_NUMBER_PER_INSTRUCTION, a);
+	idx = 1;
+	for(i = 0; i < a->num_actions; i++) {
+		switch(a->a[i].type) {
+		case AC_GOTO_TABLE:
+			mi[idx].type = htons(POFIT_GOTO_TABLE);
+			mi[idx].len = htons(sizeof(*gt));
+			gt = (void *)(mi[idx].instruction_data);
+			gt->next_table_id = u8(a->a[i].arg1);
+			gt->match_field_num = 0; //?
+			gt->packet_offset = htons(u16(a->a[i].arg2));
+			idx++;
+			break;
+		default:
+			break;
+		}
+	}
+	assert(ia->action_num + idx - 1 == a->num_actions);
+	return idx;
 }
 
 static uint8_t get_pof_table_type(enum flow_table_type type)
@@ -135,24 +196,6 @@ static uint16_t get_pof_match_field_id(enum match_field_type type)
 		return 0xffff;
 	}
 	abort();
-}
-
-static uint8_t u8(int x)
-{
-	assert(x >= 0 && x < 256);
-	return (uint8_t) x;
-}
-
-static uint16_t u16(int x)
-{
-	assert(x >= 0 && x < 65536);
-	return (uint16_t) x;
-}
-
-static uint32_t u32(int x)
-{
-	assert(x >= 0);
-	return (uint32_t) x;
 }
 
 /* export functions */
@@ -238,15 +281,13 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 	int i;
 	struct msgbuf *msg;
 	struct pof_flow_entry *mfe;
-	struct pof_instruction_apply_actions *ia;
-	int num_actions;
 
 	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_flow_entry),
 		     POFT_FLOW_MOD, &msg);
 	mfe = GET_BODY(msg);
 	mfe->command = POFFC_ADD;
 	mfe->match_field_num = u8(ft->fields_num);
-	mfe->instruction_num = 1;
+	mfe->instruction_num = 0; //set later
 
 	mfe->table_id = u8(ft->tid);
 	mfe->table_type = get_pof_table_type(ft->type);
@@ -262,28 +303,17 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 		memset(mfe->match[i].mask, 0, POF_MAX_FIELD_LENGTH_IN_BYTE);
 	}
 	for(i = 0; i < ma->fields_num; i++) {
-		if(ma->m[i].index >= 0 && ma->m[i].index < ft->fields_num) {
-			int idx = ma->m[i].index;
-			int bytes = (ft->fields[idx].length + 7) / 8;
-			memcpy(mfe->match[idx].value,
-			       ma->m[i].value.v,
-			       bytes);
-			memcpy(mfe->match[idx].mask,
-			       ma->m[i].mask.v,
-			       bytes);
-		}
+		int idx = flow_table_get_field_index(ft, ma->m[i].name);
+		assert(idx >= 0);
+		int bytes = (ft->fields[idx].length + 7) / 8;
+		memcpy(mfe->match[idx].value,
+		       ma->m[i].value.v,
+		       bytes);
+		memcpy(mfe->match[idx].mask,
+		       ma->m[i].mask.v,
+		       bytes);
 	}
-
-	mfe->instruction[0].type = htons(POFIT_APPLY_ACTIONS);
-	mfe->instruction[0].len = htons(8 + sizeof(*ia));
-	ia = (void *)(mfe->instruction[0].instruction_data);
-
-	num_actions = action_num_actions(a);
-	if(num_actions > POF_MAX_ACTION_NUMBER_PER_INSTRUCTION)
-		num_actions = POF_MAX_ACTION_NUMBER_PER_INSTRUCTION;
-
-	ia->action_num = u8(num_actions);
-	fill_action(ia->action, num_actions, a);
+	mfe->instruction_num = fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a);
 	return msg;
 }
 
@@ -291,7 +321,10 @@ struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, stru
 {
 	struct msgbuf *msg;
 	struct pof_packet_out *mpo;
-	int num_actions = action_num_actions(a);
+	int num_actions = action_num_actions(a); //upper bound
+	struct pof_action buf[num_actions];
+	num_actions = fill_action(buf, num_actions, a); //real size
+
 	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_packet_out) +
 		     num_actions * sizeof(struct pof_action) + pkt_len,
 		     POFT_PACKET_OUT,

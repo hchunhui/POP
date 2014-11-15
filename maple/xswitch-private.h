@@ -17,6 +17,7 @@ struct xswitch
 	int n_ports;
 	//TODO port number
 	int hack_start_prio;
+	int next_table_id;
 	//struct rconn *rconn;
 	struct flow_table *table0;
 	struct trace_tree_header *trace_tree;
@@ -62,7 +63,7 @@ struct match
 {
 	int fields_num;
 	struct {
-		int index;
+		char name[MATCH_FIELD_NAME_LEN];
 		value_t value;
 		value_t mask;
 	} m[FLOW_TABLE_NUM_FIELDS];
@@ -76,7 +77,8 @@ struct action
 	int num_actions;
 	struct {
 		enum action_type type;
-		int arg;
+		int arg1;
+		int arg2;
 	} a[ACTION_NUM_ACTIONS];
 };
 

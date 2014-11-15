@@ -16,45 +16,6 @@ static void inline get_next_available_waiting_host()
 			break;
 	next_available_waiting_host = i;
 }
-int 
-arp_default_flow_install(struct xswitch *sw, int prio)
-{
-        struct match *ma;
-        struct msgbuf *msg;
-        struct action *ac;
-        int idx;
-        ma = match();
-        idx = flow_table_get_field_index(sw->table0, "dl_type");
-        if(idx >= 0)
-                match_add(ma, idx, value_from_16(ETHERTYPE_ARP), value_from_16(0xffff));
-        ac = action();
-        action_add(ac, AC_PACKET_IN, 0); 
-        msg = msg_flow_entry_add(sw->table0, prio, ma, ac);
-        match_free(ma);
-        action_free(ac);
-        xswitch_send(sw, msg);
-        return prio;
-}
-
-int 
-lldp_flow_install(struct xswitch *sw, int prio)
-{
-        struct match *ma;
-        struct msgbuf *msg;
-        struct action *ac;
-        int idx;
-        ma = match();
-        idx = flow_table_get_field_index(sw->table0, "dl_type");
-        if(idx >= 0)
-                match_add(ma, idx, value_from_16(LLDP_TYPE), value_from_16(0xffff));
-        ac = action();
-        action_add(ac, AC_PACKET_IN, 0); 
-        msg = msg_flow_entry_add(sw->table0, prio, ma, ac);
-        match_free(ma);
-        action_free(ac);
-        xswitch_send(sw, msg);
-        return prio;
-}
 
 static uint8_t * 
 lldp_pkt_construct(dpid_t dpid, port_t port, int *len/*OUT*/);

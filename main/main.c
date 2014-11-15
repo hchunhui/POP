@@ -15,6 +15,7 @@
 
 #include "pof/pof_global.h"
 
+extern void xswitch_init(void);
 extern struct xswitch *xswitch_on_accept(struct sw *_sw);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
 extern void xswitch_on_close(struct sw *_sw);
@@ -77,6 +78,7 @@ main(int argc, char **argv)
 	argv += optind;
 
 	init_io_module();
+	xswitch_init();
 
 #if 0
 	while (1) {

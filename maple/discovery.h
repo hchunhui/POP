@@ -20,15 +20,11 @@
 #define LLDP_DST 0x0180C200000E
 #define LLDP_TYPE 0x88CC
 
-int
-lldp_flow_install(struct xswitch *sw, int prio);
 void
 lldp_packet_send(struct xswitch *sw);
 int
 handle_lldp_packet_in(const struct packet_in *packet_in);
 int
 handle_topo_packet_in(const struct packet_in *packet_in);
-int 
-arp_default_flow_install(struct xswitch *sw, int prio);
 
 #endif

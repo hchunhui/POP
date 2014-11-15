@@ -148,33 +148,51 @@ static void get_switch(struct entity *host, struct entity **sw, int *port)
 	*port = adjs->adj_in_port;
 }
 
+static bool is_multicast_ip(uint32_t ip)
+{
+	if((ip >> 24) >= 224 && (ip >> 24) < 240)
+		return true;
+	return false;
+}
+
+struct route *f_igmp(struct packet *pkt);
 struct route *f(struct packet *pkt)
 {
 	int i;
 	int switches_num;
+	struct entity **switches = topo_get_switches(&switches_num);
 	struct route *r, *rx;
 	struct entity *src, *dst;
 	int src_port, dst_port;
 	struct nodeinfo *visited;
+	uint32_t hdst_ip, hsrc_ip;
+	struct entity *hsrc;
 
 	/* inspect packet */
-	struct entity *hsrc = topo_get_host(read_packet(pkt, "dl_src"));
-	value_t dl_dst_v = read_packet(pkt, "dl_dst");
-	struct entity **switches = topo_get_switches(&switches_num);
+	pull_header(pkt);
+	if(strcmp(read_header_type(pkt), "ipv4") != 0)
+		return route();
+	hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
+	hdst_ip = value_to_32(read_packet(pkt, "nw_dst"));
+
+	if(test_equal(pkt, "nw_proto", value_from_8(0x02))) {
+		return f_igmp(pkt);
+	}
 
 	/* init route */
 	r = route();
+
 	/* calculate spanning tree */
+	hsrc = topo_get_host_by_paddr(hsrc_ip);
+	assert(hsrc);
 	get_switch(hsrc, &src, &src_port);
 	visited = get_tree(src, src_port, switches, switches_num);
 
-	/* 如果是单播，则只有一个源地址，一个目的地址；如果是多播，则有多个目标地址，此时应当查组，往组内所有成员发包 */
-	if(dl_dst_v.v[0] == 0x01 && dl_dst_v.v[1] == 0x00 && dl_dst_v.v[2] == 0x5e){ /* 多播mac地址为：01-00-5e-×-×-×形式 */
-		value_t nw_dst_v = read_packet(pkt, "nw_dst");
-		uint32_t groupid = value_to_32(nw_dst_v); //组地址
-		record("igmp_record");
-		uint32_t ngroup_member = get_origin_len(groupid); //目标组的成员个数
+	if(is_multicast_ip(hdst_ip)) {
+		uint32_t groupid = hdst_ip; //组地址
+		int ngroup_member = get_origin_len(groupid); //目标组的成员个数
 		uint32_t *buffer = (uint32_t *)malloc(sizeof(uint32_t) * ngroup_member);
+		record("igmp_record");
 		get_group_maddrs(groupid, buffer, ngroup_member); //获取一个组的所有成员到buffer里
 
 		for(i = 0; i < ngroup_member; i++){
@@ -182,16 +200,15 @@ struct route *f(struct packet *pkt)
 			struct entity *hdst = topo_get_host_by_paddr(nw_dst);
 			/* find connected switch */
 			get_switch(hdst, &dst, &dst_port);
-
 			assert(hsrc && hdst);
 			/* get and union route */
 			rx = get_route(dst, dst_port, visited, switches, switches_num);
 			route_union(r, rx);
 			route_free(rx);
 		}
-	}else{ /* 单播 */
-		struct entity *hdst = topo_get_host(dl_dst_v); //dst mac
-		assert(hsrc && hdst);
+	} else {
+		struct entity *hdst = topo_get_host_by_paddr(hdst_ip);
+		assert(hdst);
 		/* find connected switch */
 		get_switch(hdst, &dst, &dst_port);
 		/* get route */

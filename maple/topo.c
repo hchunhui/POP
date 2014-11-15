@@ -147,9 +147,7 @@ void topo_switch_up(struct xswitch *sw)
 	if(num_switches >= 100)
 		abort();
 	switches[num_switches++] = e;
-	lldp_flow_install(sw, 2);
 	lldp_packet_send(sw);
-	arp_default_flow_install(sw, 1);
 	/* hack */
 	/*
 	if(num_switches == 4) {

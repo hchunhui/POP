@@ -22,20 +22,23 @@ void flow_table_free(struct flow_table *ft);
 void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length);
 int flow_table_get_field_index(struct flow_table *ft, const char *name);
+int flow_table_get_tid(struct flow_table *ft);
 
 
 /* match */
 struct match *match(void);
 struct match *match_copy(struct match *m);
-void match_add(struct match *m, int index, value_t value, value_t mask);
+void match_add(struct match *m, const char *name, value_t value, value_t mask);
 void match_free(struct match *m);
+void match_dump(struct match *m, char *buf, int n);
 
 
 /* action */
-enum action_type { AC_DROP, AC_PACKET_IN, AC_OUTPUT };
+enum action_type { AC_DROP, AC_PACKET_IN, AC_OUTPUT, AC_GOTO_TABLE };
 struct action *action(void);
 struct action *action_copy(struct action *a);
 void action_add(struct action *a, enum action_type type, int arg);
+void action_add2(struct action *a, enum action_type type, int arg1, int arg2);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);
