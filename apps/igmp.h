@@ -95,5 +95,6 @@ void insert_gtb(uint32_t groupid, uint32_t origin_addr); //将（组地址，源
 void delete_gtb(uint32_t groupid); //删除一个组地址选项
 void delete_origin_address(uint32_t groupid, uint32_t origin_addr); //删除一个（组地址，源地址）对
 void clean_origin_address(uint32_t origin_addr); //清除一个主机
+void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len);
 
 #endif  /*_IGMP_H_*/

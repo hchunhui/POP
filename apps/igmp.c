@@ -252,6 +252,7 @@ bool lookup_origin_addr(uint32_t groupid, uint32_t origin_addr){
 uint32_t get_origin_len(uint32_t groupid){
 	uint32_t ret = 0;
 	struct GroupTable *ptb = _get_group_entry(groupid);
+	record(RECORD_NAME);
 	while(ptb != NULL){
 		if(ptb->groupid == groupid){
 			return ptb->origin_len;
@@ -267,6 +268,7 @@ uint32_t get_origin_len(uint32_t groupid){
 uint32_t get_group_maddrs(uint32_t groupid, uint32_t *buffer, uint32_t nums){
 	struct GroupTable *ptb = _get_group_entry(groupid);
 	uint32_t ret = 0; //the num of origin_addr write in buffer
+	record(RECORD_NAME);
 	while(ptb != NULL){
 		if(ptb->groupid == groupid){
 			ret = ptb->origin_len;
@@ -362,37 +364,11 @@ uint16_t checksum(const uint8_t *buff, int len){
 	return ~(low + high);
 }
 
-struct route *f_igmp(struct packet *pkt){
+void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
+{
 	int i;
-	const uint8_t *buffer;
-	int len;
-
-	/*get src ip*/
-	value_t v = {{0}};
-	assert(strcmp(read_header_type(pkt), "ipv4") == 0);
-	v = read_packet(pkt, "nw_src");
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:read_packet(pkt, \"nw_src\")", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
-
-	uint32_t src_ip = value_to_32(v);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:read_packet(pkt, \"nw_src\"), src_ip=0x%x", __FILE__, __LINE__, src_ip);
-	write_log(log_buf);
-/*write to log end*/
-
-	//判断IGMP的版本
-	buffer = read_payload(pkt, &len);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:get_packet_data, len=%d", __FILE__, __LINE__, len);
-	write_log(log_buf);
-/*write to log end*/
 	if( checksum(buffer, len) != 0)
-		return route(); /*checksum not equal zero, drop*/
+		return;
 	if(len == IGMP_HEADER_LEN){ 	//igmp v1, v2`
 		struct igmphdr *igmp = (struct igmphdr *)buffer;
 		uint32_t groupid = igmp->groupid;
@@ -548,7 +524,7 @@ struct route *f_igmp(struct packet *pkt){
 /*write to log end*/
 		/*only deal with membership report*/
 		if(igmpv3_pkt->type != V3_MEMBERSHIP_REPORT)
-			return route();
+			return;
 		uint16_t ngrecord = ntohs(igmpv3_pkt->ngrecord);
 		uint8_t *grecord = (uint8_t *)igmpv3_pkt->grec;
 		int i;
@@ -846,12 +822,7 @@ struct route *f_igmp(struct packet *pkt){
 		}
 	}else{
 		/*error, drop */
-		return route();
+		return;
 	}
-	return route(); //不下发流表，则返回路径为NULL
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:return", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
+	return;
 }
