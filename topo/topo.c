@@ -204,10 +204,10 @@ bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 	return true;
 }
 
-void topo_switch_port_down(struct xswitch *sw, port_t port)
+void topo_switch_port_down(struct xswitch *sw, int port)
 {
 	int i;
-	port_t sw_port;
+	int sw_port;
 	struct entity *esw;
 	struct xswitch *xsw;
 	for (i = 0; i < num_hosts; i++) {
@@ -228,7 +228,7 @@ void topo_switch_down(struct xswitch *sw)
 	int i, j;
 	int num_adjs;
 	const struct entity_adj *e_adjs;
-	port_t sw_port;
+	int sw_port;
 	for(i = 0; i < num_switches; i++) {
 		if(entity_get_xswitch(switches[i]) == sw) {
 			e_adjs = entity_get_adjs(switches[i], &num_adjs);

@@ -563,7 +563,7 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 	struct haddr hsrc_addr;
 	struct host_info hinfo;
 	uint32_t psrc_addr = 0;
-	port_t sw_port;
+	int sw_port;
 	int i;
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
 	for (i = 0; i < 6; i++)

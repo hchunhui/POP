@@ -96,7 +96,7 @@ struct host_info entity_get_addr(struct entity *e)
 	assert(e->type == ENTITY_TYPE_HOST);
 	return e->u.addr;
 }
-struct entity *entity_host_get_adj_switch(struct entity *e, port_t *sw_port)
+struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
 {
 //	printf("e: %p  sw_port: %p\n", e, sw_port);
         if (e->type != ENTITY_TYPE_HOST)
@@ -105,7 +105,7 @@ struct entity *entity_host_get_adj_switch(struct entity *e, port_t *sw_port)
 //      printf("e %p\n", e->adjs[0].adj_entity);
         return e->adjs[0].adj_entity;
 }
-void entity_adj_down(struct entity *e, port_t port)
+void entity_adj_down(struct entity *e, int port)
 {
         int i;
         if (e->type == ENTITY_TYPE_HOST)

@@ -43,10 +43,10 @@ struct xswitch *entity_get_xswitch(struct entity *e);
 dpid_t entity_get_dpid(struct entity *e);
 struct host_info entity_get_addr(struct entity *e);
 
-struct entity *entity_host_get_adj_switch(struct entity *e, port_t *sw_port);
+struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port);
 const struct entity_adj *entity_get_adjs(struct entity *e, int *pnum);
 void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2);
 void entity_print(struct entity *e);
-void entity_adj_down(struct entity *e, port_t port);
+void entity_adj_down(struct entity *e, int port);
 
 #endif /* _ENTITY_H_ */
