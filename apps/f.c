@@ -9,16 +9,6 @@
 #include "igmp.h"
 #include "spanning_tree.h"
 
-static void get_switch(struct entity *host, struct entity **sw, int *port)
-{
-	const struct entity_adj *adjs;
-	int num_adjs;
-	adjs = entity_get_adjs(host, &num_adjs);
-	assert(num_adjs == 1);
-	*sw = adjs->adj_entity;
-	*port = adjs->adj_in_port;
-}
-
 static bool is_multicast_ip(uint32_t ip)
 {
 	if((ip >> 24) >= 224 && (ip >> 24) < 240)
@@ -56,7 +46,7 @@ struct route *f(struct packet *pkt)
 	/* calculate spanning tree */
 	hsrc = topo_get_host_by_paddr(hsrc_ip);
 	assert(hsrc);
-	get_switch(hsrc, &src, &src_port);
+	src = entity_host_get_adj_switch(hsrc, &src_port);
 	visited = get_tree(src, src_port, switches, switches_num);
 
 	/* add routes */
@@ -73,7 +63,7 @@ struct route *f(struct packet *pkt)
 			hdst = topo_get_host_by_paddr(buffer[i]);
 			assert(hdst);
 			/* find connected switch */
-			get_switch(hdst, &dst, &dst_port);
+			dst = entity_host_get_adj_switch(hdst, &dst_port);
 			/* get and union route */
 			rx = get_route(dst, dst_port, visited, switches, switches_num);
 			route_union(r, rx);
@@ -84,7 +74,7 @@ struct route *f(struct packet *pkt)
 		hdst = topo_get_host_by_paddr(hdst_ip);
 		assert(hdst);
 		/* find connected switch */
-		get_switch(hdst, &dst, &dst_port);
+		dst = entity_host_get_adj_switch(hdst, &dst_port);
 		/* get route */
 		r = get_route(dst, dst_port, visited, switches, switches_num);
 	}
