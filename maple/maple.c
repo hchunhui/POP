@@ -718,6 +718,31 @@ void invalidate(const char *name)
 	trace_IE(name);
 }
 
+struct entity **get_hosts(int *pnum)
+{
+	return topo_get_hosts(pnum);
+}
+
+struct entity **get_switches(int *pnum)
+{
+	return topo_get_switches(pnum);
+}
+
+struct entity *get_switch(dpid_t dpid)
+{
+	return topo_get_switch(dpid);
+}
+
+struct entity *get_host_by_haddr(haddr_t addr)
+{
+	return topo_get_host_by_haddr(addr);
+}
+
+struct entity *get_host_by_paddr(uint32_t addr)
+{
+	return topo_get_host_by_paddr(addr);
+}
+
 void maple_init(void)
 {
 	fprintf(stderr, "loading header spec...\n");

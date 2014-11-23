@@ -105,18 +105,6 @@ struct entity *topo_get_host_by_paddr(uint32_t addr)
 	return NULL;
 }
 
-struct entity *topo_get_host(value_t addr)
-{
-	int i;
-	struct host_info hinfo;
-	for(i = 0; i < num_hosts; i++) {
-		hinfo = entity_get_addr(hosts[i]);
-		if(haddr_equal(hinfo.haddr, value_to_haddr(addr)))
-			return hosts[i];
-	}
-	return NULL;
-}
-
 struct entity *topo_get_switch(dpid_t dpid)
 {
 	int i;

@@ -13,7 +13,6 @@ void topo_switch_port_down(struct xswitch *sw, int port);
 
 struct entity **topo_get_hosts(int *pnum);
 struct entity **topo_get_switches(int *pnum);
-struct entity *topo_get_host(value_t addr);
 struct entity *topo_get_switch(dpid_t dpid);
 struct entity *topo_get_host_by_haddr(haddr_t addr);
 struct entity *topo_get_host_by_paddr(uint32_t addr);

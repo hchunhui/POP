@@ -3,7 +3,6 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "topo/topo.h"
 #include "entity.h"
 
 #include "igmp.h"
@@ -19,7 +18,7 @@ static bool is_multicast_ip(uint32_t ip)
 struct route *f(struct packet *pkt)
 {
 	int switches_num;
-	struct entity **switches = topo_get_switches(&switches_num);
+	struct entity **switches = get_switches(&switches_num);
 	struct route *r;
 	struct entity *src, *dst;
 	int src_port, dst_port;
@@ -44,7 +43,7 @@ struct route *f(struct packet *pkt)
 	}
 
 	/* calculate spanning tree */
-	hsrc = topo_get_host_by_paddr(hsrc_ip);
+	hsrc = get_host_by_paddr(hsrc_ip);
 	assert(hsrc);
 	src = entity_host_get_adj_switch(hsrc, &src_port);
 	visited = get_tree(src, src_port, switches, switches_num);
@@ -60,7 +59,7 @@ struct route *f(struct packet *pkt)
 
 		r = route();
 		for(i = 0; i < ngroup_member; i++){
-			hdst = topo_get_host_by_paddr(buffer[i]);
+			hdst = get_host_by_paddr(buffer[i]);
 			assert(hdst);
 			/* find connected switch */
 			dst = entity_host_get_adj_switch(hdst, &dst_port);
@@ -71,7 +70,7 @@ struct route *f(struct packet *pkt)
 		}
 		free(buffer);
 	} else {
-		hdst = topo_get_host_by_paddr(hdst_ip);
+		hdst = get_host_by_paddr(hdst_ip);
 		assert(hdst);
 		/* find connected switch */
 		dst = entity_host_get_adj_switch(hdst, &dst_port);
