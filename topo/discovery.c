@@ -8,7 +8,7 @@
 static struct entity *arp_waiting_hosts[20];
 static int next_available_waiting_host;
 
-static void inline get_next_available_waiting_host()
+static inline void get_next_available_waiting_host()
 {
 	int i;
 	for (i = 0; i < 20; i++)
@@ -267,9 +267,9 @@ struct arp_header {
 #define ARPOP_REVREQUEST 3
 #define ARPOP_REVREPLY	4
 
-	struct haddr arp_sha;
+	haddr_t arp_sha;
 	uint32_t arp_spa;
-	struct haddr arp_tha;
+	haddr_t arp_tha;
 	uint32_t arp_tpa;
 
 };
@@ -560,7 +560,7 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 	struct entity *host, *phost;
 	struct entity *esw;
 	struct entity *oldesw;
-	struct haddr hsrc_addr;
+	haddr_t hsrc_addr;
 	struct host_info hinfo;
 	uint32_t psrc_addr = 0;
 	int sw_port;

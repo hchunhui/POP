@@ -401,7 +401,7 @@ static bool augment_tt(struct trace_tree_header **tree, struct trace *trace, str
 			/* ev->type == EV_R */
 			assert(ev->type == EV_R);
 			for(j = 0; j < t_V->num_branches; j++) {
-				if(value_equ(t_V->branches[j].value, ev->u.r.value)) {
+				if(value_equal(t_V->branches[j].value, ev->u.r.value)) {
 					t = &(t_V->branches[j].tree);
 					break;
 				}
@@ -698,7 +698,7 @@ value_t read_packet(struct packet *pkt, const char *field)
 bool test_equal(struct packet *pkt, const char *field, value_t value)
 {
 	value_t v = packet_parser_read(pkt->pp, field);
-	bool result = value_equ(v, value);
+	bool result = value_equal(v, value);
 	trace_T(field, value, result);
 	return result;
 }

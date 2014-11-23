@@ -82,7 +82,7 @@ int topo_del_switch(struct entity *e)
 		}
 	return -1;
 }
-struct entity *topo_get_host_by_haddr(struct haddr addr)
+struct entity *topo_get_host_by_haddr(haddr_t addr)
 {
 	int i;
 	struct host_info h1;

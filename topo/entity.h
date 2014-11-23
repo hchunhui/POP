@@ -15,25 +15,12 @@ struct entity_adj
 	int adj_in_port;
 	struct entity *adj_entity;
 };
-struct haddr;
-/*{
-	uint8_t octet[6];
-};*/
+
 struct host_info
 {
-	struct haddr haddr;
+	haddr_t haddr;
 	uint32_t paddr;
 };
-
-static inline bool
-haddr_equal(struct haddr h1, struct haddr h2)
-{
-	int i;
-	for (i = 0; i < 6; i++)
-		if (h1.octet[i] != h2.octet[i])
-			return false;
-	return true;
-}
 
 struct entity *entity_host(struct host_info addr);
 struct entity *entity_switch(struct xswitch *xs);

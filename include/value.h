@@ -5,24 +5,26 @@
 #include <string.h>
 #define VALUE_LEN 8
 
-struct haddr {
+typedef struct {
 	uint8_t octet[6];
-};
+} haddr_t;
+
 typedef struct {
 	uint8_t v[VALUE_LEN];
 } value_t;
 
-// value_t to haddr
-static inline struct haddr value_to_haddr(value_t v)
+/* value_t to haddr_t */
+static inline haddr_t value_to_haddr(value_t v)
 {
-	struct haddr h;
+	haddr_t h;
 	int i;
 	for (i=0; i<6; i++)
 		h.octet[i] = v.v[i];
 	return h;
 }
-// haddr to value_t
-static inline value_t value_from_haddr(struct haddr *h)
+
+/* haddr_t to value_t */
+static inline value_t value_from_haddr(haddr_t *h)
 {
 	value_t v = {{0}};
 	int i;
@@ -30,6 +32,17 @@ static inline value_t value_from_haddr(struct haddr *h)
 		v.v[i] = h->octet[i];
 	return v;
 }
+
+/* haddr_t equal */
+static inline bool haddr_equal(haddr_t h1, haddr_t h2)
+{
+	int i;
+	for (i = 0; i < 6; i++)
+		if (h1.octet[i] != h2.octet[i])
+			return false;
+	return true;
+}
+
 /* big endian value to native integer */
 static inline uint8_t value_to_8(value_t v)
 {
@@ -222,6 +235,7 @@ static inline value_t value_from_64l(uint64_t x)
 	return v;
 }
 
+/* extract value from a buffer */
 static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 {
 	value_t v = {{0}};
@@ -243,7 +257,8 @@ static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 	return v;
 }
 
-static inline bool value_equ(value_t a, value_t b)
+/* value_t equal */
+static inline bool value_equal(value_t a, value_t b)
 {
 	int i;
 	for(i = 0; i < VALUE_LEN; i++)

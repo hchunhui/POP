@@ -152,7 +152,7 @@ void packet_parser_pull(struct packet_parser *pp,
 	*old_spec = pp->current;
 	*sel_value = v;
 	for(j = 0; j < pp->current->num_next; j++) {
-		if(value_equ(pp->current->next[j].v, v)) {
+		if(value_equal(pp->current->next[j].v, v)) {
 			pp->head += pp->current->length;
 			pp->current = pp->current->next[j].h;
 			assert(pp->head <= pp->data + pp->length);
