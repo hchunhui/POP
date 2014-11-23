@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
-#include "topo/entity.h"
+#include "topo/entity-private.h"
 
 #include "maple.h"
 #include "packet_parser.h"

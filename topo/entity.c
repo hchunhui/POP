@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "entity.h"
+#include "entity-private.h"
 #include "xswitch/xswitch-private.h"
 
 struct entity

@@ -4,7 +4,7 @@
 #include "types.h"
 #include "maple_api.h"
 #include "topo/topo.h"
-#include "topo/entity.h"
+#include "entity.h"
 
 #include "igmp.h"
 #include "spanning_tree.h"

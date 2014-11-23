@@ -3,7 +3,7 @@
 #include "types.h"
 #include "xswitch/xswitch-private.h"
 #include "topo.h"
-#include "entity.h"
+#include "entity-private.h"
 #include "discovery.h"
 #include "packet_in.h"
 // TODO next for delete

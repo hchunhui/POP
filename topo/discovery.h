@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "entity.h"
+#include "entity-private.h"
 #include "link.h"
 #include "value.h"
 #include "types.h"
