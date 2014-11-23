@@ -232,6 +232,11 @@ void topo_switch_down(struct xswitch *sw)
 	for(i = 0; i < num_switches; i++) {
 		if(entity_get_xswitch(switches[i]) == sw) {
 			e_adjs = entity_get_adjs(switches[i], &num_adjs);
+			for (j = 0; j < num_adjs; j++) {
+				if(ENTITY_TYPE_SWITCH == entity_get_type(e_adjs[j].adj_entity)) {
+					entity_adj_down(e_adjs[j].adj_entity, e_adjs[j].adj_in_port);
+				}
+			}
 			for (j = 0; j < num_hosts; j++) {
 				// printf("e: %p  sw_port=%p\n", hosts[j], &sw_port);
 				if(entity_host_get_adj_switch(hosts[j], &sw_port) == switches[i]) {
@@ -242,11 +247,6 @@ void topo_switch_down(struct xswitch *sw)
 					num_hosts --;
 					if (j != num_hosts)
 						hosts[j] = hosts[num_hosts];
-				}
-			}
-			for (j = 0; j < num_adjs; j++) {
-				if(ENTITY_TYPE_SWITCH == entity_get_type(e_adjs[j].adj_entity)) {
-					entity_adj_down(e_adjs[j].adj_entity, e_adjs[j].adj_in_port);
 				}
 			}
 			// free hosts
