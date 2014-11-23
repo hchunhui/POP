@@ -88,6 +88,8 @@ void xswitch_on_close(struct sw *_sw)
 static void init_table0(struct xswitch *sw)
 {
 	struct msgbuf *msg;
+	struct match *ma;
+	struct action *ac;
 	/* init match fields */
 	sw->table0 = flow_table(0, FLOW_TABLE_TYPE_MM, 10);
 	flow_table_add_field(sw->table0, "in_port", MATCH_FIELD_METADATA, 16, 8);
@@ -104,7 +106,16 @@ static void init_table0(struct xswitch *sw)
 	/* create table */
 	msg = msg_flow_table_add(sw->table0);
 	xswitch_send(sw, msg);
-	sw->hack_start_prio = 0;
+
+	/* init entry */
+	ma = match();
+	ac = action();
+	action_add(ac, AC_PACKET_IN, 0);
+	msg = msg_flow_entry_add(sw->table0, 0, ma, ac);
+	sw->hack_start_prio = 1;
+	match_free(ma);
+	action_free(ac);
+	xswitch_send(sw, msg);
 }
 
 //--- message handlers

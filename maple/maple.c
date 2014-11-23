@@ -729,8 +729,6 @@ void maple_switch_up(struct xswitch *sw)
 {
 	/* init trace tree */
 	sw->trace_tree = trace_tree_E();
-	/* init entry */
-	init_entry(sw, sw->table0, &(sw->hack_start_prio));
 }
 
 struct route *f(struct packet *pk);
