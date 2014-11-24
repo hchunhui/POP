@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "types.h"
-#include "xswitch/xswitch-private.h"
+#include "xswitch/xswitch.h"
 #include "topo.h"
 #include "entity-private.h"
 #include "discovery.h"
@@ -110,7 +110,7 @@ struct entity *topo_get_switch(dpid_t dpid)
 	int i;
 	for(i = 0; i < num_switches; i++) {
 		struct xswitch *xs = entity_get_xswitch(switches[i]);
-		if(xs->dpid == dpid) {
+		if(xswitch_get_dpid(xs) == dpid) {
 			return switches[i];
 		}
 	}
@@ -183,7 +183,7 @@ bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 		packet,
 		packet_len,
 		in_port,
-		sw->dpid,
+		xswitch_get_dpid(sw),
 	};
 	int rt = handle_topo_packet_in(&pkt_in);
 	printf("return value %d\n", rt);
