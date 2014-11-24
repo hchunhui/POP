@@ -3,6 +3,7 @@
 
 #include "types.h"
 
+struct xswitch;
 struct entity;
 enum entity_type { ENTITY_TYPE_HOST, ENTITY_TYPE_SWITCH };
 struct entity_adj
@@ -16,6 +17,7 @@ enum entity_type entity_get_type(struct entity *e);
 dpid_t entity_get_dpid(struct entity *e);
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port);
 const struct entity_adj *entity_get_adjs(struct entity *e, int *pnum);
+struct xswitch *entity_get_xswitch(struct entity *e);
 void entity_print(struct entity *e);
 
 #endif /* _ENTITY_H_ */

@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
-#include "topo/entity-private.h"
+#include "entity.h"
 #include "route.h"
 
 #include "maple.h"
