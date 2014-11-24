@@ -234,6 +234,7 @@ async_accept_cb(struct ev_loop *loop, ev_async *w, int revents)
 	struct sw *sw;
 	struct cq_item *item;
 
+again:
 	item = cq_pop(&me->new_conn_queue);
 	if (item == NULL)
 		return;
@@ -263,6 +264,8 @@ async_accept_cb(struct ev_loop *loop, ev_async *w, int revents)
 
 	free(item);
 	accept_cb_func(sw);
+
+	goto again;
 }
 
 static void *
