@@ -12,6 +12,8 @@ struct action;
 
 /* xswitch */
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
+dpid_t xswitch_get_dpid(struct xswitch *sw);
+int xswitch_get_num_ports(struct xswitch *sw);
 
 
 /* flow table */

@@ -22,6 +22,16 @@ void xswitch_send(struct xswitch *sw, struct msgbuf *b)
 	send_msgbuf(b);
 }
 
+dpid_t xswitch_get_dpid(struct xswitch *sw)
+{
+	return sw->dpid;
+}
+
+int xswitch_get_num_ports(struct xswitch *sw)
+{
+	return sw->n_ports;
+}
+
 struct xswitch *xswitch_on_accept(struct sw *_sw)
 {
 	struct xswitch *sw;

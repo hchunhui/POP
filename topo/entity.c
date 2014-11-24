@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include "entity-private.h"
-#include "xswitch/xswitch-private.h"
+#include "xswitch/xswitch.h"
 
 struct entity
 {
@@ -26,10 +26,11 @@ void entity_print(struct entity *e)
 		printf("\nIPv4: %08x\n", e->u.addr.paddr);
 		printf("num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port, (e->adjs[i].adj_entity)->u.xs->dpid);
+			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port,
+			       entity_get_dpid(e->adjs[i].adj_entity));
 		}
 	} else if (e->type == ENTITY_TYPE_SWITCH) {
-		printf("\nSWITCH:\nDpid: %d\n", e->u.xs->dpid);
+		printf("\nSWITCH:\nDpid: %d\n", entity_get_dpid(e));
 		printf("num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
 			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port, (e->adjs[i].adj_entity)->type);
@@ -84,12 +85,11 @@ struct xswitch *entity_get_xswitch(struct entity *e)
 	return e->u.xs;
 }
 
-/* hack */
 dpid_t entity_get_dpid(struct entity *e)
 {
 	if(e) {
 		assert(e->type == ENTITY_TYPE_SWITCH);
-		return e->u.xs->dpid;
+		return xswitch_get_dpid(e->u.xs);
 	} else {
 		return 0;
 	}

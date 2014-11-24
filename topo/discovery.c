@@ -27,12 +27,13 @@ lldp_packet_send(struct xswitch *sw)
 	struct action *out_a;
 	struct msgbuf *mb;
 	uint16_t i;
-	// TODO port number 
-	for(i = 1; i <= sw->n_ports; i++)
+	// TODO port number
+	int n_ports = xswitch_get_num_ports(sw);
+	for(i = 1; i <= n_ports; i++)
 	{
 		out_a = action();
 		action_add(out_a, AC_OUTPUT, i);
-		pkt = lldp_pkt_construct(sw->dpid, i, &pkt_len);
+		pkt = lldp_pkt_construct(xswitch_get_dpid(sw), i, &pkt_len);
 		mb = msg_packet_out(0, pkt, pkt_len, out_a);
 		action_free(out_a);
 		free(pkt);
@@ -412,23 +413,23 @@ static void port_packet_out(struct xswitch *xsw, port_t port, const uint8_t *pkt
 }
 static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
 {
-	int i, j, swnum, numadjs;
+	int i, j, swnum;
 	struct entity **esw = topo_get_switches(&swnum);
-	struct xswitch *xsw;
-	const struct entity_adj *esw_adj;
 	uint8_t tports[MAX_PORT_NUM +1] = {0};// TODO max_port_num, port num
-	for (i = 0; i < MAX_ENTITY_NUM; i++){
-		if (esw[i] == NULL)
-			continue;
-		xsw = entity_get_xswitch(esw[i]);
-		esw_adj = entity_get_adjs(esw[i], &numadjs);
-		for (j = 0; j <= xsw->n_ports; j++)
+
+	for (i = 0; i < swnum; i++){
+		struct xswitch *xsw = entity_get_xswitch(esw[i]);
+		int n_ports = xswitch_get_num_ports(xsw);
+		int numadjs;
+		const struct entity_adj *esw_adj = entity_get_adjs(esw[i], &numadjs);
+
+		for (j = 0; j <= n_ports; j++)
 			tports[j] = 0;
 		for (j = 0; j < numadjs; j++) {
 			// printf("out_port: %d\n", esw_adj[j].out_port);
 			tports[esw_adj[j].out_port] = 1;
 		}
-		for (j = 1; j <= xsw->n_ports; j++) {
+		for (j = 1; j <= n_ports; j++) {
 			if (tports[j] == 0) {
 				port_packet_out(xsw, j, packet, length);
 			}
