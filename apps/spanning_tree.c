@@ -3,6 +3,7 @@
 #include "types.h"
 #include "maple_api.h"
 #include "entity.h"
+#include "route.h"
 
 struct nodeinfo
 {
@@ -63,26 +64,26 @@ struct route *get_route(struct entity *dst, int dst_port,
 {
 	struct route *r = route();
 	int head, second;
-	dpid_t head_dpid, second_dpid;
+	struct entity *head_e, *second_e;
 	second = find_index(switches, switches_num, dst);
 	head = visited[second].parent;
-	second_dpid = entity_get_dpid(switches[second]);
-	route_add_edge(r, second_dpid, dst_port, 0, 0);
+	second_e = switches[second];
+	route_add_edge(r, edge(second_e, dst_port, NULL, 0));
 
 	while(head >= 0)
 	{
-		head_dpid = entity_get_dpid(switches[head]);
-		route_add_edge(r,
-			       head_dpid,
-			       visited[second].parent_out_port,
-			       second_dpid,
-			       visited[second].in_port);
-		second_dpid = head_dpid;
+		head_e = switches[head];
+		route_add_edge(r, edge(
+				       head_e,
+				       visited[second].parent_out_port,
+				       second_e,
+				       visited[second].in_port));
+		second_e = head_e;
 		second = head;
 		head = visited[second].parent;
 	}
 
-	route_add_edge(r, 0, 0, second_dpid, visited[second].in_port);
+	route_add_edge(r, edge(NULL, 0, second_e, visited[second].in_port));
 	return r;
 }
 

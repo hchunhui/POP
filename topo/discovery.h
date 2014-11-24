@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include "entity-private.h"
-#include "link.h"
+#include "edge.h"
 #include "value.h"
 #include "types.h"
 #include "topo.h"

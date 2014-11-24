@@ -4,6 +4,7 @@
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
 #include "topo/entity-private.h"
+#include "route.h"
 
 #include "maple.h"
 #include "packet_parser.h"
@@ -612,63 +613,6 @@ static void build_flow_table(struct xswitch *sw, struct trace_tree_header *tree)
 	match_free(ma);
 }
 
-struct route
-{
-	int num_edges;
-	struct {
-		dpid_t dpid1;
-		int out_port;
-		dpid_t dpid2;
-		int in_port;
-	} edges[32];
-};
-
-struct route *route(void)
-{
-	struct route *r = malloc(sizeof(struct route));
-	r->num_edges = 0;
-	return r;
-}
-
-void route_free(struct route *r)
-{
-	free(r);
-}
-
-void route_add_edge(struct route *r, dpid_t dpid1, int out_port, dpid_t dpid2, int in_port)
-{
-	int i = r->num_edges;
-	if(i >= 32) {
-		fprintf(stderr, "route: too many hops!\n");
-		return;
-	}
-	r->edges[i].dpid1 = dpid1;
-	r->edges[i].out_port = out_port;
-	r->edges[i].dpid2 = dpid2;
-	r->edges[i].in_port = in_port;
-	r->num_edges++;
-}
-
-void route_union(struct route *r1, struct route *r2)
-{
-	int i, j;
-	for(j = 0; j < r2->num_edges; j++) {
-		for(i = 0; i < r1->num_edges; i++) {
-			if(r1->edges[i].dpid1 == r2->edges[j].dpid1 &&
-			   r1->edges[i].out_port == r2->edges[j].out_port &&
-			   r1->edges[i].dpid2 == r2->edges[j].dpid2 &&
-			   r1->edges[i].in_port == r2->edges[j].in_port)
-				break;
-		}
-		if(i >= r1->num_edges)
-			route_add_edge(r1,
-				       r2->edges[j].dpid1,
-				       r2->edges[j].out_port,
-				       r2->edges[j].dpid2,
-				       r2->edges[j].in_port);
-	}
-}
-
 struct packet {
 	struct packet_parser *pp;
 };
@@ -772,6 +716,8 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	int i;
 	struct route *r;
 	struct packet pk;
+	edge_t *edges;
+	int num_edges;
 
 	/* init */
 	trace_clear();
@@ -786,17 +732,17 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	packet_parser_free(pk.pp);
 
 	/* learn */
-	for(i = 0; i < r->num_edges; i++) {
-		dpid_t dpid = r->edges[i].dpid1;
-		int out_port = r->edges[i].out_port;
+	edges = route_get_edges(r, &num_edges);
+	for(i = 0; i < num_edges; i++) {
+		struct entity *cur_ent = edges[i].ent1;
+		int out_port = edges[i].port1;
 		fprintf(stderr, "handle edge (0x%x, %d, 0x%x, %d):\n",
-			r->edges[i].dpid1,
-			r->edges[i].out_port,
-			r->edges[i].dpid2,
-			r->edges[i].in_port);
-		if(dpid) {
-			struct entity *cur_e = topo_get_switch(dpid);
-			struct xswitch *cur_sw = entity_get_xswitch(cur_e);
+			entity_get_dpid(edges[i].ent1),
+			edges[i].port1,
+			entity_get_dpid(edges[i].ent2),
+			edges[i].port2);
+		if(cur_ent) {
+			struct xswitch *cur_sw = entity_get_xswitch(cur_ent);
 			struct action *a = action();
 			int j;
 
@@ -804,21 +750,21 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 
 			assert(cur_sw);
 
-			if(r->edges[i].dpid2 == 0) {
+			if(!edges[i].ent2) {
 				struct msgbuf *mb;
 				mb = msg_packet_out(0, packet, packet_len, a);
 				xswitch_send(cur_sw, mb);
 			}
 
-			for(j = 0; j < r->num_edges; j++) {
-				if(r->edges[j].dpid2 == dpid)
+			for(j = 0; j < num_edges; j++) {
+				if(edges[j].ent2 == cur_ent)
 					break;
 			}
-			assert(j < r->num_edges);
-			mod_in_port(r->edges[j].in_port);
+			assert(j < num_edges);
+			mod_in_port(edges[j].port2);
 
 			if(augment_tt(&(cur_sw->trace_tree), &trace, a)) {
-				fprintf(stderr, "---- flow table for 0x%x ---\n", dpid);
+				fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
 				dump_tt(cur_sw->trace_tree);
 				fprintf(stderr, "\n");
 				init_entry(cur_sw, cur_sw->table0, &(cur_sw->hack_start_prio));

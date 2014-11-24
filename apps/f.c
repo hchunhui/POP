@@ -4,6 +4,7 @@
 #include "types.h"
 #include "maple_api.h"
 #include "entity.h"
+#include "route.h"
 
 #include "igmp.h"
 #include "spanning_tree.h"

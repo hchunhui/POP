@@ -87,8 +87,12 @@ struct xswitch *entity_get_xswitch(struct entity *e)
 /* hack */
 dpid_t entity_get_dpid(struct entity *e)
 {
-	assert(e->type == ENTITY_TYPE_SWITCH);
-	return e->u.xs->dpid;
+	if(e) {
+		assert(e->type == ENTITY_TYPE_SWITCH);
+		return e->u.xs->dpid;
+	} else {
+		return 0;
+	}
 }
 
 struct host_info entity_get_addr(struct entity *e)

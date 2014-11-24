@@ -193,7 +193,7 @@ parse_lldp(const uint8_t *packet, edge_t *link/*OUT*/)
 		}
 		i++;
 	}
-	link->dpid1 = dpid;
+	link->ent1 = topo_get_switch(dpid);
 	link->port1 = port;
 	return true;
 }
@@ -216,7 +216,7 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 	if (eth_type != LLDP_TYPE)
 		return -2;
 	edge_t link;
-	link.dpid2 = dpid;
+	link.ent2 = topo_get_switch(dpid);
 	link.port2 = port;
 	if (! parse_lldp(packet, &link))
 	{
@@ -224,14 +224,7 @@ handle_lldp_packet_in(const struct packet_in *packet_in)
 		return -3;
 	}
 	// route_add_edge(&links, &link);
-	if (! edge_valid(&link))
-	{
-		printf("edge_valid\n");
-		return -4;
-	}
-	struct entity *e1 = topo_get_switch(link.dpid1);
-	struct entity *e2 = topo_get_switch(link.dpid2);
-	entity_add_link(e1, link.port1, e2, link.port2);
+	entity_add_link(link.ent1, link.port1, link.ent2, link.port2);
 #if 0
 	uint8_t retval = route_update_edge(&links, &link);
 	switch (retval) {
