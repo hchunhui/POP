@@ -135,6 +135,8 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	}
 	i = e1->num_adjs;
 	j = e2->num_adjs;
+	assert(i < MAX_PORT_NUM);
+	assert(j < MAX_PORT_NUM);
 	e1->adjs[i].out_port = port1;
 	e1->adjs[i].adj_in_port = port2;
 	e1->adjs[i].adj_entity = e2;
