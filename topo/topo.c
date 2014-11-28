@@ -6,9 +6,11 @@
 #include "entity-private.h"
 #include "discovery.h"
 
-static struct entity *hosts[100];
+#define MAX_NUM_HOSTS 1000
+#define MAX_NUM_SWITCHES 100
+static struct entity *hosts[MAX_NUM_HOSTS];
 static int num_hosts;
-static struct entity *switches[100];
+static struct entity *switches[MAX_NUM_SWITCHES];
 static int num_switches;
 
 void topo_print()
@@ -32,7 +34,7 @@ int topo_add_host(struct entity *e)
 	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e)
 			return i;
-	if (num_hosts >= 100)
+	if (num_hosts >= MAX_NUM_HOSTS)
 		return -1;
 	hosts[num_hosts++] = e;
 	return (num_hosts-1);
@@ -44,7 +46,7 @@ int topo_add_switch(struct entity *e)
 	for (i=0; i<num_switches; i++)
 		if (switches[i] == e)
 			return i;
-	if(num_switches >= 100)
+	if(num_switches >= MAX_NUM_SWITCHES)
 		return -1;
 	switches[num_switches++] = e;
 	return (num_switches - 1);
