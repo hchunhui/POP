@@ -24,12 +24,12 @@ static inline haddr_t value_to_haddr(value_t v)
 }
 
 /* haddr_t to value_t */
-static inline value_t value_from_haddr(haddr_t *h)
+static inline value_t value_from_haddr(haddr_t h)
 {
 	value_t v = {{0}};
 	int i;
 	for(i=0; i<6; i++)
-		v.v[i] = h->octet[i];
+		v.v[i] = h.octet[i];
 	return v;
 }
 
