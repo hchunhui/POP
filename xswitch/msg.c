@@ -10,7 +10,7 @@
 /* helper functions */
 static inline uint32_t alloc_xid(void)
 {
-	static uint32_t __thread xid;
+	static __thread uint32_t xid;
 	return ++xid;
 }
 
@@ -40,10 +40,12 @@ static void *put_pof_msg_xid(size_t length, uint8_t type, uint32_t xid,
  * update_pof_msg_length() before sending.
  *
  * Returns the header. */
+#if 0
 static void *put_pof_msg(size_t length, uint8_t type, struct msgbuf *buffer)
 {
 	return put_pof_msg_xid(length, type, alloc_xid(), buffer);
 }
+#endif
 
 /* Same as make_pof_msg(), except for a transaction id 'xid'. */
 static void *make_pof_msg_xid(size_t length, uint8_t type, uint32_t xid,
