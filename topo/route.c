@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "route-private.h"
 
 struct route *route(void)
@@ -17,10 +18,7 @@ void route_free(struct route *r)
 void route_add_edge(struct route *r, edge_t e)
 {
 	int i = r->num_edges;
-	if(i >= 32) {
-		fprintf(stderr, "route: too many hops!\n");
-		return;
-	}
+	assert(i < MAX_NUM_EDGES);
 	r->edges[i] = e;
 	r->num_edges++;
 }
