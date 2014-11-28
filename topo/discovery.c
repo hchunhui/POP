@@ -16,7 +16,7 @@ static inline void get_next_available_waiting_host()
 	next_available_waiting_host = i;
 }
 
-static void port_packet_out(struct xswitch *xsw, port_t port, const uint8_t *pkt, uint16_t len)
+static void port_packet_out(struct xswitch *xsw, int port, const uint8_t *pkt, int len)
 {
 	struct action *ac;
 	struct msgbuf *mb;
@@ -35,12 +35,13 @@ lldp_packet_send(struct xswitch *sw)
 {
 	uint8_t *pkt;
 	int pkt_len;
-	uint16_t i;
+	int i;
 	// TODO port number
 	int n_ports = xswitch_get_num_ports(sw);
 	for(i = 1; i <= n_ports; i++)
 	{
 		pkt = lldp_pkt_construct(xswitch_get_dpid(sw), i, &pkt_len);
+		// int to port_t conversion
 		port_packet_out(sw, i, pkt, pkt_len);
 		free(pkt);
 	}
@@ -182,27 +183,24 @@ parse_lldp(const uint8_t *packet, edge_t *link/*OUT*/)
 		i++;
 	}
 	link->ent1 = topo_get_switch(dpid);
+	// port_t to int conversion
 	link->port1 = port;
 	return true;
 }
 
-int
-handle_lldp_packet_in(const struct packet_in *packet_in)
+static int
+handle_lldp_packet_in(const uint8_t *packet, int length, struct xswitch *sw, int port)
 {
-	const uint8_t *packet = packet_in_get_packet(packet_in);
-	uint16_t length = packet_in_get_length(packet_in);
 	if (length < 14 + 14)
 	{
 		fprintf(stderr, "length < 28\n");
 		return -1;
 	}
-	port_t port = packet_in_get_port(packet_in);
-	dpid_t dpid = packet_in_get_dpid(packet_in);
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
 	if (eth_type != LLDP_TYPE)
 		return -2;
 	edge_t link;
-	link.ent2 = topo_get_switch(dpid);
+	link.ent2 = topo_get_switch(xswitch_get_dpid(sw));
 	link.port2 = port;
 	if (! parse_lldp(packet, &link))
 	{
@@ -280,11 +278,11 @@ arp_reply_packet_construct(struct host_info *hinfo, struct arp_header *arp, int 
 	return pkt;
 }
 
-static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
+static void flood(const uint8_t *packet, int length)
 {
 	int i, j, swnum;
 	struct entity **esw = topo_get_switches(&swnum);
-	uint8_t tports[MAX_PORT_NUM +1] = {0};// TODO max_port_num, port num
+	bool tports[MAX_PORT_NUM +1]; // TODO max_port_num, port num
 
 	for (i = 0; i < swnum; i++){
 		struct xswitch *xsw = entity_get_xswitch(esw[i]);
@@ -292,28 +290,26 @@ static void flood(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t po
 		int numadjs;
 		const struct entity_adj *esw_adj = entity_get_adjs(esw[i], &numadjs);
 
-		for (j = 0; j <= n_ports; j++)
-			tports[j] = 0;
+		for (j = 1; j <= n_ports; j++)
+			tports[j] = false;
 		for (j = 0; j < numadjs; j++) {
 			if(entity_get_type(esw_adj[j].adj_entity) == ENTITY_TYPE_SWITCH)
-				tports[esw_adj[j].out_port] = 1;
+				tports[esw_adj[j].out_port] = true;
 		}
 		for (j = 1; j <= n_ports; j++) {
-			if (tports[j] == 0) {
+			if (tports[j] == false) {
 				port_packet_out(xsw, j, packet, length);
 			}
 		}
 	}
 }
 
-int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, port_t port)
+int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitch *xsw, int port)
 {
 	int i;
 	struct entity *eh1;
 	struct host_info hinfo;
 	struct arp_header arp;
-	struct entity *esw;
-	struct xswitch *xsw;
 
 	if (length < 14 + 28)
 		return -11;
@@ -341,8 +337,6 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 			uint8_t *arp_reply_pkt;
 			hinfo = entity_get_addr(eh1);
 			arp_reply_pkt = arp_reply_packet_construct(&hinfo, &arp, &len);
-			esw = topo_get_switch(dpid);
-			xsw = entity_get_xswitch(esw);
 			port_packet_out(xsw, port, arp_reply_pkt, len);
 			free(arp_reply_pkt);
 		} else {
@@ -357,7 +351,7 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 			eh_wait = topo_get_host_by_haddr(arp.arp_sha);
 			arp_waiting_hosts[next_available_waiting_host] = eh_wait;
 
-			flood(packet, length, dpid, port);
+			flood(packet, length);
 			get_next_available_waiting_host();
 		
 		}
@@ -389,7 +383,8 @@ int handle_arp_packet_in(const uint8_t *packet, uint16_t length, dpid_t dpid, po
 	}
 	return 0;
 }
-static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_t port)
+
+static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, int port)
 {
 	struct entity *host;
 	struct entity *esw;
@@ -415,7 +410,7 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 		break;
 	}
 
-	esw = topo_get_switch(dpid);
+	esw = topo_get_switch(xswitch_get_dpid(xsw));
 	assert(esw != NULL);
 
 	/* is multicast addr? */
@@ -467,27 +462,24 @@ static void update_hosts(const uint8_t *packet, uint16_t len, dpid_t dpid, port_
 	}
 }
 
-int handle_topo_packet_in(const struct packet_in *packet_in)
+int
+handle_topo_packet_in(struct xswitch *sw, int port, const uint8_t *packet, int length)
 {
-	const uint8_t *packet = packet_in_get_packet(packet_in);
-	uint16_t length = packet_in_get_length(packet_in);
-	port_t port = packet_in_get_port(packet_in);
-	dpid_t dpid = packet_in_get_dpid(packet_in);
 	if (length < 14)
 		return -1;
 
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
 	if (eth_type == LLDP_TYPE) {
-		handle_lldp_packet_in(packet_in);
+		handle_lldp_packet_in(packet, length, sw, port);
 		topo_print();
 		return -3;
 	} else if (eth_type == ETHERTYPE_ARP) {
-		update_hosts(packet, length, dpid, port);
-		handle_arp_packet_in(packet, length, dpid, port);
+		update_hosts(packet, length, sw, port);
+		handle_arp_packet_in(packet, length, sw, port);
 		// topo_print();
 		return -4;
 	} else {
-		update_hosts(packet, length, dpid, port);
+		update_hosts(packet, length, sw, port);
 		// topo_print();
 		return -2;
 	}

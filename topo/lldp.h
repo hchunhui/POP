@@ -49,7 +49,7 @@ lldp_tlv_get_type(struct lldp_tlv *tlv)
 	return tlv->type;
 }
 static inline
-uint8_t
+uint16_t
 lldp_tlv_get_length(struct lldp_tlv *tlv)
 {
 	return tlv->length;

@@ -5,7 +5,6 @@
 #include "topo.h"
 #include "entity-private.h"
 #include "discovery.h"
-#include "packet_in.h"
 
 static struct entity *hosts[100];
 static int num_hosts;
@@ -136,13 +135,7 @@ void topo_switch_up(struct xswitch *sw)
 
 bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
-	struct packet_in pkt_in = {
-		packet,
-		packet_len,
-		in_port,
-		xswitch_get_dpid(sw),
-	};
-	int rt = handle_topo_packet_in(&pkt_in);
+	int rt = handle_topo_packet_in(sw, in_port, packet, packet_len);
 	fprintf(stderr, "return value %d\n", rt);
 	if (rt==-2)
 		return false;
@@ -166,26 +159,21 @@ void topo_switch_port_down(struct xswitch *sw, int port)
 
 void topo_switch_down(struct xswitch *sw)
 {
-	fprintf(stderr, "-----switch down--------\n");
-	int i, j;
+	int j;
+	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
 
-	for(i = 0; i < num_switches; i++) {
-		if(entity_get_xswitch(switches[i]) == sw) {
-			topo_del_switch(switches[i]);
-			for (j = 0; j < num_hosts;) {
-				int num_adjs;
-				entity_get_adjs(hosts[j], &num_adjs);
-				if(num_adjs == 0) {
-					num_hosts--;
-					entity_free(hosts[j]);
-					hosts[j] = hosts[num_hosts];
-				} else {
-					j++;
-				}
-			}
-			topo_print();
-			return;
+	fprintf(stderr, "-----switch down--------\n");
+	topo_del_switch(esw);
+	for (j = 0; j < num_hosts;) {
+		int num_adjs;
+		entity_get_adjs(hosts[j], &num_adjs);
+		if(num_adjs == 0) {
+			num_hosts--;
+			entity_free(hosts[j]);
+			hosts[j] = hosts[num_hosts];
+		} else {
+			j++;
 		}
 	}
-	assert(0);
+	topo_print();
 }
