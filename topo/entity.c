@@ -16,27 +16,32 @@ struct entity
 	int num_adjs;
 	struct entity_adj adjs[MAX_PORT_NUM];
 };
+
 void entity_print(struct entity *e)
 {
 	int i;
 	if (e->type == ENTITY_TYPE_HOST) {
-		printf("\nHOST:\nEth Addr: ");
+		fprintf(stderr, "HOST:\nEth Addr: ");
 		for (i=0; i<6; i++)
-			printf("%02x ",e->u.addr.haddr.octet[i]);
-		printf("\nIPv4: %08x\n", e->u.addr.paddr);
-		printf("num_adjs: %d\n", e->num_adjs);
+			fprintf(stderr, "%02x ",e->u.addr.haddr.octet[i]);
+		fprintf(stderr, "\nIPv4: %08x\n", e->u.addr.paddr);
+		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port,
-			       entity_get_dpid(e->adjs[i].adj_entity));
+			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
+				e->adjs[i].out_port, e->adjs[i].adj_in_port,
+				entity_get_dpid(e->adjs[i].adj_entity));
 		}
 	} else if (e->type == ENTITY_TYPE_SWITCH) {
-		printf("\nSWITCH:\nDpid: %d\n", entity_get_dpid(e));
-		printf("num_adjs: %d\n", e->num_adjs);
+		fprintf(stderr, "SWITCH:\nDpid: %d\n", entity_get_dpid(e));
+		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port, (e->adjs[i].adj_entity)->type);
+			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
+				e->adjs[i].out_port, e->adjs[i].adj_in_port,
+				(e->adjs[i].adj_entity)->type);
 		}
 	}
 }
+
 struct entity *entity_host(struct host_info addr)
 {
 	struct entity *e = malloc(sizeof(struct entity));
@@ -56,7 +61,6 @@ struct entity *entity_switch(struct xswitch *xs)
 }
 void entity_free(struct entity *e)
 {
-/*
 	int i, j;
 	for(i = 0; i < e->num_adjs; i++) {
 		struct entity *peer = e->adjs[i].adj_entity;
@@ -70,7 +74,6 @@ void entity_free(struct entity *e)
 			}
 		}
 	}
-	*/
 	free(e);
 }
 
@@ -100,30 +103,19 @@ struct host_info entity_get_addr(struct entity *e)
 	assert(e->type == ENTITY_TYPE_HOST);
 	return e->u.addr;
 }
+
+void entity_set_paddr(struct entity *e, uint32_t paddr)
+{
+	assert(e->type == ENTITY_TYPE_HOST);
+	e->u.addr.paddr = paddr;
+}
+
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
 {
-//	printf("e: %p  sw_port: %p\n", e, sw_port);
         if (e->type != ENTITY_TYPE_HOST)
                 return NULL;
         *sw_port = e->adjs[0].adj_in_port;
-//      printf("e %p\n", e->adjs[0].adj_entity);
         return e->adjs[0].adj_entity;
-}
-void entity_adj_down(struct entity *e, int port)
-{
-        int i;
-        if (e->type == ENTITY_TYPE_HOST)
-                return;
-        for (i = 0; i < e->num_adjs; i++) {
-                if (e->adjs[i].out_port == port) {
-                        e->num_adjs --;
-                        if (i != e->num_adjs)
-                                e->adjs[i] = e->adjs[e->num_adjs];
-                        e->adjs[e->num_adjs].out_port = 0;
-                        e->adjs[e->num_adjs].adj_in_port = 0;
-                        e->adjs[e->num_adjs].adj_entity = NULL;
-                }
-        }
 }
 
 const struct entity_adj *entity_get_adjs(struct entity *e, int *pnum)

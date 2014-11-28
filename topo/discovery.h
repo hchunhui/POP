@@ -12,7 +12,6 @@
 #include "packet_in.h"
 #include "lldp.h"
 #include "xswitch/xswitch.h"
-// #include "spanning_tree.h"
 
 #define ETHERTYPE_IP 0x0800
 #define ETHERTYPE_ARP 0x0806
