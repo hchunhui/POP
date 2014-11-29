@@ -157,7 +157,7 @@ static int fill_instruction(struct pof_instruction *mi, int num, struct action *
 	mi[0].type = htons(POFIT_APPLY_ACTIONS);
 	mi[0].len = htons(8 + sizeof(*ia));
 	ia = (void *)(mi[0].instruction_data);
-	ia->action_num = fill_action(ia->action, POF_MAX_ACTION_NUMBER_PER_INSTRUCTION, a);
+	ia->action_num = u8(fill_action(ia->action, POF_MAX_ACTION_NUMBER_PER_INSTRUCTION, a));
 	idx = 1;
 	for(i = 0; i < a->num_actions; i++) {
 		switch(a->a[i].type) {
@@ -315,7 +315,7 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 		       ma->m[i].mask.v,
 		       bytes);
 	}
-	mfe->instruction_num = fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a);
+	mfe->instruction_num = u8(fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a));
 	return msg;
 }
 
@@ -422,7 +422,6 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			ps->desc.of_enable?"TRUE":"FALSE",
 			ntohl(ps->desc.state));
 		if (!ps->desc.of_enable) {
-			struct msgbuf *rmsg;
 			struct pof_port_status *p;
 			make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_port_status),
 				     POFT_PORT_MOD, &rmsg);
