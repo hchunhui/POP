@@ -304,7 +304,7 @@ static void flood(const uint8_t *packet, int length)
 	}
 }
 
-int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitch *xsw, int port)
+static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitch *xsw, int port)
 {
 	int i;
 	struct entity *eh1;

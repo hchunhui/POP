@@ -13,7 +13,7 @@ static int num_hosts;
 static struct entity *switches[MAX_NUM_SWITCHES];
 static int num_switches;
 
-void topo_print()
+void topo_print(void)
 {
 	int i;
 	fprintf(stderr, "\nSwitches--------------\n");

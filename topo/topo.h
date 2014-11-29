@@ -20,5 +20,5 @@ int topo_add_host(struct entity *e);
 int topo_add_switch(struct entity *e);
 int topo_del_host(struct entity *e);
 int topo_del_switch(struct entity *e);
-void topo_print();
+void topo_print(void);
 #endif
