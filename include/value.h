@@ -51,16 +51,16 @@ static inline uint8_t value_to_8(value_t v)
 
 static inline uint16_t value_to_16(value_t v)
 {
-	return (v.v[0] << 8) | v.v[1];
+	return (uint16_t)((v.v[0] << 8) | v.v[1]);
 }
 
 static inline uint32_t value_to_32(value_t v)
 {
 	return
-		(v.v[0] << 24) |
-		(v.v[1] << 16) |
-		(v.v[2] << 8)  |
-		(v.v[3]);
+		(((uint32_t)v.v[0]) << 24) |
+		(((uint32_t)v.v[1]) << 16) |
+		(((uint32_t)v.v[2]) << 8)  |
+		(((uint32_t)v.v[3]));
 }
 
 static inline uint64_t value_to_48(value_t v)
@@ -147,16 +147,16 @@ static inline uint8_t value_to_8l(value_t v)
 
 static inline uint16_t value_to_16l(value_t v)
 {
-	return (v.v[1] << 8) | v.v[0];
+	return (uint16_t)((v.v[1] << 8) | v.v[0]);
 }
 
 static inline uint32_t value_to_32l(value_t v)
 {
 	return
-		(v.v[3] << 24) |
-		(v.v[2] << 16) |
-		(v.v[1] << 8)  |
-		(v.v[0]);
+		(((uint32_t)v.v[3]) << 24) |
+		(((uint32_t)v.v[2]) << 16) |
+		(((uint32_t)v.v[1]) << 8)  |
+		(((uint32_t)v.v[0]));
 }
 
 static inline uint64_t value_to_48l(value_t v)
@@ -240,20 +240,22 @@ static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 {
 	value_t v = {{0}};
 	uint8_t tmp[VALUE_LEN+1];
-	int low = offset / 8;
-	int high = (offset + length + 7) / 8;
-	int shift = offset % 8;
-	int i;
-	memcpy(tmp, buf + low, high - low);
-	for(i = 0; i < high - low - 1; i++) {
-		v.v[i] = tmp[i];
+	if(offset >=0 && length >= 0) {
+		int low = offset / 8;
+		int high = (offset + length + 7) / 8;
+		int shift = offset % 8;
+		int i;
+		memcpy(tmp, buf + low, (size_t)(high - low));
+		for(i = 0; i < high - low - 1; i++) {
+			v.v[i] = tmp[i];
+			v.v[i] >>= shift;
+			v.v[i] |= tmp[i+1] << (8 - shift);
+		}
+		v.v[i] = buf[low + i];
 		v.v[i] >>= shift;
-		v.v[i] |= tmp[i+1] << (8 - shift);
+		if(length % 8)
+			v.v[i] %= (1 << (length % 8)) - 1;
 	}
-	v.v[i] = buf[low + i];
-	v.v[i] >>= shift;
-	if(length % 8)
-		v.v[i] %= (1 << (length % 8)) - 1;
 	return v;
 }
 
