@@ -3,7 +3,7 @@
 #include "types.h"
 #include "xswitch/xswitch.h"
 #include "topo.h"
-#include "entity-private.h"
+#include "entity.h"
 #include "discovery.h"
 
 #define MAX_NUM_HOSTS 1000

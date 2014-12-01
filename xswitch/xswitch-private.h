@@ -5,7 +5,7 @@
 struct sw;
 
 /* xswitch */
-struct trace_tree_header;
+struct trace_tree;
 struct xswitch
 {
 	enum {
@@ -20,7 +20,7 @@ struct xswitch
 	int next_table_id;
 	//struct rconn *rconn;
 	struct flow_table *table0;
-	struct trace_tree_header *trace_tree;
+	struct trace_tree *trace_tree;
 
 	struct sw *sw;
 };

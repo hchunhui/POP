@@ -3,7 +3,6 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "entity.h"
 #include "route.h"
 
 #include "igmp.h"
@@ -46,7 +45,7 @@ struct route *f(struct packet *pkt)
 	/* calculate spanning tree */
 	hsrc = get_host_by_paddr(hsrc_ip);
 	assert(hsrc);
-	src = entity_host_get_adj_switch(hsrc, &src_port);
+	src = get_host_adj_switch(hsrc, &src_port);
 	visited = get_tree(src, src_port, switches, switches_num);
 
 	/* add routes */
@@ -63,7 +62,7 @@ struct route *f(struct packet *pkt)
 			hdst = get_host_by_paddr(buffer[i]);
 			assert(hdst);
 			/* find connected switch */
-			dst = entity_host_get_adj_switch(hdst, &dst_port);
+			dst = get_host_adj_switch(hdst, &dst_port);
 			/* get and union route */
 			rx = get_route(dst, dst_port, visited, switches, switches_num);
 			route_union(r, rx);
@@ -74,7 +73,7 @@ struct route *f(struct packet *pkt)
 		hdst = get_host_by_paddr(hdst_ip);
 		assert(hdst);
 		/* find connected switch */
-		dst = entity_host_get_adj_switch(hdst, &dst_port);
+		dst = get_host_adj_switch(hdst, &dst_port);
 		/* get route */
 		r = get_route(dst, dst_port, visited, switches, switches_num);
 	}

@@ -2,7 +2,6 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "entity.h"
 #include "route.h"
 
 struct nodeinfo
@@ -113,11 +112,11 @@ struct nodeinfo *get_tree(struct entity *src, int src_port,
 	{
 		epos1 = dequeue(q);
 		entity1 = switches[epos1];
-		adjs = entity_get_adjs(entity1, &num_adjs);
+		adjs = get_entity_adjs(entity1, &num_adjs);
 		for (i = 0; i < num_adjs; i++)
 		{
 			entity2 = adjs[i].adj_entity;
-			if(entity_get_type(entity2) != ENTITY_TYPE_SWITCH)
+			if(get_entity_type(entity2) != ENTITY_TYPE_SWITCH)
 				continue;
 			epos2 = find_index(switches, switches_num, entity2);
 			assert(epos2 != -1);
