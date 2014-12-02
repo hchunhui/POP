@@ -61,7 +61,7 @@ const uint8_t *read_payload(struct packet *pkt, int *length)
 
 void record(const char *name)
 {
-	trace_RE(name);
+	trace_RE(name, NULL);
 }
 
 void invalidate(const char *name)
@@ -148,6 +148,13 @@ static void mod_in_port(struct trace *trace, int in_port)
 	trace->events[i].u.r.value = value_from_8(in_port);
 }
 
+static bool cmpname_p(void *pname, const char *name, void *arg)
+{
+	if(strcmp(pname, name) == 0)
+		return true;
+	return false;
+}
+
 void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
 	int i;
@@ -224,7 +231,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 		for(i = 0; i < num_switches; i++) {
 			struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 			struct trace_tree *tt = cur_sw->trace_tree;
-			if(trace_tree_invalidate(&tt, name)) {
+			if(trace_tree_invalidate(&tt, cmpname_p, (void *)name)) {
 				fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
 				trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
 			}

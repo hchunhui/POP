@@ -50,6 +50,7 @@ struct trace_tree_D
 {
 	struct trace_tree h;
 	char name[32];
+	void *arg;
 	struct trace_tree *t;
 };
 
@@ -109,12 +110,14 @@ static struct trace_tree *trace_tree_T(const char *name,
 }
 
 static struct trace_tree *trace_tree_D(const char *name,
+				       void *arg,
 				       struct trace_tree *tt)
 {
 	struct trace_tree_D *t = malloc(sizeof *t);
 	t->h.type = TT_D;
 	strncpy(t->name, name, 32);
 	t->name[31] = 0;
+	t->arg = arg;
 	t->t = tt;
 	return (struct trace_tree *)t;
 }
@@ -256,7 +259,7 @@ static struct trace_tree *events_to_tree(struct event *events, int num_events,
 			root = trace_tree_V(ev->u.r.name, ev->u.r.value, root);
 			break;
 		case EV_RE:
-			root = trace_tree_D(ev->u.re.name, root);
+			root = trace_tree_D(ev->u.re.name, ev->u.re.arg, root);
 			break;
 		case EV_G:
 			root = trace_tree_G(ev->u.g.spec, ev->u.g.move_length, root);
@@ -367,7 +370,8 @@ bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct ac
 	return n1 != n2;
 }
 
-bool trace_tree_invalidate(struct trace_tree **tree, const char *name)
+bool trace_tree_invalidate(struct trace_tree **tree,
+			   bool (*p)(void *p_data, const char *name, void *arg), void *p_data)
 {
 	int i;
 	bool b, b1;
@@ -385,26 +389,26 @@ bool trace_tree_invalidate(struct trace_tree **tree, const char *name)
 		tv = (struct trace_tree_V *)t;
 		b = false;
 		for(i = 0; i < tv->num_branches; i++) {
-			b1 = trace_tree_invalidate(&(tv->branches[i].tree), name);
+			b1 = trace_tree_invalidate(&(tv->branches[i].tree), p, p_data);
 			b = b || b1;
 		}
 		return b;
 	case TT_T:
 		tt = (struct trace_tree_T *)t;
-		b = trace_tree_invalidate(&(tt->t), name);
-		b1 = trace_tree_invalidate(&(tt->f), name);
+		b = trace_tree_invalidate(&(tt->t), p, p_data);
+		b1 = trace_tree_invalidate(&(tt->f), p, p_data);
 		return b || b1;
 	case TT_D:
 		td = (struct trace_tree_D *)t;
-		if(strcmp(td->name, name) == 0) {
+		if(p(p_data, td->name, td->arg)) {
 			trace_tree_free(td->t);
 			td->t = trace_tree_E();
 			return true;
 		}
-		return trace_tree_invalidate(&(td->t), name);
+		return trace_tree_invalidate(&(td->t), p, p_data);
 	case TT_G:
 		tg = (struct trace_tree_G *)t;
-		return trace_tree_invalidate(&(tg->t), name);
+		return trace_tree_invalidate(&(tg->t), p, p_data);
 	}
 	assert(0);
 }

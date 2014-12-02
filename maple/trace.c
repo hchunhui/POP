@@ -23,12 +23,13 @@ void trace_T(const char *name, value_t value, bool result)
 	trace.num_events++;
 }
 
-void trace_RE(const char *name)
+void trace_RE(const char *name, void *arg)
 {
 	int i = trace.num_events;
 	trace.events[i].type = EV_RE;
 	strncpy(trace.events[i].u.re.name, name, 32);
 	trace.events[i].u.re.name[31] = 0;
+	trace.events[i].u.re.arg = arg;
 	trace.num_events++;
 }
 

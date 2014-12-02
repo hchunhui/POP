@@ -20,6 +20,7 @@ struct event
 		} t;
 		struct {
 			char name[32];
+			void *arg;
 		} re;
 		struct {
 			struct header *spec;
@@ -40,7 +41,7 @@ struct trace
 
 void trace_R(const char *name, value_t value);
 void trace_T(const char *name, value_t value, bool result);
-void trace_RE(const char *name);
+void trace_RE(const char *name, void *arg);
 void trace_IE(const char *name);
 void trace_G(struct header *spec, int move_length);
 void trace_clear(void);
