@@ -71,27 +71,37 @@ void invalidate(const char *name)
 
 struct entity **get_hosts(int *pnum)
 {
-	return topo_get_hosts(pnum);
+	struct entity **hosts = topo_get_hosts(pnum);
+	trace_RE("topo_hosts", (void *)hosts);
+	return hosts;
 }
 
 struct entity **get_switches(int *pnum)
 {
-	return topo_get_switches(pnum);
+	struct entity **switches = topo_get_switches(pnum);
+	trace_RE("topo_switches", (void *)switches);
+	return switches;
 }
 
 struct entity *get_switch(dpid_t dpid)
 {
-	return topo_get_switch(dpid);
+	struct entity *esw = topo_get_switch(dpid);
+	trace_RE("topo_switch", (void *)esw);
+	return esw;
 }
 
 struct entity *get_host_by_haddr(haddr_t addr)
 {
-	return topo_get_host_by_haddr(addr);
+	struct entity *eh = topo_get_host_by_haddr(addr);
+	trace_RE("topo_host", (void *)eh);
+	return eh;
 }
 
 struct entity *get_host_by_paddr(uint32_t addr)
 {
-	return topo_get_host_by_paddr(addr);
+	struct entity *eh = topo_get_host_by_paddr(addr);
+	trace_RE("topo_host", (void *)eh);
+	return eh;
 }
 
 enum entity_type get_entity_type(struct entity *e)
@@ -104,14 +114,23 @@ dpid_t get_switch_dpid(struct entity *e)
 	return entity_get_dpid(e);
 }
 
-struct entity *get_host_adj_switch(struct entity *e, int *sw_port)
-{
-	return entity_host_get_adj_switch(e, sw_port);
-}
-
 const struct entity_adj *get_entity_adjs(struct entity *e, int *pnum)
 {
-	return entity_get_adjs(e, pnum);
+	const struct entity_adj *adjs = entity_get_adjs(e, pnum);
+	char buf[32];
+	snprintf(buf, 32, "entity_adjs%d", *pnum);
+	trace_RE(buf, (void *)adjs);
+	return adjs;
+}
+
+struct entity *get_host_adj_switch(struct entity *e, int *sw_port)
+{
+	assert(entity_get_type(e) == ENTITY_TYPE_HOST);
+	int num;
+	const struct entity_adj *adjs = get_entity_adjs(e, &num);
+	assert(num == 1);
+	*sw_port = adjs[0].adj_in_port;
+	return adjs[0].adj_entity;
 }
 
 void print_entity(struct entity *e)
@@ -119,6 +138,22 @@ void print_entity(struct entity *e)
 	return entity_print(e);
 }
 
+/* XXX */
+void maple_invalidate(bool (*p)(void *p_data, const char *name, void *arg), void *p_data)
+{
+	int num_switches;
+	struct entity **switches = topo_get_switches(&num_switches);
+	int i;
+	fprintf(stderr, "maple_invalidate\n");
+	for(i = 0; i < num_switches; i++) {
+		struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
+		struct trace_tree *tt = cur_sw->trace_tree;
+		if(trace_tree_invalidate(&tt, p, p_data)) {
+			fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
+			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
+		}
+	}
+}
 
 /* call back funtions */
 void maple_init(void)
@@ -222,19 +257,10 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	route_free(r);
 
 	/* invalidate */
-	int j, num_switches;
-	struct entity **switches = topo_get_switches(&num_switches);
-	for(j = 0; j < trace->num_inv_events; j++) {
+	for(i = 0; i < trace->num_inv_events; i++) {
 		const char *name;
-		name = trace->inv_events[j].name;
+		name = trace->inv_events[i].name;
 		fprintf(stderr, "invalidate \"%s\":\n", name);
-		for(i = 0; i < num_switches; i++) {
-			struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
-			struct trace_tree *tt = cur_sw->trace_tree;
-			if(trace_tree_invalidate(&tt, cmpname_p, (void *)name)) {
-				fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
-				trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
-			}
-		}
+		maple_invalidate(cmpname_p, (void *)name);
 	}
 }

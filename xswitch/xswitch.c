@@ -133,8 +133,8 @@ void xswitch_up(struct xswitch *sw)
 {
 	init_table0(sw);
 	sw->next_table_id = 1;
-	topo_switch_up(sw);
 	maple_switch_up(sw);
+	topo_switch_up(sw);
 }
 
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
@@ -160,7 +160,7 @@ void xswitch_port_down(struct xswitch *sw, int port)
 
 void xswitch_down(struct xswitch *sw)
 {
-	maple_switch_down(sw);
 	topo_switch_down(sw);
+	maple_switch_down(sw);
 	flow_table_free(sw->table0);
 }

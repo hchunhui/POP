@@ -6,6 +6,8 @@
 #include "entity.h"
 #include "discovery.h"
 
+#include "maple/maple.h"
+
 #define MAX_NUM_HOSTS 1000
 #define MAX_NUM_SWITCHES 100
 static struct entity *hosts[MAX_NUM_HOSTS];
@@ -28,6 +30,44 @@ void topo_print(void)
 		num_switches, num_hosts);
 }
 
+static bool host_p(void *phost, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_hosts") == 0 &&
+	   hosts == arg)
+		return true;
+	if(strcmp(name, "topo_host") == 0 &&
+	   arg == phost)
+		return true;
+	if(phost && strncmp(name, "entity_adjs", 11) == 0) {
+		int i;
+		int n = atoi(name + 11);
+		const struct entity_adj *adjs = arg;
+		for(i = 0; i < n; i++)
+			if(adjs[i].adj_entity == phost)
+				return true;
+	}
+	return false;
+}
+
+static bool switch_p(void *pswitch, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_switches") == 0 &&
+	   switches == arg)
+		return true;
+	if(strcmp(name, "topo_switch") == 0 &&
+	   arg == pswitch)
+		return true;
+	if(pswitch && strncmp(name, "entity_adjs", 11) == 0) {
+		int i;
+		int n = atoi(name + 11);
+		const struct entity_adj *adjs = arg;
+		for(i = 0; i < n; i++)
+			if(adjs[i].adj_entity == pswitch)
+				return true;
+	}
+	return false;
+}
+
 int topo_add_host(struct entity *e)
 {
 	int i;
@@ -37,8 +77,10 @@ int topo_add_host(struct entity *e)
 	if (num_hosts >= MAX_NUM_HOSTS)
 		return -1;
 	hosts[num_hosts++] = e;
+	maple_invalidate(host_p, NULL);
 	return (num_hosts-1);
 }
+
 
 int topo_add_switch(struct entity *e)
 {
@@ -49,6 +91,7 @@ int topo_add_switch(struct entity *e)
 	if(num_switches >= MAX_NUM_SWITCHES)
 		return -1;
 	switches[num_switches++] = e;
+	maple_invalidate(switch_p, NULL);
 	return (num_switches - 1);
 }
 
@@ -57,6 +100,7 @@ int topo_del_host(struct entity *e)
 	int i;
 	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e) {
+			maple_invalidate(host_p, e);
 			num_hosts --;
 			entity_free(e);
 			if (i != num_hosts)
@@ -71,6 +115,7 @@ int topo_del_switch(struct entity *e)
 	int i;
 	for (i=0; i < num_switches; i++)
 		if (switches[i] == e) {
+			maple_invalidate(switch_p, e);
 			num_switches --;
 			entity_free(e);
 			if (i != num_switches)
@@ -170,6 +215,7 @@ void topo_switch_down(struct xswitch *sw)
 		int num_adjs;
 		entity_get_adjs(hosts[j], &num_adjs);
 		if(num_adjs == 0) {
+			maple_invalidate(host_p, hosts[j]);
 			num_hosts--;
 			entity_free(hosts[j]);
 			hosts[j] = hosts[num_hosts];

@@ -4,6 +4,8 @@
 #include "entity.h"
 #include "xswitch/xswitch.h"
 
+#include "maple/maple.h"
+
 struct entity
 {
 	enum entity_type type;
@@ -16,6 +18,23 @@ struct entity
 	int num_adjs;
 	struct entity_adj adjs[MAX_PORT_NUM];
 };
+
+static bool host_p(void *phost, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_host") == 0 &&
+	   (arg == phost || arg == NULL))
+	   return true;
+	return false;
+}
+
+
+static bool entity_adjs_p(void *adjs, const char *name, void *arg)
+{
+	if(strncmp(name, "entity_adjs", 11) == 0 &&
+	   arg == adjs)
+		return true;
+	return false;
+}
 
 void entity_print(struct entity *e)
 {
@@ -59,6 +78,7 @@ struct entity *entity_switch(struct xswitch *xs)
 	e->num_adjs = 0;
 	return e;
 }
+
 void entity_free(struct entity *e)
 {
 	int i, j;
@@ -108,6 +128,7 @@ void entity_set_paddr(struct entity *e, uint32_t paddr)
 {
 	assert(e->type == ENTITY_TYPE_HOST);
 	e->u.addr.paddr = paddr;
+	maple_invalidate(host_p, (void *)e);
 }
 
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
@@ -145,4 +166,6 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	e2->adjs[j].adj_entity = e1;
 	e1->num_adjs++;
 	e2->num_adjs++;
+	maple_invalidate(entity_adjs_p, e1->adjs);
+	maple_invalidate(entity_adjs_p, e2->adjs);
 }
