@@ -393,6 +393,8 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 	int old_port;
 	uint16_t eth_type;
 	uint32_t old_paddr;
+	const struct entity_adj *esw_adj;
+	int j, numadjs;
 
 	hinfo.haddr = value_to_haddr(value_extract(packet, 48, 48));
 	eth_type = value_to_16(value_extract(packet, 96, 16));
@@ -412,6 +414,14 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 
 	esw = topo_get_switch(xswitch_get_dpid(xsw));
 	assert(esw != NULL);
+
+	/* Make sure the packet is sent by a host directly. */
+	esw_adj = entity_get_adjs(esw, &numadjs);
+	for (j = 0; j < numadjs; j++) {
+		if(esw_adj[j].out_port == port &&
+		   entity_get_type(esw_adj[j].adj_entity) == ENTITY_TYPE_SWITCH)
+			return;
+	}
 
 	/* is multicast addr? */
 	if(hinfo.haddr.octet[0] & 1)

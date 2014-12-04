@@ -421,6 +421,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			ps->reason, ntohl(ps->desc.port_id), ps->desc.name,
 			ps->desc.of_enable?"TRUE":"FALSE",
 			ntohl(ps->desc.state));
+		/* All ports are not Openflow(POF) enabled by default, enable it. */
 		if (!ps->desc.of_enable) {
 			struct pof_port_status *p;
 			make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_port_status),
@@ -430,6 +431,11 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			p->reason = POFPR_MODIFY;
 			p->desc.of_enable = POFE_ENABLE;
 			xswitch_send(sw, rmsg);
+			sw->n_ready_ports++;
+
+			/* Are we ready? */
+			if(sw->n_ready_ports == sw->n_ports)
+				xswitch_up(sw);
 		}
 		// handle_port_status(uint32_t state, uint32_t port_id);
 		if (ps->desc.state == POFPS_LINK_DOWN)

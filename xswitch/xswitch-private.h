@@ -15,6 +15,7 @@ struct xswitch
 	} state;
 	dpid_t dpid;
 	int n_ports;
+	int n_ready_ports;
 	//TODO port number
 	int hack_start_prio;
 	int next_table_id;
