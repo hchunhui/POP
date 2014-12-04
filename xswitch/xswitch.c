@@ -40,6 +40,7 @@ struct xswitch *xswitch_on_accept(struct sw *_sw)
 	sw = malloc(sizeof *sw);
 	sw->dpid = 0;
 	sw->n_ports = 0;
+	sw->n_ready_ports = 0;
 
 	_sw->xsw = sw;
 	sw->sw = _sw;
@@ -72,8 +73,12 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 			xswitch_send(sw, rmsg);
 			rmsg = msg_get_config_request();
 			xswitch_send(sw, rmsg);
-			xswitch_up(sw);
 			sw->state = XS_RUNNING;
+			/*
+			 * Note:
+			 * We can not call xswitch_up() here,
+			 * because ports are not ready.
+			 */
 		}
 		break;
 	case XS_RUNNING:
