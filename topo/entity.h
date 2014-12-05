@@ -28,6 +28,7 @@ struct host_info entity_get_addr(struct entity *e);
 void entity_set_paddr(struct entity *e, uint32_t paddr);
 
 void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2);
+void entity_del_link(struct entity *e1, int port1);
 
 enum entity_type entity_get_type(struct entity *e);
 dpid_t entity_get_dpid(struct entity *e);

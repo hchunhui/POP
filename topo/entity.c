@@ -169,3 +169,28 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	maple_invalidate(entity_adjs_p, e1->adjs);
 	maple_invalidate(entity_adjs_p, e2->adjs);
 }
+
+void entity_del_link(struct entity *e1, int port1)
+{
+	int i, j;
+	for (i = 0; i < e1->num_adjs;) {
+		if (e1->adjs[i].out_port == port1) {
+			struct entity *e2 = e1->adjs[i].adj_entity;
+			int port2 = e1->adjs[i].adj_in_port;
+			for(j = 0; j < e2->num_adjs;) {
+				if(e2->adjs[j].out_port == port2) {
+					e2->num_adjs--;
+					e2->adjs[j] = e2->adjs[e2->num_adjs];
+				} else {
+					j++;
+				}
+			}
+			maple_invalidate(entity_adjs_p, e2->adjs);
+			e1->num_adjs--;
+			e1->adjs[i] = e1->adjs[e1->num_adjs];
+		} else {
+			i++;
+		}
+	}
+	maple_invalidate(entity_adjs_p, e1->adjs);
+}

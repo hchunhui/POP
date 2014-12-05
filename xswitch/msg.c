@@ -436,10 +436,12 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			/* Are we ready? */
 			if(sw->n_ready_ports == sw->n_ports)
 				xswitch_up(sw);
+		} else {
+			if (ntohl(ps->desc.state) & POFPS_LINK_DOWN)
+				xswitch_port_status(sw, ntohl(ps->desc.port_id), PORT_DOWN);
+			else
+				xswitch_port_status(sw, ntohl(ps->desc.port_id), PORT_UP);
 		}
-		// handle_port_status(uint32_t state, uint32_t port_id);
-		if (ps->desc.state == POFPS_LINK_DOWN)
-			xswitch_port_down(sw, ps->desc.port_id);
 		break;
 	default:
 		fprintf(stderr, "POF packet ignored\n");

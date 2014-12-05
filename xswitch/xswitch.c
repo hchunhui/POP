@@ -158,9 +158,9 @@ void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, i
 		maple_packet_in(sw, in_port, packet, packet_len);
 }
 
-void xswitch_port_down(struct xswitch *sw, int port)
+void xswitch_port_status(struct xswitch *sw, int port, enum port_status status)
 {
-	topo_switch_port_down(sw, port);
+	topo_switch_port_status(sw, port, status);
 }
 
 void xswitch_down(struct xswitch *sw)

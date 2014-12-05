@@ -189,28 +189,9 @@ bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 	return true;
 }
 
-void topo_switch_port_down(struct xswitch *sw, int port)
-{
-	int i;
-	int sw_port;
-	struct entity *esw;
-	struct xswitch *xsw;
-	for (i = 0; i < num_hosts; i++) {
-		esw = entity_host_get_adj_switch(hosts[i], &sw_port);
-		xsw = entity_get_xswitch(esw);
-		if (xsw == sw && sw_port == port) {
-			topo_del_host(hosts[i]);
-		}
-	}
-}
-
-void topo_switch_down(struct xswitch *sw)
+static void del_dangling_hosts(void)
 {
 	int j;
-	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
-
-	fprintf(stderr, "-----switch down--------\n");
-	topo_del_switch(esw);
 	for (j = 0; j < num_hosts;) {
 		int num_adjs;
 		entity_get_adjs(hosts[j], &num_adjs);
@@ -223,5 +204,31 @@ void topo_switch_down(struct xswitch *sw)
 			j++;
 		}
 	}
+}
+
+void topo_switch_port_status(struct xswitch *sw, int port, enum port_status status)
+{
+	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+	switch(status) {
+	case PORT_DOWN:
+		fprintf(stderr, "-----port down-----\n");
+		entity_del_link(esw, port);
+		del_dangling_hosts();
+		topo_print();
+		break;
+	case PORT_UP:
+		fprintf(stderr, "-----port up-----\n");
+		lldp_packet_send(sw);
+		break;
+	}
+}
+
+void topo_switch_down(struct xswitch *sw)
+{
+	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+
+	fprintf(stderr, "-----switch down--------\n");
+	topo_del_switch(esw);
+	del_dangling_hosts();
 	topo_print();
 }
