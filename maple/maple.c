@@ -22,6 +22,7 @@ struct route *f(struct packet *pk);
 /* API for f */
 struct packet {
 	struct packet_parser *pp;
+	bool hack_get_payload;
 };
 
 void pull_header(struct packet *pkt)
@@ -56,6 +57,7 @@ bool test_equal(struct packet *pkt, const char *field, value_t value)
 
 const uint8_t *read_payload(struct packet *pkt, int *length)
 {
+	pkt->hack_get_payload = true;
 	return packet_parser_get_payload(pkt->pp, length);
 }
 
@@ -204,6 +206,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 
 	/* run */
 	pkt.pp = packet_parser(header_spec, packet, packet_len);
+	pkt.hack_get_payload = false;
 	trace_G(header_spec, 0);
 
 	r = f(&pkt);
@@ -254,6 +257,20 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			action_free(a);
 		}
 	}
+
+	if((!pkt.hack_get_payload) && num_edges == 0) {
+		struct action *a = action();
+		mod_in_port(trace, in_port);
+		action_add(a, AC_DROP, 0);
+		if(trace_tree_augment(&(sw->trace_tree), trace, a)) {
+			fprintf(stderr, "--- flow table for cur sw ---\n");
+			trace_tree_print(sw->trace_tree);
+			fprintf(stderr, "\n");
+			trace_tree_emit_rule(sw, sw->trace_tree);
+		}
+		action_free(a);
+	}
+
 	route_free(r);
 
 	/* invalidate */
