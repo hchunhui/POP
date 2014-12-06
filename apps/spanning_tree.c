@@ -67,6 +67,11 @@ struct route *get_route(struct entity *dst, int dst_port,
 	second = find_index(switches, switches_num, dst);
 	head = visited[second].parent;
 	second_e = switches[second];
+
+	/* Destination unreachable? */
+	if(head < 0)
+		return r;
+
 	route_add_edge(r, edge(second_e, dst_port, NULL, 0));
 
 	while(head >= 0)
@@ -86,7 +91,7 @@ struct route *get_route(struct entity *dst, int dst_port,
 	return r;
 }
 
-struct nodeinfo *get_tree(struct entity *src, int src_port,
+struct nodeinfo *get_tree(struct entity *src, int src_port, struct entity *dst,
 			  struct entity **switches, int switches_num)
 {
 	struct nodeinfo *visited = malloc(sizeof(struct nodeinfo)*switches_num);
@@ -112,6 +117,8 @@ struct nodeinfo *get_tree(struct entity *src, int src_port,
 	{
 		epos1 = dequeue(q);
 		entity1 = switches[epos1];
+		if(entity1 == dst)
+			break;
 		adjs = get_entity_adjs(entity1, &num_adjs);
 		for (i = 0; i < num_adjs; i++)
 		{
