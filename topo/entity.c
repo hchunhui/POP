@@ -166,17 +166,27 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	e2->adjs[j].adj_entity = e1;
 	e1->num_adjs++;
 	e2->num_adjs++;
+#ifdef STRICT_INVALIDATE
 	maple_invalidate(entity_adjs_p, e1->adjs);
 	maple_invalidate(entity_adjs_p, e2->adjs);
+#else
+	if(e1->type != ENTITY_TYPE_HOST && e2->type != ENTITY_TYPE_HOST) {
+		maple_invalidate(entity_adjs_p, e1->adjs);
+		maple_invalidate(entity_adjs_p, e2->adjs);
+	}
+#endif
 }
 
 void entity_del_link(struct entity *e1, int port1)
 {
 	int i, j;
+	bool flag = e1->type == ENTITY_TYPE_SWITCH ? true : false;
 	for (i = 0; i < e1->num_adjs;) {
 		if (e1->adjs[i].out_port == port1) {
 			struct entity *e2 = e1->adjs[i].adj_entity;
 			int port2 = e1->adjs[i].adj_in_port;
+			if(e2->type != ENTITY_TYPE_HOST)
+				flag = false;
 			for(j = 0; j < e2->num_adjs;) {
 				if(e2->adjs[j].out_port == port2) {
 					e2->num_adjs--;
@@ -192,5 +202,10 @@ void entity_del_link(struct entity *e1, int port1)
 			i++;
 		}
 	}
+#ifdef STRICT_INVALIDATE
 	maple_invalidate(entity_adjs_p, e1->adjs);
+#else
+	if(flag == false)
+		maple_invalidate(entity_adjs_p, e1->adjs);
+#endif
 }
