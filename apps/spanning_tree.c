@@ -69,7 +69,7 @@ struct route *get_route(struct entity *dst, int dst_port,
 	second_e = switches[second];
 
 	/* Destination unreachable? */
-	if(head < 0)
+	if(head == -1)
 		return r;
 
 	route_add_edge(r, edge(second_e, dst_port, NULL, 0));
