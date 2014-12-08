@@ -78,8 +78,29 @@ struct action
 	int num_actions;
 	struct {
 		enum action_type type;
-		int arg1;
-		int arg2;
+		union {
+			int arg;
+			struct {
+				int tid;
+				int offset;
+			} goto_table;
+			struct {
+				enum action_oper_type op_type;
+				enum match_field_type dst_type;
+				int dst_offset;
+				int dst_length;
+				enum match_field_type src_type;
+				int src_offset;
+				int src_length;
+			} op_r;
+			struct {
+				enum action_oper_type op_type;
+				enum match_field_type dst_type;
+				int dst_offset;
+				int dst_length;
+				uint32_t src_value;
+			} op_i;
+		} u;
 	} a[ACTION_NUM_ACTIONS];
 };
 

@@ -576,7 +576,7 @@ static int __build_flow_table(struct xswitch *sw, struct flow_table *ft,
 		}
 		// insert GOTO_TABLE into orig table
 		a = action();
-		action_add2(a, AC_GOTO_TABLE, flow_table_get_tid(tg->ft), tg->move_length);
+		action_add_goto_table(a, flow_table_get_tid(tg->ft), tg->move_length);
 
 		match_dump(ma, buf, 128);
 		action_dump(a, buf2, 128);

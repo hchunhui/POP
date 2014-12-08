@@ -10,19 +10,58 @@ struct action *action(void)
 	return a;
 }
 
-void action_add2(struct action *a, enum action_type type, int arg1, int arg2)
+void action_add_goto_table(struct action *a, int tid, int offset)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_GOTO_TABLE;
+	a->a[n].u.goto_table.tid = tid;
+	a->a[n].u.goto_table.offset = offset;
+	a->num_actions++;
+}
+
+void action_add(struct action *a, enum action_type type, int arg)
 {
 	int n = a->num_actions;
 	assert(n < ACTION_NUM_ACTIONS);
 	a->a[n].type = type;
-	a->a[n].arg1 = arg1;
-	a->a[n].arg2 = arg2;
+	a->a[n].u.arg = arg;
 	a->num_actions++;
 }
 
-void action_add(struct action *a, enum action_type type, int arg1)
+void action_add_calc_r(struct action *a, enum action_oper_type op_type,
+		       enum match_field_type dst_type,
+		       int dst_offset, int dst_length,
+		       enum match_field_type src_type,
+		       int src_offset, int src_length)
 {
-	action_add2(a, type, arg1, 0);
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_CALC_R;
+	a->a[n].u.op_r.op_type = op_type;
+	a->a[n].u.op_r.dst_type = dst_type;
+	a->a[n].u.op_r.dst_offset = dst_offset;
+	a->a[n].u.op_r.dst_length = dst_length;
+	a->a[n].u.op_r.src_type = src_type;
+	a->a[n].u.op_r.src_offset = src_offset;
+	a->a[n].u.op_r.src_length = src_length;
+	a->num_actions++;
+}
+
+void action_add_calc_i(struct action *a, enum action_oper_type op_type,
+		       enum match_field_type dst_type,
+		       int dst_offset, int dst_length,
+		       uint32_t src_value)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_CALC_R;
+	a->a[n].u.op_i.op_type = op_type;
+	a->a[n].u.op_i.dst_type = dst_type;
+	a->a[n].u.op_i.dst_offset = dst_offset;
+	a->a[n].u.op_i.dst_length = dst_length;
+	a->a[n].u.op_i.src_value = src_value;
+	a->num_actions++;
 }
 
 void action_free(struct action *m)
@@ -46,14 +85,15 @@ void action_union(struct action *a1, struct action *a2)
 {
 	int i, j;
 	for(j = 0; j < a2->num_actions; j++) {
+		assert(a2->a[j].type == AC_OUTPUT || a2->a[j].type == AC_DROP);
 		for(i = 0; i < a1->num_actions; i++) {
+			assert(a1->a[i].type == AC_OUTPUT || a1->a[i].type == AC_DROP);
 			if(a1->a[i].type == a2->a[j].type &&
-			   a1->a[i].arg1 == a2->a[j].arg1 &&
-			   a1->a[i].arg2 == a2->a[j].arg2)
+			   a1->a[i].u.arg == a2->a[j].u.arg)
 				break;
 		}
 		if(i >= a1->num_actions)
-			action_add2(a1, a2->a[j].type, a2->a[j].arg1, a2->a[j].arg2);
+			action_add(a1, a2->a[j].type, a2->a[j].u.arg);
 	}
 }
 
@@ -71,11 +111,13 @@ void action_dump(struct action *a, char *buf, int n)
 			offset += snprintf(buf + offset, n - offset, "PACKET_IN ");
 			break;
 		case AC_OUTPUT:
-			offset += snprintf(buf + offset, n - offset, "OUTPUT %d ", a->a[i].arg1);
+			offset += snprintf(buf + offset, n - offset, "OUTPUT %d ",
+					   a->a[i].u.arg);
 			break;
 		case AC_GOTO_TABLE:
 			offset += snprintf(buf + offset, n - offset, "GOTO_TABLE %d off %d ",
-					   a->a[i].arg1, a->a[i].arg2);
+					   a->a[i].u.goto_table.tid,
+					   a->a[i].u.goto_table.offset);
 			break;
 		default:
 			offset += snprintf(buf + offset, n - offset, "unknown ");
