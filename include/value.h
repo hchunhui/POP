@@ -235,26 +235,80 @@ static inline value_t value_from_64l(uint64_t x)
 	return v;
 }
 
-/* extract value from a buffer */
+/*
+ * Network programming prefers big-endianness and MSB 0 bit numbering...
+ * References:
+ *   http://en.wikipedia.org/wiki/Bit_numbering
+ *   http://en.wikipedia.org/wiki/Endianness
+ *   http://en.wikipedia.org/wiki/IPv4#Header
+ */
+
+/* MSB 0 bit numbering value to/from 8 bit number */
+static inline uint8_t value_bits_to_8(int n, value_t v)
+{
+	return v.v[0] >> (8-n);
+}
+
+static inline value_t value_bits_from_8(int n, uint8_t b)
+{
+	value_t v = {{0}};
+	v.v[0] = b << (8-n);
+	return v;
+}
+
+/* LSB 0 bit numbering value to/from 8 bit number */
+static inline uint8_t value_bits_to_8l(int n, value_t v)
+{
+	return v.v[0];
+}
+
+static inline value_t value_bits_from_8l(int n, uint8_t b)
+{
+	value_t v = {{0}};
+	v.v[0] = b;
+	return v;
+}
+
+/* extract value from a buffer ({offset, length} is MSB 0 bit numbering) */
 static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 {
 	value_t v = {{0}};
-	uint8_t tmp[VALUE_LEN+1];
 	if(offset >=0 && length >= 0) {
 		int low = offset / 8;
 		int high = (offset + length + 7) / 8;
 		int shift = offset % 8;
 		int i;
-		memcpy(tmp, buf + low, (size_t)(high - low));
 		for(i = 0; i < high - low - 1; i++) {
-			v.v[i] = tmp[i];
+			v.v[i] = buf[low+i];
+			v.v[i] <<= shift;
+			v.v[i] |= buf[low+i+1] >> (8 - shift);
+		}
+		v.v[i] = buf[low + i];
+		v.v[i] <<= shift;
+		if(length % 8)
+			v.v[i] &= 0xff << (8 - (length % 8));
+	}
+	return v;
+}
+
+/* extract value from a buffer ({offset, length} is LSB 0 bit numbering) */
+static inline value_t value_extractl(const uint8_t *buf, int offset, int length)
+{
+	value_t v = {{0}};
+	if(offset >=0 && length >= 0) {
+		int low = offset / 8;
+		int high = (offset + length + 7) / 8;
+		int shift = offset % 8;
+		int i;
+		for(i = 0; i < high - low - 1; i++) {
+			v.v[i] = buf[low+i];
 			v.v[i] >>= shift;
-			v.v[i] |= tmp[i+1] << (8 - shift);
+			v.v[i] |= buf[low+i+1] << (8 - shift);
 		}
 		v.v[i] = buf[low + i];
 		v.v[i] >>= shift;
 		if(length % 8)
-			v.v[i] %= (1 << (length % 8)) - 1;
+			v.v[i] &= (1 << (length % 8)) - 1;
 	}
 	return v;
 }
