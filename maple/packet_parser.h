@@ -4,10 +4,29 @@
 #include <inttypes.h>
 #include "value.h"
 
+struct expr;
+enum expr_type {
+	EXPR_FIELD,
+	EXPR_VALUE,
+	EXPR_NOT,
+	EXPR_ADD,
+	EXPR_SUB,
+	EXPR_SHL,
+	EXPR_SHR,
+	EXPR_AND,
+	EXPR_OR,
+	EXPR_XOR,
+};
+struct expr *expr_field(const char *name);
+struct expr *expr_value(uint32_t value);
+struct expr *expr_op1(enum expr_type type, struct expr *sub_expr);
+struct expr *expr_op2(enum expr_type type, struct expr *left, struct expr *right);
+void expr_free(struct expr *e);
+
 struct header;
 struct header *header(const char *name);
 void header_add_field(struct header *h, const char *name, int offset, int length);
-void header_set_length(struct header *h, int length);
+void header_set_length(struct header *h, struct expr *e);
 int header_get_length(struct header *h);
 void header_set_sel(struct header *h, const char *name);
 const char *header_get_sel(struct header *h);
@@ -24,6 +43,7 @@ void packet_parser_reset(struct packet_parser *pp);
 void packet_parser_pull(struct packet_parser *pp,
 			struct header **old_spec, value_t *sel_val, struct header **new_spec);
 value_t packet_parser_read(struct packet_parser *pp, const char *field);
+uint32_t packet_parser_read_to_32(struct packet_parser *pp, const char *field);
 const char *packet_parser_read_type(struct packet_parser *pp);
 const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length);
 

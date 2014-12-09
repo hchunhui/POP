@@ -21,9 +21,9 @@ header ethernet {
 
 header ipv4 {
 	fields {
-/*
 		ver : 4;
 		ihl : 4;
+/*
 		tos : 8;
 		len : 16;
 		id : 16;
@@ -31,14 +31,14 @@ header ipv4 {
 		off : 13;
 		ttl : 8;
 */
-		__unused : 72;
+		__unused : 64;
 		nw_proto : 8;
 		sum : 16;
 		nw_src : 32;
 		nw_dst : 32;
 		opt : *;
 	}
-	//length : ihl * 4;
+	length : ihl << 2;
 	next select (nw_proto) {
 		case 0x01 : icmp;
 		case 0x02 : igmp;
