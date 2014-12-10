@@ -3,7 +3,6 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "entity.h"
 #include "route.h"
 
 #include "igmp.h"
@@ -43,11 +42,9 @@ struct route *f(struct packet *pkt)
 		return route();
 	}
 
-	/* calculate spanning tree */
 	hsrc = get_host_by_paddr(hsrc_ip);
 	assert(hsrc);
-	src = entity_host_get_adj_switch(hsrc, &src_port);
-	visited = get_tree(src, src_port, switches, switches_num);
+	src = get_host_adj_switch(hsrc, &src_port);
 
 	/* add routes */
 	if(is_multicast_ip(hdst_ip)) {
@@ -59,26 +56,35 @@ struct route *f(struct packet *pkt)
 		get_group_maddrs(groupid, buffer, ngroup_member);
 
 		r = route();
+		/* calculate spanning tree */
+		visited = get_tree(src, src_port, NULL, switches, switches_num);
 		for(i = 0; i < ngroup_member; i++){
 			hdst = get_host_by_paddr(buffer[i]);
-			assert(hdst);
+			if(hdst == NULL)
+				continue;
 			/* find connected switch */
-			dst = entity_host_get_adj_switch(hdst, &dst_port);
+			dst = get_host_adj_switch(hdst, &dst_port);
 			/* get and union route */
 			rx = get_route(dst, dst_port, visited, switches, switches_num);
 			route_union(r, rx);
 			route_free(rx);
 		}
 		free(buffer);
+		free(visited);
 	} else {
 		hdst = get_host_by_paddr(hdst_ip);
-		assert(hdst);
-		/* find connected switch */
-		dst = entity_host_get_adj_switch(hdst, &dst_port);
-		/* get route */
-		r = get_route(dst, dst_port, visited, switches, switches_num);
+		if(hdst == NULL) {
+			fprintf(stderr, "dst host not found: %08x\n", hdst_ip);
+			r = route();
+		} else {
+			/* find connected switch */
+			dst = get_host_adj_switch(hdst, &dst_port);
+			/* get route */
+			visited = get_tree(src, src_port, dst, switches, switches_num);
+			r = get_route(dst, dst_port, visited, switches, switches_num);
+			free(visited);
+		}
 	}
 
-	free(visited);
 	return r;
 }

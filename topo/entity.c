@@ -1,8 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
-#include "entity-private.h"
+#include "entity.h"
 #include "xswitch/xswitch.h"
+
+#include "maple/maple.h"
 
 struct entity
 {
@@ -16,6 +18,23 @@ struct entity
 	int num_adjs;
 	struct entity_adj adjs[MAX_PORT_NUM];
 };
+
+static bool host_p(void *phost, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_host") == 0 &&
+	   (arg == phost || arg == NULL))
+	   return true;
+	return false;
+}
+
+
+static bool entity_adjs_p(void *adjs, const char *name, void *arg)
+{
+	if(strncmp(name, "entity_adjs", 11) == 0 &&
+	   arg == adjs)
+		return true;
+	return false;
+}
 
 void entity_print(struct entity *e)
 {
@@ -59,6 +78,7 @@ struct entity *entity_switch(struct xswitch *xs)
 	e->num_adjs = 0;
 	return e;
 }
+
 void entity_free(struct entity *e)
 {
 	int i, j;
@@ -108,6 +128,7 @@ void entity_set_paddr(struct entity *e, uint32_t paddr)
 {
 	assert(e->type == ENTITY_TYPE_HOST);
 	e->u.addr.paddr = paddr;
+	maple_invalidate(host_p, (void *)e);
 }
 
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
@@ -145,4 +166,46 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	e2->adjs[j].adj_entity = e1;
 	e1->num_adjs++;
 	e2->num_adjs++;
+#ifdef STRICT_INVALIDATE
+	maple_invalidate(entity_adjs_p, e1->adjs);
+	maple_invalidate(entity_adjs_p, e2->adjs);
+#else
+	if(e1->type != ENTITY_TYPE_HOST && e2->type != ENTITY_TYPE_HOST) {
+		maple_invalidate(entity_adjs_p, e1->adjs);
+		maple_invalidate(entity_adjs_p, e2->adjs);
+	}
+#endif
+}
+
+void entity_del_link(struct entity *e1, int port1)
+{
+	int i, j;
+	bool flag = e1->type == ENTITY_TYPE_SWITCH ? true : false;
+	for (i = 0; i < e1->num_adjs;) {
+		if (e1->adjs[i].out_port == port1) {
+			struct entity *e2 = e1->adjs[i].adj_entity;
+			int port2 = e1->adjs[i].adj_in_port;
+			if(e2->type != ENTITY_TYPE_HOST)
+				flag = false;
+			for(j = 0; j < e2->num_adjs;) {
+				if(e2->adjs[j].out_port == port2) {
+					e2->num_adjs--;
+					e2->adjs[j] = e2->adjs[e2->num_adjs];
+				} else {
+					j++;
+				}
+			}
+			maple_invalidate(entity_adjs_p, e2->adjs);
+			e1->num_adjs--;
+			e1->adjs[i] = e1->adjs[e1->num_adjs];
+		} else {
+			i++;
+		}
+	}
+#ifdef STRICT_INVALIDATE
+	maple_invalidate(entity_adjs_p, e1->adjs);
+#else
+	if(flag == false)
+		maple_invalidate(entity_adjs_p, e1->adjs);
+#endif
 }

@@ -10,6 +10,11 @@ struct flow_table;
 struct match;
 struct action;
 
+enum port_status {
+	PORT_DOWN,
+	PORT_UP,
+};
+
 /* xswitch */
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
 dpid_t xswitch_get_dpid(struct xswitch *sw);

@@ -3,8 +3,10 @@
 #include "types.h"
 #include "xswitch/xswitch.h"
 #include "topo.h"
-#include "entity-private.h"
+#include "entity.h"
 #include "discovery.h"
+
+#include "maple/maple.h"
 
 #define MAX_NUM_HOSTS 1000
 #define MAX_NUM_SWITCHES 100
@@ -28,6 +30,46 @@ void topo_print(void)
 		num_switches, num_hosts);
 }
 
+static bool host_p(void *phost, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_hosts") == 0 &&
+	   hosts == arg)
+		return true;
+	if(strcmp(name, "topo_host") == 0 &&
+	   arg == phost)
+		return true;
+#if STRICT_INVALIDATE
+	if(phost && strncmp(name, "entity_adjs", 11) == 0) {
+		int i;
+		int n = atoi(name + 11);
+		const struct entity_adj *adjs = arg;
+		for(i = 0; i < n; i++)
+			if(adjs[i].adj_entity == phost)
+				return true;
+	}
+#endif
+	return false;
+}
+
+static bool switch_p(void *pswitch, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_switches") == 0 &&
+	   switches == arg)
+		return true;
+	if(strcmp(name, "topo_switch") == 0 &&
+	   arg == pswitch)
+		return true;
+	if(pswitch && strncmp(name, "entity_adjs", 11) == 0) {
+		int i;
+		int n = atoi(name + 11);
+		const struct entity_adj *adjs = arg;
+		for(i = 0; i < n; i++)
+			if(adjs[i].adj_entity == pswitch)
+				return true;
+	}
+	return false;
+}
+
 int topo_add_host(struct entity *e)
 {
 	int i;
@@ -37,8 +79,10 @@ int topo_add_host(struct entity *e)
 	if (num_hosts >= MAX_NUM_HOSTS)
 		return -1;
 	hosts[num_hosts++] = e;
+	maple_invalidate(host_p, NULL);
 	return (num_hosts-1);
 }
+
 
 int topo_add_switch(struct entity *e)
 {
@@ -49,6 +93,7 @@ int topo_add_switch(struct entity *e)
 	if(num_switches >= MAX_NUM_SWITCHES)
 		return -1;
 	switches[num_switches++] = e;
+	maple_invalidate(switch_p, NULL);
 	return (num_switches - 1);
 }
 
@@ -57,6 +102,7 @@ int topo_del_host(struct entity *e)
 	int i;
 	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e) {
+			maple_invalidate(host_p, e);
 			num_hosts --;
 			entity_free(e);
 			if (i != num_hosts)
@@ -71,6 +117,7 @@ int topo_del_switch(struct entity *e)
 	int i;
 	for (i=0; i < num_switches; i++)
 		if (switches[i] == e) {
+			maple_invalidate(switch_p, e);
 			num_switches --;
 			entity_free(e);
 			if (i != num_switches)
@@ -144,32 +191,14 @@ bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int 
 	return true;
 }
 
-void topo_switch_port_down(struct xswitch *sw, int port)
-{
-	int i;
-	int sw_port;
-	struct entity *esw;
-	struct xswitch *xsw;
-	for (i = 0; i < num_hosts; i++) {
-		esw = entity_host_get_adj_switch(hosts[i], &sw_port);
-		xsw = entity_get_xswitch(esw);
-		if (xsw == sw && sw_port == port) {
-			topo_del_host(hosts[i]);
-		}
-	}
-}
-
-void topo_switch_down(struct xswitch *sw)
+static void del_dangling_hosts(void)
 {
 	int j;
-	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
-
-	fprintf(stderr, "-----switch down--------\n");
-	topo_del_switch(esw);
 	for (j = 0; j < num_hosts;) {
 		int num_adjs;
 		entity_get_adjs(hosts[j], &num_adjs);
 		if(num_adjs == 0) {
+			maple_invalidate(host_p, hosts[j]);
 			num_hosts--;
 			entity_free(hosts[j]);
 			hosts[j] = hosts[num_hosts];
@@ -177,5 +206,31 @@ void topo_switch_down(struct xswitch *sw)
 			j++;
 		}
 	}
+}
+
+void topo_switch_port_status(struct xswitch *sw, int port, enum port_status status)
+{
+	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+	switch(status) {
+	case PORT_DOWN:
+		fprintf(stderr, "-----port down-----\n");
+		entity_del_link(esw, port);
+		del_dangling_hosts();
+		topo_print();
+		break;
+	case PORT_UP:
+		fprintf(stderr, "-----port up-----\n");
+		lldp_packet_send(sw);
+		break;
+	}
+}
+
+void topo_switch_down(struct xswitch *sw)
+{
+	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+
+	fprintf(stderr, "-----switch down--------\n");
+	topo_del_switch(esw);
+	del_dangling_hosts();
 	topo_print();
 }

@@ -5,7 +5,7 @@
 struct sw;
 
 /* xswitch */
-struct trace_tree_header;
+struct trace_tree;
 struct xswitch
 {
 	enum {
@@ -21,7 +21,7 @@ struct xswitch
 	int next_table_id;
 	//struct rconn *rconn;
 	struct flow_table *table0;
-	struct trace_tree_header *trace_tree;
+	struct trace_tree *trace_tree;
 
 	struct sw *sw;
 };
@@ -29,7 +29,7 @@ struct xswitch
 void xswitch_up(struct xswitch *sw);
 void xswitch_down(struct xswitch *sw);
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
-void xswitch_port_down(struct xswitch *sw, int port);
+void xswitch_port_status(struct xswitch *sw, int port, enum port_status status);
 
 /* msg */
 void msg_process(struct xswitch *sw, const struct msgbuf *msg);
