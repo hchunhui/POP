@@ -161,8 +161,6 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		 * then do:
 		 *   op r(stage), r(stage+1)
 		 */
-		expr_gen(e->u.binop.left, ft, a, stage);
-		expr_gen(e->u.binop.right, ft, a, stage + 1);
 		switch(e->type) {
 		case EXPR_ADD: op_type = AC_OP_ADD; break;
 		case EXPR_SUB: op_type = AC_OP_SUB; break;
@@ -173,18 +171,48 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		case EXPR_XOR: op_type = AC_OP_XOR; break;
 		default: assert(0);
 		}
-		action_add_calc_r(a, op_type,
-				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
-				  MATCH_FIELD_METADATA, R_offset(stage+1), R_length);
+		expr_gen(e->u.binop.left, ft, a, stage);
+
+		/* before generate the right expr, check if we can do it better */
+		if(e->u.binop.right->type == EXPR_VALUE) {
+			action_add_calc_i(a, op_type,
+					  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+					  e->u.binop.right->u.value);
+		} else {
+			/* fall back to generic procedure */
+			expr_gen(e->u.binop.right, ft, a, stage + 1);
+			action_add_calc_r(a, op_type,
+					  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+					  MATCH_FIELD_METADATA, R_offset(stage+1), R_length);
+		}
 		break;
 	}
 }
 
 void expr_generate_action(struct expr *e, struct flow_table *ft, struct action *a)
 {
-	expr_gen(e, ft, a, 0);
-	action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
-	action_add_goto_table(a, flow_table_get_tid(ft), 0);
+	int offset, length;
+	switch(e->type) {
+	case EXPR_VALUE:
+		/* Fixed value is the most common case */
+		action_add_goto_table(a, flow_table_get_tid(ft), e->u.value);
+		break;
+	case EXPR_FIELD:
+		/* Handle a single field name is simple */
+		flow_table_get_offset_length(ft,
+					     flow_table_get_field_index(ft, e->u.field),
+					     &offset,
+					     &length);
+		action_add_move_packet(a, MATCH_FIELD_PACKET, offset, length);
+		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		break;
+	default:
+		/* The expr is complex, do generic procedure */
+		expr_gen(e, ft, a, 0);
+		action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
+		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		break;
+	}
 }
 
 struct header {
