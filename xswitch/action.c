@@ -55,12 +55,35 @@ void action_add_calc_i(struct action *a, enum action_oper_type op_type,
 {
 	int n = a->num_actions;
 	assert(n < ACTION_NUM_ACTIONS);
-	a->a[n].type = AC_CALC_R;
+	a->a[n].type = AC_CALC_I;
 	a->a[n].u.op_i.op_type = op_type;
 	a->a[n].u.op_i.dst_type = dst_type;
 	a->a[n].u.op_i.dst_offset = dst_offset;
 	a->a[n].u.op_i.dst_length = dst_length;
 	a->a[n].u.op_i.src_value = src_value;
+	a->num_actions++;
+}
+
+void action_add_write_metadata(struct action *a, int dst_offset, int dst_length, value_t val)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_WRITE_METADATA;
+	a->a[n].u.write_metadata.dst_offset = dst_offset;
+	a->a[n].u.write_metadata.dst_length = dst_length;
+	a->a[n].u.write_metadata.val = val;
+	a->num_actions++;
+}
+
+void action_add_move_packet(struct action *a,
+			    enum match_field_type type, int offset, int length)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_MOVE_PACKET;
+	a->a[n].u.move_packet.type = type;
+	a->a[n].u.move_packet.offset = offset;
+	a->a[n].u.move_packet.length = length;
 	a->num_actions++;
 }
 

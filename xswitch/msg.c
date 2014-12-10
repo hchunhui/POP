@@ -231,13 +231,13 @@ static void emit_calc_i(struct pof_instruction *mi, enum action_oper_type type,
 	cf->src_operand.value = imm;
 }
 
-static int fill_instruction(struct flow_table *ft,
-			    struct pof_instruction *mi, int num, struct action *a)
+static int fill_instruction(struct pof_instruction *mi, int num, struct action *a)
 {
 	int i, idx;
 	struct pof_instruction_apply_actions *ia;
 	struct pof_instruction_goto_table *gt;
 	struct pof_instruction_mov_packet_offset *mpo;
+	struct pof_instruction_write_metadata *wm;
 	assert(a->num_actions <= num);
 
 	/* XXX: hack */
@@ -263,6 +263,16 @@ static int fill_instruction(struct flow_table *ft,
 				    a->a[i].u.op_i.src_value);
 			idx++;
 			break;
+		case AC_WRITE_METADATA:
+			mi[idx].type = htons(POFIT_WRITE_METADATA);
+			mi[idx].len = htons(sizeof(*wm));
+			wm = (void *)(mi[idx].instruction_data);
+			wm->metadata_offset = htons(u16(a->a[i].u.write_metadata.dst_offset));
+			wm->len = htons(u16(a->a[i].u.write_metadata.dst_length));
+			assert(VALUE_LEN <= POF_MAX_FIELD_LENGTH_IN_BYTE);
+			memcpy(wm->value, a->a[i].u.write_metadata.val.v, VALUE_LEN);
+			idx++;
+			break;
 		default:
 			break;
 		}
@@ -275,13 +285,18 @@ static int fill_instruction(struct flow_table *ft,
 	idx++;
 	for(i = 0; i < a->num_actions; i++) {
 		switch(a->a[i].type) {
-		case AC_MOVE_PACKET_OFFSET:
+		case AC_MOVE_PACKET:
 			mi[idx].type = htons(POFIT_MOVE_PACKET_OFFSET);
 			mi[idx].len = htons(sizeof(*mpo));
 			mpo = (void *)(mi[idx].instruction_data);
 			mpo->direction = 0;
 			mpo->value_type = 1;
-			fill_match(&(mpo->movement.field), &(ft->fields[a->a[i].u.arg]));
+			mpo->movement.field.field_id =
+				htons(get_pof_match_field_id(a->a[i].u.move_packet.type));
+			mpo->movement.field.offset =
+				htons(u16(a->a[i].u.move_packet.offset));
+			mpo->movement.field.len =
+				htons(u16(a->a[i].u.move_packet.length));
 			idx++;
 			break;
 		case AC_GOTO_TABLE:
@@ -414,7 +429,7 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 		       ma->m[i].mask.v,
 		       bytes);
 	}
-	mfe->instruction_num = u8(fill_instruction(ft, mfe->instruction, POF_MAX_INSTRUCTION_NUM, a));
+	mfe->instruction_num = u8(fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a));
 	return msg;
 }
 

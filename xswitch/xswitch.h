@@ -25,6 +25,7 @@ void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length);
 int flow_table_get_field_index(struct flow_table *ft, const char *name);
 int flow_table_get_tid(struct flow_table *ft);
+void flow_table_get_offset_length(struct flow_table *ft, int idx, int *offset, int *length);
 
 
 /* match */
@@ -53,10 +54,11 @@ enum action_type {
 	AC_PACKET_IN,
 	AC_OUTPUT             /*port*/,
 	/* "instructions" */
-	AC_GOTO_TABLE         /*tid_imm*/  /*off_imm*/,
-	AC_MOVE_PACKET_OFFSET /*match_idx*/,
+	AC_GOTO_TABLE,
+	AC_MOVE_PACKET,
 	AC_CALC_R,
 	AC_CALC_I,
+	AC_WRITE_METADATA,
 };
 
 struct action *action(void);
@@ -72,6 +74,9 @@ void action_add_calc_i(struct action *a, enum action_oper_type op_type,
 		       enum match_field_type dst_type,
 		       int dst_offset, int dst_length,
 		       uint32_t src_value);
+void action_add_write_metadata(struct action *a, int dst_offset, int dst_length, value_t val);
+void action_add_move_packet(struct action *a,
+			    enum match_field_type type, int offset, int length);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);

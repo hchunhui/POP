@@ -34,7 +34,7 @@ struct event
 		} re;
 		struct {
 			struct header *spec;
-			int move_length;
+			struct expr *move_expr;
 		} g;
 	} u;
 };
@@ -89,12 +89,12 @@ static void trace_IE(const char *name)
 	trace.num_inv_events++;
 }
 
-static void trace_G(struct header *spec, int move_length)
+static void trace_G(struct header *spec, struct expr *move_expr)
 {
 	int i = trace.num_events;
 	trace.events[i].type = EV_G;
 	trace.events[i].u.g.spec = spec;
-	trace.events[i].u.g.move_length = move_length;
+	trace.events[i].u.g.move_expr = move_expr;
 	trace.num_events++;
 }
 
@@ -154,7 +154,7 @@ struct trace_tree_G
 	struct trace_tree_header h;
 	struct flow_table *ft;
 	struct header *spec;
-	int move_length;
+	struct expr *move_expr;
 	int hack_start_prio;
 	struct trace_tree_header *t;
 };
@@ -215,14 +215,14 @@ static struct trace_tree_header *trace_tree_D(const char *name,
 }
 
 static struct trace_tree_header *trace_tree_G(struct header *spec,
-					      int move_length,
+					      struct expr *move_expr,
 					      struct trace_tree_header *tt)
 {
 	struct trace_tree_G *t = malloc(sizeof *t);
 	t->h.type = TT_G;
 	t->ft = NULL;
 	t->spec = spec;
-	t->move_length = move_length;
+	t->move_expr = move_expr;
 	t->hack_start_prio = 0;
 	t->t = tt;
 	return (struct trace_tree_header *)t;
@@ -301,7 +301,7 @@ static struct trace_tree_header *events_to_tree(struct event *events, int num_ev
 			root = trace_tree_D(ev->u.re.name, root);
 			break;
 		case EV_G:
-			root = trace_tree_G(ev->u.g.spec, ev->u.g.move_length, root);
+			root = trace_tree_G(ev->u.g.spec, ev->u.g.move_expr, root);
 			break;
 		}
 	}
@@ -576,7 +576,7 @@ static int __build_flow_table(struct xswitch *sw, struct flow_table *ft,
 		}
 		// insert GOTO_TABLE into orig table
 		a = action();
-		action_add_goto_table(a, flow_table_get_tid(tg->ft), tg->move_length);
+		expr_generate_action(tg->move_expr, tg->ft, a);
 
 		match_dump(ma, buf, 128);
 		action_dump(a, buf2, 128);
@@ -724,7 +724,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 
 	/* run */
 	pk.pp = packet_parser(header_spec, packet, packet_len);
-	trace_G(header_spec, 0);
+	trace_G(header_spec, expr_value(0));
 
 	r = f(&pk);
 

@@ -100,6 +100,16 @@ struct action
 				int dst_length;
 				uint32_t src_value;
 			} op_i;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} write_metadata;
+			struct {
+				enum match_field_type type;
+				int offset;
+				int length;
+			} move_packet;
 		} u;
 	} a[ACTION_NUM_ACTIONS];
 };

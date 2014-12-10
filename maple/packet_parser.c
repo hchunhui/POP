@@ -99,6 +99,94 @@ static uint32_t expr_interp(struct expr *e, struct packet_parser *pp)
 	return 0;
 }
 
+/*
+ * Metadata configuration:
+ * offset |01234567|01234567|01234567|01234567|
+ *     0  |      length     | inport |reserved|
+ *    32  |compRes |          not uesd        |
+ *    64  |                r0                 |
+ *    96  |                r1                 |
+ *   128  |                r2                 |
+ *   160  |               ....                |
+ *   ...
+ */
+#define R_offset(x) (64 + 32*(x))
+#define R_length    32
+
+/*
+ * expr_gen() performs a stack-based translation.
+ * r{0, 1, 2, ...} are viewed as a "register stack",
+ * "stage" points to the top of the stack.
+ */
+static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, int stage)
+{
+	enum action_oper_type op_type;
+	int offset, length;
+	switch(e->type) {
+	case EXPR_FIELD:
+		/* load packet data to stage:
+		 *   xor  r(stage), r(stage)
+		 *   add  r(stage), packet(offset, length)
+		 */
+		flow_table_get_offset_length(ft,
+					     flow_table_get_field_index(ft, e->u.field),
+					     &offset,
+					     &length);
+		action_add_calc_r(a, AC_OP_XOR,
+				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+				  MATCH_FIELD_METADATA, R_offset(stage), R_length);
+		action_add_calc_r(a, AC_OP_ADD,
+				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+				  MATCH_FIELD_PACKET, offset, length);
+		break;
+	case EXPR_VALUE:
+		/* load imm to stage:
+		 *   write_metadata r(stage), imm
+		 */
+		action_add_write_metadata(a, R_offset(stage), R_length,
+					  value_from_32(e->u.value));
+		break;
+	case EXPR_NOT:
+		/* recursively generate sub expr to stage,
+		 * then do:
+		 *   nori r(stage), 0
+		 */
+		expr_gen(e->u.sub_expr, ft, a, stage);
+		action_add_calc_i(a, AC_OP_NOR,
+				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+				  0);
+		break;
+	default:
+		/* recursively generate sub exprs to stage and (stage+1)
+		 * then do:
+		 *   op r(stage), r(stage+1)
+		 */
+		expr_gen(e->u.binop.left, ft, a, stage);
+		expr_gen(e->u.binop.right, ft, a, stage + 1);
+		switch(e->type) {
+		case EXPR_ADD: op_type = AC_OP_ADD; break;
+		case EXPR_SUB: op_type = AC_OP_SUB; break;
+		case EXPR_SHL: op_type = AC_OP_SHL; break;
+		case EXPR_SHR: op_type = AC_OP_SHR; break;
+		case EXPR_AND: op_type = AC_OP_AND; break;
+		case EXPR_OR:  op_type = AC_OP_OR;  break;
+		case EXPR_XOR: op_type = AC_OP_XOR; break;
+		default: assert(0);
+		}
+		action_add_calc_r(a, op_type,
+				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
+				  MATCH_FIELD_METADATA, R_offset(stage+1), R_length);
+		break;
+	}
+}
+
+void expr_generate_action(struct expr *e, struct flow_table *ft, struct action *a)
+{
+	expr_gen(e, ft, a, 0);
+	action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
+	action_add_goto_table(a, flow_table_get_tid(ft), 0);
+}
+
 struct header {
 	char name[32];
 	int num_fields;
@@ -145,10 +233,9 @@ void header_set_length(struct header *h, struct expr *e)
 	h->length = e;
 }
 
-int header_get_length(struct header *h)
+struct expr *header_get_length(struct header *h)
 {
-	assert(h->length->type == EXPR_VALUE);
-	return h->length->u.value;
+	return h->length;
 }
 
 void header_set_sel(struct header *h, const char *name)
