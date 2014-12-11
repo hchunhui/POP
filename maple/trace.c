@@ -1,6 +1,7 @@
+#include <string.h>
 #include "trace.h"
 
-static __thread struct trace trace = { 0 };
+static __thread struct trace trace;
 
 void trace_R(const char *name, value_t value)
 {

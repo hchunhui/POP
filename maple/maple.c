@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
@@ -185,7 +186,7 @@ static void mod_in_port(struct trace *trace, int in_port)
 	trace->events[i].u.r.value = value_from_8(in_port);
 }
 
-static bool cmpname_p(void *pname, const char *name, void *arg)
+static bool cmpname_p(void *pname, const char *name, void *arg __attribute__((unused)))
 {
 	if(strcmp(pname, name) == 0)
 		return true;

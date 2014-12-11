@@ -1,3 +1,4 @@
+#include <string.h>
 #include "discovery.h"
 // install flow table
 // construct LLDP packet
@@ -108,7 +109,7 @@ lldp_tlv_next(const uint8_t *packet, struct lldp_tlv *tlv/*OUT*/, uint16_t offse
         tlv->type = v >> 9;
         tlv->length = v & 511;
         assert((tlv->type < 9 && tlv->type >=0) || tlv->type == 127);
-        assert(tlv->length >= 0 && tlv->length < 512);
+        assert(tlv->length < 512);
         memcpy(tlv->value, packet + offset/8 + 2, tlv->length);
         return tlv->length + 2;
 }

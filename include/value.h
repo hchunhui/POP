@@ -2,7 +2,6 @@
 #define _VALUE_H_
 #include <inttypes.h>
 #include <stdbool.h>
-#include <string.h>
 #define VALUE_LEN 8
 
 typedef struct {
@@ -257,12 +256,12 @@ static inline value_t value_bits_from_8(int n, uint8_t b)
 }
 
 /* LSB 0 bit numbering value to/from 8 bit number */
-static inline uint8_t value_bits_to_8l(int n, value_t v)
+static inline uint8_t value_bits_to_8l(int n __attribute__((unused)), value_t v)
 {
 	return v.v[0];
 }
 
-static inline value_t value_bits_from_8l(int n, uint8_t b)
+static inline value_t value_bits_from_8l(int n __attribute__((unused)), uint8_t b)
 {
 	value_t v = {{0}};
 	v.v[0] = b;
