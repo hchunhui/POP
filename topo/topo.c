@@ -39,7 +39,7 @@ static bool host_p(void *phost, const char *name, void *arg)
 	if(strcmp(name, "topo_host") == 0 &&
 	   arg == phost)
 		return true;
-#if STRICT_INVALIDATE
+#ifdef STRICT_INVALIDATE
 	if(phost && strncmp(name, "entity_adjs", 11) == 0) {
 		int i;
 		int n = atoi(name + 11);
