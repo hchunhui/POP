@@ -60,7 +60,7 @@ struct route *f(struct packet *pkt)
 		dst = get_switch(dpid_dst);
 		if (src == NULL || dst == NULL || src == dst)
 			return route();
-		visited = get_tree(src, port_src, switches, switches_num);
+		visited = get_tree(src, port_src, NULL, switches, switches_num);
 		return get_route(dst, port_dst, visited, switches, switches_num);
 	} else if(strcmp(read_header_type(pkt), "ipv4") != 0)
 		return route();
