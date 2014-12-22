@@ -5,7 +5,7 @@ struct entity;
 struct route;
 struct nodeinfo;
 
-struct nodeinfo *get_tree(struct entity *src, int src_port,
+struct nodeinfo *get_tree(struct entity *src, int src_port, struct entity *dst,
 			  struct entity **switches, int switches_num);
 
 struct route *get_route(struct entity *dst, int dst_port,

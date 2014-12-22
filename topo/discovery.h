@@ -4,16 +4,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "entity-private.h"
-#include "link.h"
+#include "entity.h"
+#include "edge.h"
 #include "value.h"
 #include "types.h"
 #include "topo.h"
-#include "packet_in.h"
 #include "lldp.h"
 #include "xswitch/xswitch.h"
-#include "xswitch/xswitch-private.h"
-// #include "spanning_tree.h"
 
 #define ETHERTYPE_IP 0x0800
 #define ETHERTYPE_ARP 0x0806
@@ -23,8 +20,6 @@
 void
 lldp_packet_send(struct xswitch *sw);
 int
-handle_lldp_packet_in(const struct packet_in *packet_in);
-int
-handle_topo_packet_in(const struct packet_in *packet_in);
+handle_topo_packet_in(struct xswitch *sw, int port, const uint8_t *packet, int length);
 
 #endif

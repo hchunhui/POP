@@ -10,8 +10,15 @@ struct flow_table;
 struct match;
 struct action;
 
+enum port_status {
+	PORT_DOWN,
+	PORT_UP,
+};
+
 /* xswitch */
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
+dpid_t xswitch_get_dpid(struct xswitch *sw);
+int xswitch_get_num_ports(struct xswitch *sw);
 
 
 /* flow table */
@@ -23,6 +30,7 @@ void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length);
 int flow_table_get_field_index(struct flow_table *ft, const char *name);
 int flow_table_get_tid(struct flow_table *ft);
+void flow_table_get_offset_length(struct flow_table *ft, int idx, int *offset, int *length);
 
 
 /* match */
@@ -34,11 +42,46 @@ void match_dump(struct match *m, char *buf, int n);
 
 
 /* action */
-enum action_type { AC_DROP, AC_PACKET_IN, AC_OUTPUT, AC_GOTO_TABLE };
+enum action_oper_type {
+	AC_OP_ADD,
+	AC_OP_SUB,
+	AC_OP_AND,
+	AC_OP_OR,
+	AC_OP_SHL,
+	AC_OP_SHR,
+	AC_OP_XOR,
+	AC_OP_NOR,
+};
+
+enum action_type {
+	/* "actions" */
+	AC_DROP,
+	AC_PACKET_IN,
+	AC_OUTPUT             /*port*/,
+	/* "instructions" */
+	AC_GOTO_TABLE,
+	AC_MOVE_PACKET,
+	AC_CALC_R,
+	AC_CALC_I,
+	AC_WRITE_METADATA,
+};
+
 struct action *action(void);
 struct action *action_copy(struct action *a);
 void action_add(struct action *a, enum action_type type, int arg);
-void action_add2(struct action *a, enum action_type type, int arg1, int arg2);
+void action_add_goto_table(struct action *a, int tid, int offset);
+void action_add_calc_r(struct action *a, enum action_oper_type op_type,
+		       enum match_field_type dst_type,
+		       int dst_offset, int dst_length,
+		       enum match_field_type src_type,
+		       int src_offset, int src_length);
+void action_add_calc_i(struct action *a, enum action_oper_type op_type,
+		       enum match_field_type dst_type,
+		       int dst_offset, int dst_length,
+		       uint32_t src_value);
+void action_add_write_metadata(struct action *a, int dst_offset, int dst_length, value_t val);
+void action_add_move_packet(struct action *a,
+			    enum match_field_type type, int offset, int length);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);

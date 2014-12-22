@@ -5,7 +5,7 @@
 struct sw;
 
 /* xswitch */
-struct trace_tree_header;
+struct trace_tree;
 struct xswitch
 {
 	enum {
@@ -15,12 +15,13 @@ struct xswitch
 	} state;
 	dpid_t dpid;
 	int n_ports;
+	int n_ready_ports;
 	//TODO port number
 	int hack_start_prio;
 	int next_table_id;
 	//struct rconn *rconn;
 	struct flow_table *table0;
-	struct trace_tree_header *trace_tree;
+	struct trace_tree *trace_tree;
 
 	struct sw *sw;
 };
@@ -28,7 +29,7 @@ struct xswitch
 void xswitch_up(struct xswitch *sw);
 void xswitch_down(struct xswitch *sw);
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
-void xswitch_port_down(struct xswitch *sw, int port);
+void xswitch_port_status(struct xswitch *sw, int port, enum port_status status);
 
 /* msg */
 void msg_process(struct xswitch *sw, const struct msgbuf *msg);
@@ -77,8 +78,39 @@ struct action
 	int num_actions;
 	struct {
 		enum action_type type;
-		int arg1;
-		int arg2;
+		union {
+			int arg;
+			struct {
+				int tid;
+				int offset;
+			} goto_table;
+			struct {
+				enum action_oper_type op_type;
+				enum match_field_type dst_type;
+				int dst_offset;
+				int dst_length;
+				enum match_field_type src_type;
+				int src_offset;
+				int src_length;
+			} op_r;
+			struct {
+				enum action_oper_type op_type;
+				enum match_field_type dst_type;
+				int dst_offset;
+				int dst_length;
+				uint32_t src_value;
+			} op_i;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} write_metadata;
+			struct {
+				enum match_field_type type;
+				int offset;
+				int length;
+			} move_packet;
+		} u;
 	} a[ACTION_NUM_ACTIONS];
 };
 

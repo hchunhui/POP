@@ -32,6 +32,14 @@ enum token {
 	T_COL,    // ":"
 	T_SCOL,   // ";"
 	T_STAR,   // "*"
+	T_LL,     // "<<"
+	T_RR,     // ">>"
+	T_PLUS,   // "+"
+	T_MINUS,  // "-"
+	T_AND,    // "&"
+	T_OR,     // "|"
+	T_XOR,    // "^"
+	T_NOT,    // "~"
 	T_IDENT,  // [_a-zA-Z][_a-zA-Z0-9]*
 	T_NUMBER, // 0[0-7]* | 0[xX][0-9a-fA-F]+ | 0[bB][01]+ | [1-9][0-9]*
 };
@@ -52,6 +60,7 @@ struct parse_ctx {
 	int tabsize;
 	struct header *curr_h;
 	int curr_offset;
+	struct expr *cur_expr;
 };
 
 /* Get next char from input buffer */
@@ -110,6 +119,30 @@ static void next_tok(struct parse_ctx *pctx)
 		case ':': N; R(T_COL);
 		case ';': N; R(T_SCOL);
 		case '*': N; R(T_STAR);
+		case '+': N; R(T_PLUS);
+		case '-': N; R(T_MINUS);
+		case '&': N; R(T_AND);
+		case '|': N; R(T_OR);
+		case '^': N; R(T_XOR);
+		case '~': N; R(T_NOT);
+		case '<':
+			N;
+			if(L == '<') {
+				N;
+				R(T_LL);
+			} else {
+				R(T_BAD);
+			}
+			break;
+		case '>':
+			N;
+			if(L == '>') {
+				N;
+				R(T_RR);
+			} else {
+				R(T_BAD);
+			}
+			break;
 		case '\0': R(T_EOI);
 		default:
 			if(isalpha(L) || L == '_') {
@@ -253,9 +286,21 @@ Syntax for Packet Header Spec:
   header ::= HEADER IDENT (SCOL | BEGIN fields length next END)
   fields ::= FIELDS BEGIN items END
   items ::= e | IDENT COL (NUMBER | STAR) SCOL items
-  length ::= e | LENGTH COL NUMBER
+  length ::= e | LENGTH COL expr0 SCOL
   next ::= e | NEXT SELECT LP IDENT RP BEGIN cases END
   cases ::= e | CASE NUMBER COL IDENT SCOL cases
+
+  expr0  ::= expr1 expr0s
+  expr0s ::= OR expr1 expr0s | E
+  expr1  ::= expr2 expr1s
+  expr1s ::= XOR expr2 expr1s | E
+  expr2  ::= expr3 expr2s
+  expr2s ::= AND expr3 expr2s | E
+  expr3  ::= expr4 expr3s
+  expr3s ::= (LL | RR) expr4 expr3s | E
+  expr4  ::= expr5 expr4s
+  expr4s ::= (PLUS | MINUS) expr5 expr4s | E
+  expr5  ::= NUMBER | IDENT | NOT expr5 | LP expr0 RP
 */
 
 static struct entry *symtab_find(struct parse_ctx *pctx, char *name)
@@ -277,6 +322,110 @@ static void symtab_enter(struct parse_ctx *pctx, struct header *h)
 	pctx->tabsize++;
 }
 
+// forward decl
+D(expr0);
+
+D(expr5)
+{
+	if(T(T_NUMBER)) {
+		CTX->cur_expr = expr_value(CTX->val);
+		return 0;
+	} else if(T(T_IDENT)) {
+		CTX->cur_expr = expr_field(CTX->buf);
+		return 0;
+	} else if(T(T_NOT)) {
+		P(expr5);
+		CTX->cur_expr = expr_op1(EXPR_NOT, CTX->cur_expr);
+		return 0;
+	} else {
+		M(T_LP);
+		P(expr0);
+		M(T_RP);
+		return 0;
+	}
+}
+
+D(expr4)
+{
+	enum expr_type type;
+	struct expr *old_expr;
+	P(expr5);
+	old_expr = CTX->cur_expr;
+	while(1) {
+		if(T(T_PLUS)) {
+			type = EXPR_ADD;
+		} else if(T(T_MINUS)) {
+			type = EXPR_SUB;
+		} else {
+			break;
+		}
+		P(expr5);
+		old_expr = expr_op2(type, old_expr, CTX->cur_expr);
+	}
+	CTX->cur_expr = old_expr;
+	return 0;
+}
+
+D(expr3)
+{
+	enum expr_type type;
+	struct expr *old_expr;
+	P(expr4);
+	old_expr = CTX->cur_expr;
+	while(1) {
+		if(T(T_LL)) {
+			type = EXPR_SHL;
+		} else if(T(T_RR)) {
+			type = EXPR_SHR;
+		} else {
+			break;
+		}
+		P(expr4);
+		old_expr = expr_op2(type, old_expr, CTX->cur_expr);
+	}
+	CTX->cur_expr = old_expr;
+	return 0;
+}
+
+D(expr2)
+{
+	struct expr *old_expr;
+	P(expr3);
+	old_expr = CTX->cur_expr;
+	while(T(T_AND)) {
+		P(expr3);
+		old_expr = expr_op2(EXPR_AND, old_expr, CTX->cur_expr);
+	}
+	CTX->cur_expr = old_expr;
+	return 0;
+}
+
+D(expr1)
+{
+	struct expr *old_expr;
+	P(expr2);
+	old_expr = CTX->cur_expr;
+	while(T(T_XOR)) {
+		P(expr2);
+		old_expr = expr_op2(EXPR_XOR, old_expr, CTX->cur_expr);
+	}
+	CTX->cur_expr = old_expr;
+	return 0;
+}
+
+D(expr0)
+{
+	struct expr *old_expr;
+	P(expr1);
+	old_expr = CTX->cur_expr;
+	while(T(T_OR)) {
+		P(expr1);
+		old_expr = expr_op2(EXPR_OR, old_expr, CTX->cur_expr);
+	}
+	CTX->cur_expr = old_expr;
+	return 0;
+}
+
 D(cases)
 {
 	if(T(T_CASE)) {
@@ -294,7 +443,9 @@ D(cases)
 		}
 		slen = header_get_sel_length(CTX->curr_h);
 		e->ref++;
-		if(slen <= 8)
+		if(slen < 8)
+			header_add_next(CTX->curr_h, value_bits_from_8(slen, val), e->h);
+		if(slen == 8)
 			header_add_next(CTX->curr_h, value_from_8(val), e->h);
 		else if(slen == 16)
 			header_add_next(CTX->curr_h, value_from_16(val), e->h);
@@ -337,8 +488,8 @@ D(length)
 {
 	if(T(T_LENGTH)) {
 		M(T_COL);
-		M(T_NUMBER);
-		header_set_length(CTX->curr_h, CTX->val);
+		P(expr0);
+		header_set_length(CTX->curr_h, CTX->cur_expr);
 		M(T_SCOL);
 		return 0;
 	} else {
@@ -346,7 +497,7 @@ D(length)
 			fprintf(stderr, "Bad header length: %d bits.\n", CTX->curr_offset);
 			return 2;
 		}
-		header_set_length(CTX->curr_h, CTX->curr_offset/8);
+		header_set_length(CTX->curr_h, expr_value(CTX->curr_offset/8));
 		return 0;
 	}
 }

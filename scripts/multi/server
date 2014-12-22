@@ -1,0 +1,2 @@
+#!/bin/bash
+exec cvlc --sout '#transcode{vcodec=h264,acodec=mpga,ab=128,channels=2,samplerate=44100}:rtp{dst=224.1.1.1,mux=ts}' --sout-keep $*

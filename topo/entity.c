@@ -1,8 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
-#include "entity-private.h"
-#include "xswitch/xswitch-private.h"
+#include "entity.h"
+#include "xswitch/xswitch.h"
+
+#include "maple/maple.h"
 
 struct entity
 {
@@ -16,26 +19,49 @@ struct entity
 	int num_adjs;
 	struct entity_adj adjs[MAX_PORT_NUM];
 };
+
+static bool host_p(void *phost, const char *name, void *arg)
+{
+	if(strcmp(name, "topo_host") == 0 &&
+	   (arg == phost || arg == NULL))
+	   return true;
+	return false;
+}
+
+
+static bool entity_adjs_p(void *adjs, const char *name, void *arg)
+{
+	if(strncmp(name, "entity_adjs", 11) == 0 &&
+	   arg == adjs)
+		return true;
+	return false;
+}
+
 void entity_print(struct entity *e)
 {
 	int i;
 	if (e->type == ENTITY_TYPE_HOST) {
-		printf("\nHOST:\nEth Addr: ");
+		fprintf(stderr, "HOST:\nEth Addr: ");
 		for (i=0; i<6; i++)
-			printf("%02x ",e->u.addr.haddr.octet[i]);
-		printf("\nIPv4: %08x\n", e->u.addr.paddr);
-		printf("num_adjs: %d\n", e->num_adjs);
+			fprintf(stderr, "%02x ",e->u.addr.haddr.octet[i]);
+		fprintf(stderr, "\nIPv4: %08x\n", e->u.addr.paddr);
+		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port, (e->adjs[i].adj_entity)->u.xs->dpid);
+			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
+				e->adjs[i].out_port, e->adjs[i].adj_in_port,
+				entity_get_dpid(e->adjs[i].adj_entity));
 		}
 	} else if (e->type == ENTITY_TYPE_SWITCH) {
-		printf("\nSWITCH:\nDpid: %d\n", e->u.xs->dpid);
-		printf("num_adjs: %d\n", e->num_adjs);
+		fprintf(stderr, "SWITCH:\nDpid: %d\n", entity_get_dpid(e));
+		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			printf("  %3d: %d, %d, %d\n",i, e->adjs[i].out_port, e->adjs[i].adj_in_port, (e->adjs[i].adj_entity)->type);
+			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
+				e->adjs[i].out_port, e->adjs[i].adj_in_port,
+				(e->adjs[i].adj_entity)->type);
 		}
 	}
 }
+
 struct entity *entity_host(struct host_info addr)
 {
 	struct entity *e = malloc(sizeof(struct entity));
@@ -53,9 +79,9 @@ struct entity *entity_switch(struct xswitch *xs)
 	e->num_adjs = 0;
 	return e;
 }
+
 void entity_free(struct entity *e)
 {
-/*
 	int i, j;
 	for(i = 0; i < e->num_adjs; i++) {
 		struct entity *peer = e->adjs[i].adj_entity;
@@ -69,7 +95,6 @@ void entity_free(struct entity *e)
 			}
 		}
 	}
-	*/
 	free(e);
 }
 
@@ -84,11 +109,14 @@ struct xswitch *entity_get_xswitch(struct entity *e)
 	return e->u.xs;
 }
 
-/* hack */
 dpid_t entity_get_dpid(struct entity *e)
 {
-	assert(e->type == ENTITY_TYPE_SWITCH);
-	return e->u.xs->dpid;
+	if(e) {
+		assert(e->type == ENTITY_TYPE_SWITCH);
+		return xswitch_get_dpid(e->u.xs);
+	} else {
+		return 0;
+	}
 }
 
 struct host_info entity_get_addr(struct entity *e)
@@ -96,30 +124,20 @@ struct host_info entity_get_addr(struct entity *e)
 	assert(e->type == ENTITY_TYPE_HOST);
 	return e->u.addr;
 }
+
+void entity_set_paddr(struct entity *e, uint32_t paddr)
+{
+	assert(e->type == ENTITY_TYPE_HOST);
+	e->u.addr.paddr = paddr;
+	maple_invalidate(host_p, (void *)e);
+}
+
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
 {
-//	printf("e: %p  sw_port: %p\n", e, sw_port);
         if (e->type != ENTITY_TYPE_HOST)
                 return NULL;
         *sw_port = e->adjs[0].adj_in_port;
-//      printf("e %p\n", e->adjs[0].adj_entity);
         return e->adjs[0].adj_entity;
-}
-void entity_adj_down(struct entity *e, int port)
-{
-        int i;
-        if (e->type == ENTITY_TYPE_HOST)
-                return;
-        for (i = 0; i < e->num_adjs; i++) {
-                if (e->adjs[i].out_port == port) {
-                        e->num_adjs --;
-                        if (i != e->num_adjs)
-                                e->adjs[i] = e->adjs[e->num_adjs];
-                        e->adjs[e->num_adjs].out_port = 0;
-                        e->adjs[e->num_adjs].adj_in_port = 0;
-                        e->adjs[e->num_adjs].adj_entity = NULL;
-                }
-        }
 }
 
 const struct entity_adj *entity_get_adjs(struct entity *e, int *pnum)
@@ -139,6 +157,8 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	}
 	i = e1->num_adjs;
 	j = e2->num_adjs;
+	assert(i < MAX_PORT_NUM);
+	assert(j < MAX_PORT_NUM);
 	e1->adjs[i].out_port = port1;
 	e1->adjs[i].adj_in_port = port2;
 	e1->adjs[i].adj_entity = e2;
@@ -147,4 +167,46 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	e2->adjs[j].adj_entity = e1;
 	e1->num_adjs++;
 	e2->num_adjs++;
+#ifdef STRICT_INVALIDATE
+	maple_invalidate(entity_adjs_p, e1->adjs);
+	maple_invalidate(entity_adjs_p, e2->adjs);
+#else
+	if(e1->type != ENTITY_TYPE_HOST && e2->type != ENTITY_TYPE_HOST) {
+		maple_invalidate(entity_adjs_p, e1->adjs);
+		maple_invalidate(entity_adjs_p, e2->adjs);
+	}
+#endif
+}
+
+void entity_del_link(struct entity *e1, int port1)
+{
+	int i, j;
+	bool flag = e1->type == ENTITY_TYPE_SWITCH ? true : false;
+	for (i = 0; i < e1->num_adjs;) {
+		if (e1->adjs[i].out_port == port1) {
+			struct entity *e2 = e1->adjs[i].adj_entity;
+			int port2 = e1->adjs[i].adj_in_port;
+			if(e2->type != ENTITY_TYPE_HOST)
+				flag = false;
+			for(j = 0; j < e2->num_adjs;) {
+				if(e2->adjs[j].out_port == port2) {
+					e2->num_adjs--;
+					e2->adjs[j] = e2->adjs[e2->num_adjs];
+				} else {
+					j++;
+				}
+			}
+			maple_invalidate(entity_adjs_p, e2->adjs);
+			e1->num_adjs--;
+			e1->adjs[i] = e1->adjs[e1->num_adjs];
+		} else {
+			i++;
+		}
+	}
+#ifdef STRICT_INVALIDATE
+	maple_invalidate(entity_adjs_p, e1->adjs);
+#else
+	if(flag == false)
+		maple_invalidate(entity_adjs_p, e1->adjs);
+#endif
 }

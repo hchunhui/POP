@@ -2,7 +2,6 @@
 #define _VALUE_H_
 #include <inttypes.h>
 #include <stdbool.h>
-#include <string.h>
 #define VALUE_LEN 8
 
 typedef struct {
@@ -24,12 +23,12 @@ static inline haddr_t value_to_haddr(value_t v)
 }
 
 /* haddr_t to value_t */
-static inline value_t value_from_haddr(haddr_t *h)
+static inline value_t value_from_haddr(haddr_t h)
 {
 	value_t v = {{0}};
 	int i;
 	for(i=0; i<6; i++)
-		v.v[i] = h->octet[i];
+		v.v[i] = h.octet[i];
 	return v;
 }
 
@@ -51,16 +50,16 @@ static inline uint8_t value_to_8(value_t v)
 
 static inline uint16_t value_to_16(value_t v)
 {
-	return (v.v[0] << 8) | v.v[1];
+	return (uint16_t)((v.v[0] << 8) | v.v[1]);
 }
 
 static inline uint32_t value_to_32(value_t v)
 {
 	return
-		(v.v[0] << 24) |
-		(v.v[1] << 16) |
-		(v.v[2] << 8)  |
-		(v.v[3]);
+		(((uint32_t)v.v[0]) << 24) |
+		(((uint32_t)v.v[1]) << 16) |
+		(((uint32_t)v.v[2]) << 8)  |
+		(((uint32_t)v.v[3]));
 }
 
 static inline uint64_t value_to_48(value_t v)
@@ -147,16 +146,16 @@ static inline uint8_t value_to_8l(value_t v)
 
 static inline uint16_t value_to_16l(value_t v)
 {
-	return (v.v[1] << 8) | v.v[0];
+	return (uint16_t)((v.v[1] << 8) | v.v[0]);
 }
 
 static inline uint32_t value_to_32l(value_t v)
 {
 	return
-		(v.v[3] << 24) |
-		(v.v[2] << 16) |
-		(v.v[1] << 8)  |
-		(v.v[0]);
+		(((uint32_t)v.v[3]) << 24) |
+		(((uint32_t)v.v[2]) << 16) |
+		(((uint32_t)v.v[1]) << 8)  |
+		(((uint32_t)v.v[0]));
 }
 
 static inline uint64_t value_to_48l(value_t v)
@@ -235,25 +234,81 @@ static inline value_t value_from_64l(uint64_t x)
 	return v;
 }
 
-/* extract value from a buffer */
+/*
+ * Network programming prefers big-endianness and MSB 0 bit numbering...
+ * References:
+ *   http://en.wikipedia.org/wiki/Bit_numbering
+ *   http://en.wikipedia.org/wiki/Endianness
+ *   http://en.wikipedia.org/wiki/IPv4#Header
+ */
+
+/* MSB 0 bit numbering value to/from 8 bit number */
+static inline uint8_t value_bits_to_8(int n, value_t v)
+{
+	return v.v[0] >> (8-n);
+}
+
+static inline value_t value_bits_from_8(int n, uint8_t b)
+{
+	value_t v = {{0}};
+	v.v[0] = b << (8-n);
+	return v;
+}
+
+/* LSB 0 bit numbering value to/from 8 bit number */
+static inline uint8_t value_bits_to_8l(int n __attribute__((unused)), value_t v)
+{
+	return v.v[0];
+}
+
+static inline value_t value_bits_from_8l(int n __attribute__((unused)), uint8_t b)
+{
+	value_t v = {{0}};
+	v.v[0] = b;
+	return v;
+}
+
+/* extract value from a buffer ({offset, length} is MSB 0 bit numbering) */
 static inline value_t value_extract(const uint8_t *buf, int offset, int length)
 {
 	value_t v = {{0}};
-	uint8_t tmp[VALUE_LEN+1];
-	int low = offset / 8;
-	int high = (offset + length + 7) / 8;
-	int shift = offset % 8;
-	int i;
-	memcpy(tmp, buf + low, high - low);
-	for(i = 0; i < high - low - 1; i++) {
-		v.v[i] = tmp[i];
-		v.v[i] >>= shift;
-		v.v[i] |= tmp[i+1] << (8 - shift);
+	if(offset >=0 && length >= 0) {
+		int low = offset / 8;
+		int high = (offset + length + 7) / 8;
+		int shift = offset % 8;
+		int i;
+		for(i = 0; i < high - low - 1; i++) {
+			v.v[i] = buf[low+i];
+			v.v[i] <<= shift;
+			v.v[i] |= buf[low+i+1] >> (8 - shift);
+		}
+		v.v[i] = buf[low + i];
+		v.v[i] <<= shift;
+		if(length % 8)
+			v.v[i] &= 0xff << (8 - (length % 8));
 	}
-	v.v[i] = buf[low + i];
-	v.v[i] >>= shift;
-	if(length % 8)
-		v.v[i] %= (1 << (length % 8)) - 1;
+	return v;
+}
+
+/* extract value from a buffer ({offset, length} is LSB 0 bit numbering) */
+static inline value_t value_extractl(const uint8_t *buf, int offset, int length)
+{
+	value_t v = {{0}};
+	if(offset >=0 && length >= 0) {
+		int low = offset / 8;
+		int high = (offset + length + 7) / 8;
+		int shift = offset % 8;
+		int i;
+		for(i = 0; i < high - low - 1; i++) {
+			v.v[i] = buf[low+i];
+			v.v[i] >>= shift;
+			v.v[i] |= buf[low+i+1] << (8 - shift);
+		}
+		v.v[i] = buf[low + i];
+		v.v[i] >>= shift;
+		if(length % 8)
+			v.v[i] &= (1 << (length % 8)) - 1;
+	}
 	return v;
 }
 

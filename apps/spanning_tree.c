@@ -2,7 +2,7 @@
 #include <assert.h>
 #include "types.h"
 #include "maple_api.h"
-#include "entity.h"
+#include "route.h"
 
 struct nodeinfo
 {
@@ -63,30 +63,35 @@ struct route *get_route(struct entity *dst, int dst_port,
 {
 	struct route *r = route();
 	int head, second;
-	dpid_t head_dpid, second_dpid;
+	struct entity *head_e, *second_e;
 	second = find_index(switches, switches_num, dst);
 	head = visited[second].parent;
-	second_dpid = entity_get_dpid(switches[second]);
-	route_add_edge(r, second_dpid, dst_port, 0, 0);
+	second_e = switches[second];
+
+	/* Destination unreachable? */
+	if(head == -1)
+		return r;
+
+	route_add_edge(r, edge(second_e, dst_port, NULL, 0));
 
 	while(head >= 0)
 	{
-		head_dpid = entity_get_dpid(switches[head]);
-		route_add_edge(r,
-			       head_dpid,
-			       visited[second].parent_out_port,
-			       second_dpid,
-			       visited[second].in_port);
-		second_dpid = head_dpid;
+		head_e = switches[head];
+		route_add_edge(r, edge(
+				       head_e,
+				       visited[second].parent_out_port,
+				       second_e,
+				       visited[second].in_port));
+		second_e = head_e;
 		second = head;
 		head = visited[second].parent;
 	}
 
-	route_add_edge(r, 0, 0, second_dpid, visited[second].in_port);
+	route_add_edge(r, edge(NULL, 0, second_e, visited[second].in_port));
 	return r;
 }
 
-struct nodeinfo *get_tree(struct entity *src, int src_port,
+struct nodeinfo *get_tree(struct entity *src, int src_port, struct entity *dst,
 			  struct entity **switches, int switches_num)
 {
 	struct nodeinfo *visited = malloc(sizeof(struct nodeinfo)*switches_num);
@@ -112,11 +117,13 @@ struct nodeinfo *get_tree(struct entity *src, int src_port,
 	{
 		epos1 = dequeue(q);
 		entity1 = switches[epos1];
-		adjs = entity_get_adjs(entity1, &num_adjs);
+		if(entity1 == dst)
+			break;
+		adjs = get_entity_adjs(entity1, &num_adjs);
 		for (i = 0; i < num_adjs; i++)
 		{
 			entity2 = adjs[i].adj_entity;
-			if(entity_get_type(entity2) != ENTITY_TYPE_SWITCH)
+			if(get_entity_type(entity2) != ENTITY_TYPE_SWITCH)
 				continue;
 			epos2 = find_index(switches, switches_num, entity2);
 			assert(epos2 != -1);

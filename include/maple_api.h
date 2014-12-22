@@ -3,11 +3,6 @@
 #include "types.h"
 
 struct route;
-struct route *route(void);
-void route_free(struct route *r);
-void route_add_edge(struct route *r, dpid_t dpid1, int out_port, dpid_t dpid2, int in_port);
-void route_union(struct route *r1, struct route *r2);
-
 struct packet;
 void pull_header(struct packet *pkt);
 const char *read_header_type(struct packet *pkt);
@@ -24,5 +19,21 @@ struct entity **get_switches(int *pnum);
 struct entity *get_switch(dpid_t dpid);
 struct entity *get_host_by_haddr(haddr_t addr);
 struct entity *get_host_by_paddr(uint32_t addr);
+
+#ifndef _ENTITY_H_
+enum entity_type { ENTITY_TYPE_HOST, ENTITY_TYPE_SWITCH };
+struct entity_adj
+{
+	int out_port;
+	int adj_in_port;
+	struct entity *adj_entity;
+};
+#endif
+
+enum entity_type get_entity_type(struct entity *e);
+dpid_t get_switch_dpid(struct entity *e);
+struct entity *get_host_adj_switch(struct entity *e, int *sw_port);
+const struct entity_adj *get_entity_adjs(struct entity *e, int *pnum);
+void print_entity(struct entity *e);
 
 #endif /* _MAPLE_API_H_ */

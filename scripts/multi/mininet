@@ -1,0 +1,2 @@
+#!/bin/bash
+exec mn --controller=remote --switch=pofs --multiroute --mac --custom ../topo2.py --topo mytopo
