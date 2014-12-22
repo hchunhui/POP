@@ -1,4 +1,5 @@
 header ipv4;
+header sdnp;
 header ipv6;
 header arp;
 header icmp;
@@ -13,10 +14,27 @@ header ethernet {
 		dl_type : 16;
 	}
 	next select (dl_type) {
+		case 0x5555: sdnp;
 		case 0x0800: ipv4;
 		case 0x0806: arp;
 		case 0x86dd: ipv6;
 	}
+}
+
+header sdnp {
+	fields {
+		type : 8;
+		// reason : 8;
+		// len : 16;
+		__unused : 24;
+		dpid_src : 32;
+		port_src : 16;
+		port_dst : 16;
+		dpid_dst : 32;
+		// seq_num : 16;
+		// checksum : 16;
+	}
+	// length : 20 + len;
 }
 
 header ipv4 {

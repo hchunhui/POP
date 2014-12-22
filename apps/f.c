@@ -14,7 +14,28 @@ static bool is_multicast_ip(uint32_t ip)
 		return true;
 	return false;
 }
+/*
+struct route *sdnproute(struct packet *pkt)
+{
+	// uint8_t type = value_to_8(read_packet(pkt, "type"));
+	// uint8_t reason =  value_to_8(read_packet(pkt, "reason"));
+	uint32_t dpid_src = value_to_32(read_packet(pkt, "dpid_src"));
+	uint16_t port_src = value_to_16(read_packet(pkt, "port_src"));
+	uint16_t port_dst = value_to_16(read_packet(pkt, "port_dst"));
+	uint32_t dpid_dst = value_to_32(read_packet(pkt, "dpid_dst"));
+	// uint16_t seq_num = value_to_16(read_packet(pkt, "seq_num"));
+	struct entity *src, *dst;
+	struct nodeinfo *visited;
+	int switches_num;
+	struct entity **switches = get_switches(&switches_num);
 
+	src = get_switch(dpid_src);
+	dst = get_switch(dpid_dst);
+	if (src == NULL || dst == NULL || src == dst)
+		return route();
+	visited = get_tree(src, port_src, switches, switches_num);
+	return get_route(dst, port_dst, visited, switches, switches_num);
+}*/
 struct route *f(struct packet *pkt)
 {
 	int switches_num;
@@ -29,7 +50,19 @@ struct route *f(struct packet *pkt)
 	/* inspect packet */
 	pull_header(pkt);
 
-	if(strcmp(read_header_type(pkt), "ipv4") != 0)
+	if (strcmp(read_header_type(pkt), "sdnp") == 0) {
+		uint32_t dpid_src = value_to_32(read_packet(pkt, "dpid_src"));
+		uint16_t port_src = value_to_16(read_packet(pkt, "port_src"));
+		uint16_t port_dst = value_to_16(read_packet(pkt, "port_dst"));
+		uint32_t dpid_dst = value_to_32(read_packet(pkt, "dpid_dst"));
+		// uint16_t seq_num = value_to_16(read_packet(pkt, "seq_num"));
+		src = get_switch(dpid_src);
+		dst = get_switch(dpid_dst);
+		if (src == NULL || dst == NULL || src == dst)
+			return route();
+		visited = get_tree(src, port_src, switches, switches_num);
+		return get_route(dst, port_dst, visited, switches, switches_num);
+	} else if(strcmp(read_header_type(pkt), "ipv4") != 0)
 		return route();
 
 	hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
