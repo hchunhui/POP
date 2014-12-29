@@ -6,4 +6,6 @@ extern int realtime;
 extern int server_port;
 extern int async_send;
 
+#define TIMEOUT_INTERVAL 5   /* seconds */
+
 #endif

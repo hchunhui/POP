@@ -28,6 +28,7 @@ struct worker {
 	int cpuid;
 	struct ev_loop *loop;
 	struct ev_async async_watcher; /* async watcher for new connections */
+	struct ev_timer timeout_watcher;
 	struct cq_head new_conn_queue;
 };
 

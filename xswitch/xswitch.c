@@ -169,3 +169,9 @@ void xswitch_down(struct xswitch *sw)
 	maple_switch_down(sw);
 	flow_table_free(sw->table0);
 }
+
+void xswitch_on_timeout(void)
+{
+	static int seconds = 0;
+	printf("%d seconds past\n", seconds += 5);
+}
