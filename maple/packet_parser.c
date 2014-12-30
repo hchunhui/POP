@@ -324,21 +324,22 @@ void header_free(struct header *h)
 
 struct packet_parser
 {
-	struct header *start;
-	struct header *current;
-	const uint8_t *head;
-	const uint8_t *data;
-	int length;
+	struct {
+		struct header *spec;
+		const uint8_t *data;
+		int length;
+	} stack[32];
+	int stack_top;
 };
+#define STACK_TOP(pp) ((pp)->stack[(pp)->stack_top])
 
 struct packet_parser *packet_parser(struct header *spec, const uint8_t *data, int length)
 {
 	struct packet_parser *pp = malloc(sizeof(struct packet_parser));
-	pp->head = data;
-	pp->data = data;
-	pp->length = length;
-	pp->start = spec;
-	pp->current = pp->start;
+	pp->stack[0].spec = spec;
+	pp->stack[0].data = data;
+	pp->stack[0].length = length;
+	pp->stack_top = 0;
 	return pp;
 }
 
@@ -349,8 +350,7 @@ void packet_parser_free(struct packet_parser *pp)
 
 void packet_parser_reset(struct packet_parser *pp)
 {
-	pp->head = pp->data;
-	pp->current = pp->start;
+	pp->stack_top = 0;
 }
 
 void packet_parser_pull(struct packet_parser *pp,
@@ -358,20 +358,27 @@ void packet_parser_pull(struct packet_parser *pp,
 			value_t *sel_value,
 			struct header **new_spec)
 {
-	int i = pp->current->sel_idx;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	const uint8_t *cur_data = STACK_TOP(pp).data;
+	int cur_length = STACK_TOP(pp).length;
+	int i = cur_spec->sel_idx;
 	assert(i >= 0);
 	int j;
-	value_t v = value_extract(pp->head,
-				  pp->current->fields[i].offset,
-				  pp->current->fields[i].length);
-	*old_spec = pp->current;
+	value_t v = value_extract(cur_data,
+				  cur_spec->fields[i].offset,
+				  cur_spec->fields[i].length);
+	*old_spec = cur_spec;
 	*sel_value = v;
-	for(j = 0; j < pp->current->num_next; j++) {
-		if(value_equal(pp->current->next[j].v, v)) {
-			pp->head += expr_interp(pp->current->length, pp);
-			pp->current = pp->current->next[j].h;
-			assert(pp->head <= pp->data + pp->length);
-			*new_spec = pp->current;
+	for(j = 0; j < STACK_TOP(pp).spec->num_next; j++) {
+		if(value_equal(cur_spec->next[j].v, v)) {
+			int offset = expr_interp(cur_spec->length, pp);
+			pp->stack_top++;
+			assert(pp->stack_top < 32);
+			STACK_TOP(pp).data = cur_data + offset;
+			STACK_TOP(pp).spec = cur_spec->next[j].h;
+			STACK_TOP(pp).length = cur_length - offset;
+			assert(STACK_TOP(pp).length >= 0);
+			*new_spec = STACK_TOP(pp).spec;
 			return;
 		}
 	}
@@ -381,12 +388,13 @@ void packet_parser_pull(struct packet_parser *pp,
 value_t packet_parser_read(struct packet_parser *pp, const char *field)
 {
 	int i;
-	for(i = 0; i < pp->current->num_fields; i++) {
-		if(strcmp(field, pp->current->fields[i].name) == 0) {
-			int offset = pp->current->fields[i].offset;
-			int length = pp->current->fields[i].length;
-			assert(pp->head + (offset + length + 7) / 8 <= pp->data + pp->length);
-			return value_extract(pp->head, offset, length);
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	for(i = 0; i < cur_spec->num_fields; i++) {
+		if(strcmp(field, cur_spec->fields[i].name) == 0) {
+			int offset = cur_spec->fields[i].offset;
+			int length = cur_spec->fields[i].length;
+			assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+			return value_extract(STACK_TOP(pp).data, offset, length);
 		}
 	}
 	assert(0);
@@ -395,13 +403,14 @@ value_t packet_parser_read(struct packet_parser *pp, const char *field)
 uint32_t packet_parser_read_to_32(struct packet_parser *pp, const char *field)
 {
 	int i;
-	for(i = 0; i < pp->current->num_fields; i++) {
-		if(strcmp(field, pp->current->fields[i].name) == 0) {
-			int offset = pp->current->fields[i].offset;
-			int length = pp->current->fields[i].length;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	for(i = 0; i < cur_spec->num_fields; i++) {
+		if(strcmp(field, cur_spec->fields[i].name) == 0) {
+			int offset = cur_spec->fields[i].offset;
+			int length = cur_spec->fields[i].length;
 			value_t v;
-			assert(pp->head + (offset + length + 7) / 8 <= pp->data + pp->length);
-			v = value_extract(pp->head, offset, length);
+			assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+			v = value_extract(STACK_TOP(pp).data, offset, length);
 			if(length < 8)
 				return value_bits_to_8(length, v);
 			else if (length == 8)
@@ -420,14 +429,14 @@ uint32_t packet_parser_read_to_32(struct packet_parser *pp, const char *field)
 
 const char *packet_parser_read_type(struct packet_parser *pp)
 {
-	return pp->current->name;
+	return STACK_TOP(pp).spec->name;
 }
 
 const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length)
 {
-	int header_length = expr_interp(pp->current->length, pp);
-	const uint8_t *head = pp->head + header_length;
+	int header_length = expr_interp(STACK_TOP(pp).spec->length, pp);
+	const uint8_t *head = STACK_TOP(pp).data + header_length;
 	if(length)
-		*length = pp->length - (head - pp->data);
+		*length = STACK_TOP(pp).length - header_length;
 	return head;
 }
