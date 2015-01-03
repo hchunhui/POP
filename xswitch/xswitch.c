@@ -4,12 +4,17 @@
 #include <errno.h>
 
 #include "xswitch-private.h"
+#include "xswitch.h"
 #include "io/msgbuf.h"
 
 #include "maple/maple.h"
 #include "topo/topo.h"
 
 #include "io/sw.h"
+
+#define XSWITCHMAX 100
+static int xswitchnum;
+static struct xswitch *xswitches[XSWITCHMAX];
 
 void xswitch_init(void)
 {
@@ -31,6 +36,10 @@ int xswitch_get_num_ports(struct xswitch *sw)
 {
 	return sw->n_ports;
 }
+struct xport **xswitch_get_xports(struct xswitch *sw)
+{
+	return sw->xports;
+}
 
 struct xswitch *xswitch_on_accept(struct sw *_sw)
 {
@@ -42,6 +51,8 @@ struct xswitch *xswitch_on_accept(struct sw *_sw)
 	sw->n_ports = 0;
 	sw->n_ready_ports = 0;
 
+	memset(sw->xports, 0, XPORT_HASH_SIZE * sizeof(struct xport *));
+
 	_sw->xsw = sw;
 	sw->sw = _sw;
 
@@ -49,6 +60,13 @@ struct xswitch *xswitch_on_accept(struct sw *_sw)
 	msg = msg_hello();
 	xswitch_send(sw, msg);
 	sw->state = XS_HELLO;
+
+	if (xswitchnum < XSWITCHMAX)
+		xswitches[xswitchnum ++] = sw;
+	else
+		fprintf(stderr, "xswitchnum: %d >= XSWITCHMAX: %d",
+			xswitchnum, XSWITCHMAX);
+
 	return sw;
 }
 
@@ -94,19 +112,28 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 void xswitch_on_close(struct sw *_sw)
 {
 	struct xswitch *sw = _sw->xsw;
+	int i;
+
+	for (i = 0; i < xswitchnum; i++) {
+		if (xswitches[i] == sw) {
+			xswitches[i] = xswitches[-- xswitchnum];
+			xswitches[xswitchnum] = NULL;
+			break;
+		}
+	}
+
 	if (sw->state == XS_RUNNING)
 		xswitch_down(sw);
 	//rconn_destroy(sw->rconn);
         free(sw);
 }
-
 static void init_table0(struct xswitch *sw)
 {
 	struct msgbuf *msg;
 	struct match *ma;
 	struct action *ac;
 	/* init match fields */
-	sw->table0 = flow_table(0, FLOW_TABLE_TYPE_MM, 10);
+	sw->table0 = flow_table(1, FLOW_TABLE_TYPE_MM, 10);
 	flow_table_add_field(sw->table0, "in_port", MATCH_FIELD_METADATA, 16, 8);
 	flow_table_add_field(sw->table0, "dl_dst", MATCH_FIELD_PACKET, 0, 48);
 	flow_table_add_field(sw->table0, "dl_src", MATCH_FIELD_PACKET, 48, 48);
@@ -132,14 +159,70 @@ static void init_table0(struct xswitch *sw)
 	action_free(ac);
 	xswitch_send(sw, msg);
 }
+static void init_counter(struct xswitch *sw, int counter_id)
+{
+	struct msgbuf *msg;
+	msg = msg_counter_add(counter_id);
+	fprintf(stderr, "add counter %d\n", counter_id);
+	xswitch_send(sw, msg);
+}
+static void init_counter_table(struct xswitch *sw)
+{
+	struct msgbuf *msg;
+	struct match *ma;
+	struct action *ac;
+	struct xport **xps, *xp;
+	int i;
+	uint16_t port_id;
+	int priority = 1;
+	struct flow_table *ft = flow_table(0, FLOW_TABLE_TYPE_MM, 4);
+	flow_table_add_field(ft, "in_port", MATCH_FIELD_METADATA, 16, 8);
 
+	msg = msg_flow_table_add(ft);
+	xswitch_send(sw, msg);
+
+	xps = xswitch_get_xports(sw);
+	for (i = 0; i < XPORT_HASH_SIZE; i++) {
+		xp = xps[i];
+		if (xp == NULL)
+			continue;
+next:
+		port_id = xport_get_port_id(xp);
+		init_counter(sw, port_id);
+		/* match port_id */
+		ma = match();
+		match_add(ma, "in_port", value_from_16(port_id),
+			  value_from_64(0xffffffffffffffffull));
+		ac = action();
+		action_add(ac, AC_COUNTER, port_id);
+		// action_add_goto_table(ac, 1, 0);
+		msg = msg_flow_entry_add(ft, priority ++, ma, ac);
+		match_free(ma);
+		action_free(ac);
+		fprintf(stderr, "add counter %u on port %u\n", port_id, port_id);
+		xswitch_send(sw, msg);
+		if ((xp = xport_get_next(xp)) != NULL)
+			goto next;
+	}
+}
+static void query_all(struct xswitch *sw, uint16_t slotID)
+{
+	struct msgbuf *msg;
+	msg = msg_query_all(slotID);
+	fprintf(stderr, "send query all command\n");
+	xswitch_send(sw, msg);
+}
 //--- message handlers
 void xswitch_up(struct xswitch *sw)
 {
-	init_table0(sw);
-	sw->next_table_id = 1;
-	maple_switch_up(sw);
-	topo_switch_up(sw);
+	// int counter_id = 1;
+	// init_counter(sw, counter_id);
+	init_counter_table(sw);
+	query_all(sw, 0xFFFF);
+	// init_table0(sw);
+	// sw->next_table_id = 1;
+	// maple_switch_up(sw);
+	// topo_switch_up(sw);
 }
 
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
@@ -165,13 +248,29 @@ void xswitch_port_status(struct xswitch *sw, int port, enum port_status status)
 
 void xswitch_down(struct xswitch *sw)
 {
-	topo_switch_down(sw);
-	maple_switch_down(sw);
-	flow_table_free(sw->table0);
+	//topo_switch_down(sw);
+	//maple_switch_down(sw);
+	//flow_table_free(sw->table0);
 }
 
 void xswitch_on_timeout(void)
 {
-	static int seconds = 0;
-	printf("%d seconds past\n", seconds += 5);
+#if 0
+	// static int sendonce = 0;
+	struct msgbuf *msg;
+	struct xswitch *sw;
+	int i;
+	int counter_id;
+	/*if (sendonce)
+		return;
+	sendonce = 1;
+	*/
+	fprintf(stderr, "\n\n\nsend counter request\n");
+	counter_id = 1;
+	for (i = 0; i < xswitchnum; i++) {
+		sw = xswitches[i];
+		msg = msg_counter_request(counter_id);
+		xswitch_send(sw, msg);
+	}
+#endif
 }
