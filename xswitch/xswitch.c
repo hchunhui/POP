@@ -191,7 +191,7 @@ next:
 		init_counter(sw, port_id);
 		/* match port_id */
 		ma = match();
-		match_add(ma, "in_port", value_from_16(port_id),
+		match_add(ma, "in_port", value_from_16l(port_id),
 			  value_from_64(0xffffffffffffffffull));
 		ac = action();
 		action_add(ac, AC_COUNTER, port_id);
@@ -255,6 +255,27 @@ void xswitch_down(struct xswitch *sw)
 
 void xswitch_on_timeout(void)
 {
+	int i;
+	struct xport **xps, *xp;
+	struct xswitch *sw;
+	uint16_t port_id;
+	struct msgbuf *msg;
+	int j;
+	for (i = 0; i < xswitchnum; i++) {
+		sw = xswitches[i];
+		xps = xswitch_get_xports(sw);
+		for (j = 0; j < XPORT_HASH_SIZE; j++) {
+			xp = xps[j];
+			if (xp == NULL)
+				continue;
+next2:
+			port_id = xport_get_port_id(xp);
+			msg = msg_counter_request(port_id);
+			xswitch_send(sw, msg);
+			if ((xp = xport_get_next(xp)) != NULL)
+				goto next2;
+		}
+	}
 #if 0
 	// static int sendonce = 0;
 	struct msgbuf *msg;
