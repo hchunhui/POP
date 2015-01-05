@@ -119,7 +119,7 @@ static uint32_t expr_interp(struct expr *e, struct packet_parser *pp)
  * r{0, 1, 2, ...} are viewed as a "register stack",
  * "stage" points to the top of the stack.
  */
-static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, int stage)
+static void expr_gen(struct expr *e, struct header *spec, struct action *a, int stage)
 {
 	enum action_oper_type op_type;
 	int offset, length;
@@ -129,10 +129,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		 *   xor  r(stage), r(stage)
 		 *   add  r(stage), packet(offset, length)
 		 */
-		flow_table_get_offset_length(ft,
-					     flow_table_get_field_index(ft, e->u.field),
-					     &offset,
-					     &length);
+		header_get_field(spec, e->u.field, &offset, &length);
 		action_add_calc_r(a, AC_OP_XOR,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length);
@@ -152,7 +149,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		 * then do:
 		 *   nori r(stage), 0
 		 */
-		expr_gen(e->u.sub_expr, ft, a, stage);
+		expr_gen(e->u.sub_expr, spec, a, stage);
 		action_add_calc_i(a, AC_OP_NOR,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 				  0);
@@ -172,7 +169,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		case EXPR_XOR: op_type = AC_OP_XOR; break;
 		default: assert(0);
 		}
-		expr_gen(e->u.binop.left, ft, a, stage);
+		expr_gen(e->u.binop.left, spec, a, stage);
 
 		/* before generate the right expr, check if we can do it better */
 		if(e->u.binop.right->type == EXPR_VALUE) {
@@ -181,7 +178,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 					  e->u.binop.right->u.value);
 		} else {
 			/* fall back to generic procedure */
-			expr_gen(e->u.binop.right, ft, a, stage + 1);
+			expr_gen(e->u.binop.right, spec, a, stage + 1);
 			action_add_calc_r(a, op_type,
 					  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 					  MATCH_FIELD_METADATA, R_offset(stage+1), R_length);
@@ -190,28 +187,20 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 	}
 }
 
-void expr_generate_action(struct expr *e, struct flow_table *ft, struct action *a)
+void expr_generate_action(struct expr *e,
+			  struct header *spec, struct flow_table *ft, struct action *a)
 {
-	int offset, length;
+	int tid = flow_table_get_tid(ft);
 	switch(e->type) {
 	case EXPR_VALUE:
 		/* Fixed value is the most common case */
-		action_add_goto_table(a, flow_table_get_tid(ft), e->u.value);
-		break;
-	case EXPR_FIELD:
-		/* Handle a single field name is simple */
-		flow_table_get_offset_length(ft,
-					     flow_table_get_field_index(ft, e->u.field),
-					     &offset,
-					     &length);
-		action_add_move_packet(a, MATCH_FIELD_PACKET, offset, length);
-		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		action_add_goto_table(a, tid, e->u.value);
 		break;
 	default:
 		/* The expr is complex, do generic procedure */
-		expr_gen(e, ft, a, 0);
+		expr_gen(e, spec, a, 0);
 		action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
-		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		action_add_goto_table(a, tid, 0);
 		break;
 	}
 }
@@ -254,6 +243,18 @@ void header_add_field(struct header *h, const char *name, int offset, int length
 	h->fields[i].offset = offset;
 	h->fields[i].length = length;
 	h->num_fields++;
+}
+
+void header_get_field(struct header *h, const char *name, int *offset, int *length)
+{
+	int i;
+	for(i = 0; i < h->num_fields; i++)
+		if(strcmp(name, h->fields[i].name) == 0) {
+			*offset = h->fields[i].offset;
+			*length = h->fields[i].length;
+			return;
+		}
+	assert(0);
 }
 
 void header_set_length(struct header *h, struct expr *e)

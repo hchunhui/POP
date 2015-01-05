@@ -6,8 +6,9 @@
 
 struct action;
 struct flow_table;
-
+struct header;
 struct expr;
+
 enum expr_type {
 	EXPR_FIELD,
 	EXPR_VALUE,
@@ -20,16 +21,18 @@ enum expr_type {
 	EXPR_OR,
 	EXPR_XOR,
 };
+
 struct expr *expr_field(const char *name);
 struct expr *expr_value(uint32_t value);
 struct expr *expr_op1(enum expr_type type, struct expr *sub_expr);
 struct expr *expr_op2(enum expr_type type, struct expr *left, struct expr *right);
 void expr_free(struct expr *e);
-void expr_generate_action(struct expr *e, struct flow_table *ft, struct action *a);
+void expr_generate_action(struct expr *e,
+			  struct header *spec, struct flow_table *ft, struct action *a);
 
-struct header;
 struct header *header(const char *name);
 void header_add_field(struct header *h, const char *name, int offset, int length);
+void header_get_field(struct header *h, const char *name, int *offset, int *length);
 void header_set_length(struct header *h, struct expr *e);
 struct expr *header_get_length(struct header *h);
 void header_set_sel(struct header *h, const char *name);

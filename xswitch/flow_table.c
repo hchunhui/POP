@@ -41,14 +41,6 @@ int flow_table_get_field_index(struct flow_table *ft, const char *name)
 	return -1;
 }
 
-void flow_table_get_offset_length(struct flow_table *ft, int idx,
-				  int *offset, int *length)
-{
-	assert(idx >= 0 && idx < ft->fields_num);
-	*offset = ft->fields[idx].offset;
-	*length = ft->fields[idx].length;
-}
-
 int flow_table_get_tid(struct flow_table *ft)
 {
 	return ft->tid;

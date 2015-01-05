@@ -493,7 +493,7 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		}
 		// insert GOTO_TABLE into orig table
 		a = action();
-		expr_generate_action(tg->move_expr, tg->ft, a);
+		expr_generate_action(tg->move_expr, tg->spec, tg->ft, a);
 
 		match_dump(ma, buf, 128);
 		action_dump(a, buf2, 128);
