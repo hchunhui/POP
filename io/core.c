@@ -41,6 +41,7 @@ int async_send = 1;
 
 extern void accept_cb_func(struct sw *sw);
 extern void close_cb_func(struct sw *sw);
+extern void timeout_cb_func(void);
 
 static void
 rxtx_cb(struct ev_loop *loop, ev_io *w, int revents)
@@ -268,6 +269,12 @@ again:
 	goto again;
 }
 
+static void
+timeout_cb(struct ev_loop *loop, ev_timer *w, int revents)
+{
+	timeout_cb_func();
+}
+
 static void *
 worker_thread(void *arg)
 {
@@ -294,6 +301,10 @@ setup_worker(struct worker *me)
 	me->async_watcher.data = me;
 	ev_async_init(&me->async_watcher, async_accept_cb);
 	ev_async_start(me->loop, &me->async_watcher);
+
+	ev_timer_init(&me->timeout_watcher, timeout_cb, TIMEOUT_INTERVAL,
+		      TIMEOUT_INTERVAL);
+	ev_timer_start(me->loop, &me->timeout_watcher);
 }
 
 static void *
