@@ -199,7 +199,7 @@ void expr_generate_action(struct expr *e,
 	default:
 		/* The expr is complex, do generic procedure */
 		expr_gen(e, spec, a, 0);
-		action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
+		action_add_move_packet(a, MOVE_FORWARD, MATCH_FIELD_METADATA, R_offset(0), R_length);
 		action_add_goto_table(a, tid, 0);
 		break;
 	}

@@ -57,12 +57,19 @@ enum action_type {
 	AC_DROP,
 	AC_PACKET_IN,
 	AC_OUTPUT             /*port*/,
+	AC_SET_FIELD,
 	/* "instructions" */
 	AC_GOTO_TABLE,
 	AC_MOVE_PACKET,
+	AC_MOVE_PACKET_IMM,
 	AC_CALC_R,
 	AC_CALC_I,
 	AC_WRITE_METADATA,
+};
+
+enum move_direction {
+	MOVE_FORWARD,
+	MOVE_BACKWARD
 };
 
 struct action *action(void);
@@ -79,8 +86,11 @@ void action_add_calc_i(struct action *a, enum action_oper_type op_type,
 		       int dst_offset, int dst_length,
 		       uint32_t src_value);
 void action_add_write_metadata(struct action *a, int dst_offset, int dst_length, value_t val);
+void action_add_set_field(struct action *a, int dst_offset, int dst_length, value_t val);
 void action_add_move_packet(struct action *a,
+			    enum move_direction dir,
 			    enum match_field_type type, int offset, int length);
+void action_add_move_packet_imm(struct action *a, enum move_direction dir, int value);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);

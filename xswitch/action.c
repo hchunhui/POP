@@ -76,15 +76,37 @@ void action_add_write_metadata(struct action *a, int dst_offset, int dst_length,
 	a->num_actions++;
 }
 
-void action_add_move_packet(struct action *a,
+void action_add_set_field(struct action *a, int dst_offset, int dst_length, value_t val)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_SET_FIELD;
+	a->a[n].u.set_field.dst_offset = dst_offset;
+	a->a[n].u.set_field.dst_length = dst_length;
+	a->a[n].u.set_field.val = val;
+	a->num_actions++;
+}
+
+void action_add_move_packet(struct action *a, enum move_direction dir,
 			    enum match_field_type type, int offset, int length)
 {
 	int n = a->num_actions;
 	assert(n < ACTION_NUM_ACTIONS);
 	a->a[n].type = AC_MOVE_PACKET;
+	a->a[n].u.move_packet.dir = dir;
 	a->a[n].u.move_packet.type = type;
 	a->a[n].u.move_packet.offset = offset;
 	a->a[n].u.move_packet.length = length;
+	a->num_actions++;
+}
+
+void action_add_move_packet_imm(struct action *a, enum move_direction dir, int value)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_MOVE_PACKET_IMM;
+	a->a[n].u.move_packet_imm.dir = dir;
+	a->a[n].u.move_packet_imm.value = value;
 	a->num_actions++;
 }
 

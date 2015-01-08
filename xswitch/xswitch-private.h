@@ -76,7 +76,7 @@ struct match
 struct action
 {
 	int num_actions;
-	struct {
+	struct action_entry {
 		enum action_type type;
 		union {
 			int arg;
@@ -106,10 +106,20 @@ struct action
 				value_t val;
 			} write_metadata;
 			struct {
+				enum move_direction dir;
 				enum match_field_type type;
 				int offset;
 				int length;
 			} move_packet;
+			struct {
+				enum move_direction dir;
+				int value;
+			} move_packet_imm;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} set_field;
 		} u;
 	} a[ACTION_NUM_ACTIONS];
 };
