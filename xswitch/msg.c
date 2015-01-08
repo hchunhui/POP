@@ -228,7 +228,7 @@ static void emit_calc_i(struct pof_instruction *mi, enum action_oper_type type,
 	cf->dst_field.field_id = htons(get_pof_match_field_id(dst_type));
 	cf->dst_field.offset = htons(u16(dst_offset));
 	cf->dst_field.len = htons(u16(dst_length));
-	cf->src_operand.value = imm;
+	cf->src_operand.value = htonl(imm);
 }
 
 static int fill_instruction(struct pof_instruction *mi, int num, struct action *a)
