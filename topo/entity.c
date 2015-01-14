@@ -105,18 +105,21 @@ enum entity_type entity_get_type(struct entity *e)
 
 struct xswitch *entity_get_xswitch(struct entity *e)
 {
-	assert(e->type == ENTITY_TYPE_SWITCH);
+	if (!e)
+		return NULL;
+	if (e->type != ENTITY_TYPE_SWITCH)
+		return NULL;
 	return e->u.xs;
 }
 
 dpid_t entity_get_dpid(struct entity *e)
 {
 	if(e) {
-		assert(e->type == ENTITY_TYPE_SWITCH);
+		if (e->type != ENTITY_TYPE_SWITCH)
+			return 0;
 		return xswitch_get_dpid(e->u.xs);
-	} else {
-		return 0;
 	}
+	return 0;
 }
 
 struct host_info entity_get_addr(struct entity *e)

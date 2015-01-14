@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include "xswitch/xswitch-private.h"
+#include "xswitch/xswitch.h"
 #include "topo/topo.h"
 #include "topo/entity.h"
 #include "route.h"
@@ -139,6 +140,40 @@ struct entity *get_host_adj_switch(struct entity *e, int *sw_port)
 void print_entity(struct entity *e)
 {
 	return entity_print(e);
+}
+
+uint64_t get_port_recvpkts(struct entity *e, uint16_t port_id)
+{
+	return xport_get_recvpkts(xport_lookup(entity_get_xswitch(e), port_id));
+}
+
+uint64_t get_port_recvbytes(struct entity *e, uint16_t port_id)
+{
+	return xport_get_recvbytes(xport_lookup(entity_get_xswitch(e), port_id));
+}
+
+uint64_t get_port_recent_recvpkts(struct entity *e, uint16_t port_id)
+{
+	return xport_get_recent_recvpkts(xport_lookup(entity_get_xswitch(e), port_id));
+}
+
+uint64_t get_port_recent_recvbytes(struct entity *e, uint16_t port_id)
+{
+	return xport_get_recent_recvbytes(xport_lookup(entity_get_xswitch(e), port_id));
+}
+
+/* Return false means a wrong port_id or something else.*/
+bool get_port_stats(struct entity *e, uint16_t port_id,
+		    uint64_t *recvpkts/*OUT*/,
+		    uint64_t *recvbytes/*OUT*/,
+		    uint64_t *recent_recvpkts/*OUT*/,
+		    uint64_t *recent_recvbytes/*OUT*/)
+{
+	struct xport *xp;
+	if ((xp = xport_lookup(entity_get_xswitch(e), port_id)) == NULL)
+		return false;
+	xport_query(xp, recvpkts, recvbytes, recent_recvpkts, recent_recvbytes);
+	return true;
 }
 
 /* XXX */

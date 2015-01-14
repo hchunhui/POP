@@ -25,9 +25,13 @@ void xport_free(struct xport *xp)
 }
 struct xport *xport_lookup(struct xswitch *sw, uint16_t port_id)
 {
-	struct xport **xps = xswitch_get_xports(sw);
+	struct xport **xps;
 	struct xport *xp;
-	uint16_t index = port_id/XPORT_HASH_SIZE;
+	uint16_t index;
+	if (!sw)
+		return NULL;
+	xps = xswitch_get_xports(sw);
+	index = port_id/XPORT_HASH_SIZE;
 	for (xp = xps[index]; xp != NULL; xp = xp->next)
 		if (xp->port_id == port_id)
 			return xp;
