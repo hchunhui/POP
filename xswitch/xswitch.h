@@ -31,6 +31,12 @@ struct xport *xport_copy(const struct xport *xp);
 void xport_free(struct xport *xp);
 struct xport *xport_lookup(struct xswitch *sw, uint16_t port_id);
 struct xport *xport_insert(struct xswitch *sw, const struct xport *xp);
+void xport_update(struct xport *xp, uint64_t recvpkts, uint64_t recvbytes);
+void xport_query(struct xport *xp,
+		 uint64_t *recvpkts/*OUT*/,
+		 uint64_t *recvbytes/*OUT*/,
+		 uint64_t *recent_recvpkts/*OUT*/,
+		 uint64_t *recent_recvbytes/*OUT*/);
 bool xport_delete(struct xswitch *sw, struct xport *xp);
 uint16_t xport_get_port_id(const struct xport *xp);
 uint64_t xport_get_recvpkts(const struct xport *xp);

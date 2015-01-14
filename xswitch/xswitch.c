@@ -195,7 +195,7 @@ next:
 			  value_from_64(0xffffffffffffffffull));
 		ac = action();
 		action_add(ac, AC_COUNTER, port_id);
-		// action_add_goto_table(ac, 1, 0);
+		action_add_goto_table(ac, 1, 0);
 		msg = msg_flow_entry_add(ft, priority ++, ma, ac);
 		match_free(ma);
 		action_free(ac);
@@ -215,14 +215,12 @@ static void query_all(struct xswitch *sw, uint16_t slotID)
 //--- message handlers
 void xswitch_up(struct xswitch *sw)
 {
-	// int counter_id = 1;
-	// init_counter(sw, counter_id);
 	init_counter_table(sw);
-	query_all(sw, 0xFFFF);
-	// init_table0(sw);
-	// sw->next_table_id = 1;
-	// maple_switch_up(sw);
-	// topo_switch_up(sw);
+	// query_all(sw, 0xFFFF);
+	init_table0(sw);
+	sw->next_table_id = 2;
+	maple_switch_up(sw);
+	topo_switch_up(sw);
 }
 
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
@@ -248,9 +246,16 @@ void xswitch_port_status(struct xswitch *sw, int port, enum port_status status)
 
 void xswitch_down(struct xswitch *sw)
 {
-	//topo_switch_down(sw);
-	//maple_switch_down(sw);
-	//flow_table_free(sw->table0);
+	int i;
+	struct xport **xps;
+	topo_switch_down(sw);
+	maple_switch_down(sw);
+	flow_table_free(sw->table0);
+	xps = xswitch_get_xports(sw);
+	for (i = 0; i < XPORT_HASH_SIZE; i++) {
+		if (xps[i] != NULL)
+			free(xps[i]);
+	}
 }
 
 void xswitch_on_timeout(void)

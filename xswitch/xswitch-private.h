@@ -31,6 +31,7 @@ struct xswitch
 	dpid_t dpid;
 	int n_ports;
 	int n_ready_ports;
+
 	struct xport *xports[XPORT_HASH_SIZE];
 	//TODO port number
 	int hack_start_prio;
@@ -46,7 +47,6 @@ void xswitch_up(struct xswitch *sw);
 void xswitch_down(struct xswitch *sw);
 void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
 void xswitch_port_status(struct xswitch *sw, int port, enum port_status status);
-
 
 /* msg */
 void msg_process(struct xswitch *sw, const struct msgbuf *msg);

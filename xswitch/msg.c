@@ -624,11 +624,19 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		break;
 	case POFT_COUNTER_REPLY:
 		ct = GET_BODY(msg);
-		fprintf(stderr, "receive counter reply:\n"
+		/*
+		fprintf(stderr, "receive counter reply from switch %d:\n"
 			"counter_id: %d\n"
-			"value: %d\n",
+			"value: %llu\n"
+			"byte_value: %llu\n",
+			xswitch_get_dpid(sw),
 			ntohl(ct->counter_id),
-			ntohl(*((uint32_t *)(((uint8_t *)&(ct->value))+4))));
+			ntohll(ct->value),
+			ntohll(ct->byte_value));
+		*/
+		xport_update(xport_lookup(sw, (uint16_t)ntohl(ct->counter_id)),
+			     ntohll(ct->value),
+			     ntohll(ct->byte_value));
 		break;
 	case POFT_QUERYALL_FIN:
 		fprintf(stderr, "receive queryall fin\n");

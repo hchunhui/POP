@@ -54,6 +54,25 @@ struct xport *xport_insert(struct xswitch *sw, const struct xport *xp)
 	tmp->next = xport_copy(xp);
 	return tmp->next;
 }
+void xport_query(struct xport *xp, uint64_t *recvpkts, uint64_t *recvbytes,
+		 uint64_t *recent_recvpkts, uint64_t *recent_recvbytes)
+{
+	if (xp == NULL)
+		return;
+	*recvpkts = xp->recvpkts;
+	*recvbytes = xp->recvbytes;
+	*recent_recvpkts = xp->recent_recvpkts;
+	*recent_recvbytes = xp->recent_recvbytes;
+}
+void xport_update(struct xport *xp, uint64_t recvpkts, uint64_t recvbytes)
+{
+	if (xp == NULL)
+		return;
+	xp->recent_recvpkts = recvpkts - xp->recvpkts;
+	xp->recent_recvbytes = recvbytes - xp->recvbytes;
+	xp->recvpkts = recvpkts;
+	xp->recvbytes = recvbytes;
+}
 bool xport_delete(struct xswitch *sw, struct xport *xp)
 {
 	uint16_t index = xp->port_id/XPORT_HASH_SIZE;

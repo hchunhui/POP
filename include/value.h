@@ -12,6 +12,23 @@ typedef struct {
 	uint8_t v[VALUE_LEN];
 } value_t;
 
+static inline uint64_t ntohll(uint64_t v)
+{
+	return
+		((v << 56) & (0xff00000000000000ull)) |
+		((v << 40) & (0x00ff000000000000ull)) |
+		((v << 24) & (0x0000ff0000000000ull)) |
+		((v <<  8) & (0x000000ff00000000ull)) |
+		((v >>  8) & (0x00000000ff000000ull)) |
+		((v >> 24) & (0x0000000000ff0000ull)) |
+		((v >> 40) & (0x000000000000ff00ull)) |
+		((v >> 56) & (0x00000000000000ffull));
+}
+
+static inline uint64_t htonll(uint64_t v)
+{
+	return ntohll(v);
+}
 /* value_t to haddr_t */
 static inline haddr_t value_to_haddr(value_t v)
 {
