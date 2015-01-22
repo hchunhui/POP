@@ -23,6 +23,9 @@ void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length)
 {
 	struct match_field *f = ft->fields + ft->fields_num;
+	/* XXX: hack */
+	if(strlen(name) >= 2 && name[0] == '_' && name[1] == '_')
+		return;
 	assert(ft->fields_num < FLOW_TABLE_NUM_FIELDS);
 	strncpy(f->name, name, MATCH_FIELD_NAME_LEN);
 	f->name[MATCH_FIELD_NAME_LEN - 1] = 0;
