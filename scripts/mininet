@@ -1,3 +1,4 @@
 #!/bin/bash
+cd `dirname $0`
 exec mn --controller=remote --switch=pofs --mac --custom topo.py --topo mytopo
 # exec mn --controller=remote --switch=pofs --mac --custom topo2.py --topo mytopo

@@ -105,6 +105,10 @@ recv_cb_func(struct msgbuf *msg)
 }
 #endif
 
+void timeout_cb_func(void)
+{
+}
+
 int
 main(int argc, char **argv)
 {

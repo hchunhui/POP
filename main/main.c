@@ -19,6 +19,7 @@ extern void xswitch_init(void);
 extern struct xswitch *xswitch_on_accept(struct sw *_sw);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
 extern void xswitch_on_close(struct sw *_sw);
+extern void xswitch_on_timeout(void);
 
 int realtime = 0;
 int verbose  = 0;
@@ -41,6 +42,12 @@ void
 recv_cb_func(struct msgbuf *msg)
 {
 	xswitch_on_recv(msg->sw->xsw, msg);
+}
+
+void
+timeout_cb_func(void)
+{
+	xswitch_on_timeout();
 }
 
 static void
