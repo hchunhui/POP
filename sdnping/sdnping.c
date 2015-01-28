@@ -207,8 +207,8 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	remote_port = (uint16_t) t;
-	devstr = "h2-eth1";
-	// devstr = pcap_lookupdev(errbuf);
+	// devstr = "h2-eth1";
+	devstr = pcap_lookupdev(errbuf);
 	if (devstr) {
 		printf("success: devstr: %s\n", devstr);
 	} else {
@@ -223,7 +223,7 @@ main(int argc, char *argv[])
 		return 1;
 	}
 
-	device = pcap_open_live(devstr, 65535, 1, 3000, errbuf);
+	device = pcap_open_live(devstr, 65535, 1, 0, errbuf);
 	if (!device) {
 		printf("error: pcap_open_live(): %s\n", errbuf);
 		return 1;

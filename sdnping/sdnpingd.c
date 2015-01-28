@@ -168,8 +168,8 @@ main()
 
 	if (fork() != 0)
 		return 0;
-	// devstr = pcap_lookupdev(err_buf);
-	devstr = "h1-eth1";
+	devstr = pcap_lookupdev(err_buf);
+	// devstr = "h1-eth1";
 	printf("devstr: %s\n", devstr);
 	if (!devstr) {
 		printf("error: %s\n", err_buf);
