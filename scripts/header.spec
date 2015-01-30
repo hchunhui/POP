@@ -24,32 +24,27 @@ header ethernet {
 header sdnp {
 	fields {
 		type : 8;
-		// reason : 8;
-		// len : 16;
-		__unused : 24;
+		__reason : 8;
+		__len : 16;
 		dpid_src : 32;
 		port_src : 16;
 		port_dst : 16;
 		dpid_dst : 32;
-		// seq_num : 16;
-		// checksum : 16;
+		__seq_num : 16;
+		checksum : 16;
 	}
-	// length : 20 + len;
 }
 
 header ipv4 {
 	fields {
 		ver : 4;
 		ihl : 4;
-/*
-		tos : 8;
-		len : 16;
-		id : 16;
-		flag : 3;
-		off : 13;
+		__tos : 8;
+		__len : 16;
+		__id : 16;
+		__flag : 3;
+		__off : 13;
 		ttl : 8;
-*/
-		__unused : 64;
 		nw_proto : 8;
 		sum : 16;
 		nw_src : 32;
@@ -76,13 +71,24 @@ header tcp {
 	fields {
 		tp_src : 16;
 		tp_dst : 16;
+		__seq : 32;
+		__ack : 32;
+		off : 4;
+		__flags : 12;
+		__win : 16;
+		sum : 16;
+		__urp : 16;
+		opt : *;
 	}
+	length : off << 2;
 }
 
 header udp {
 	fields {
 		tp_src : 16;
 		tp_dst : 16;
+		len : 16;
+		sum : 16;
 	}
 }
 
