@@ -59,8 +59,9 @@ struct trace_tree_G
 {
 	struct trace_tree h;
 	struct flow_table *ft;
-	struct header *spec;
-	struct expr *move_expr;
+	struct header *old_spec;
+	struct header *new_spec;
+	int stack_base;
 	int hack_start_prio;
 	struct trace_tree *t;
 };
@@ -123,15 +124,17 @@ static struct trace_tree *trace_tree_D(const char *name,
 	return (struct trace_tree *)t;
 }
 
-static struct trace_tree *trace_tree_G(struct header *spec,
-				       struct expr *move_expr,
+static struct trace_tree *trace_tree_G(struct header *old_spec,
+				       struct header *new_spec,
+				       int stack_base,
 				       struct trace_tree *tt)
 {
 	struct trace_tree_G *t = malloc(sizeof *t);
 	t->h.type = TT_G;
 	t->ft = NULL;
-	t->spec = spec;
-	t->move_expr = move_expr;
+	t->old_spec = old_spec;
+	t->new_spec = new_spec;
+	t->stack_base = stack_base;
 	t->hack_start_prio = 0;
 	t->t = tt;
 	return (struct trace_tree *)t;
@@ -224,7 +227,7 @@ void trace_tree_print(struct trace_tree *tree)
 		break;
 	case TT_G:
 		tg = (struct trace_tree_G *) tree;
-		fprintf(stderr, "(G %s ", header_get_name(tg->spec));
+		fprintf(stderr, "(G %s ", header_get_name(tg->new_spec));
 		trace_tree_print(tg->t);
 		fprintf(stderr, ")");
 		break;
@@ -263,7 +266,8 @@ static struct trace_tree *events_to_tree(struct event *events, int num_events,
 			root = trace_tree_D(ev->u.re.name, ev->u.re.arg, root);
 			break;
 		case EV_G:
-			root = trace_tree_G(ev->u.g.spec, ev->u.g.move_expr, root);
+			root = trace_tree_G(ev->u.g.old_spec, ev->u.g.new_spec,
+					    ev->u.g.stack_base, root);
 			break;
 		}
 	}
@@ -275,8 +279,6 @@ bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct ac
 	int i, j;
 	struct trace_tree **t = tree;
 	int num_events = trace->num_events;
-	int n1, n2;
-	struct trace_tree_L *t_L;
 
 	if((*t)->type == TT_E) {
 		free(*t);
@@ -359,16 +361,12 @@ bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct ac
 			}
 			break;
 		case TT_L:
+			break;
 		case TT_E:
 			break;
 		}
 	}
-	assert((*t)->type == TT_L);
-	t_L = *(struct trace_tree_L **) t;
-	n1 = action_num_actions(t_L->ac);
-	action_union(t_L->ac, a);
-	n2 = action_num_actions(t_L->ac);
-	return n1 != n2;
+	return false;
 }
 
 bool trace_tree_invalidate(struct trace_tree **tree,
@@ -444,6 +442,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 	struct match *maa;
 	struct action *a;
 	char buf[128], buf2[128];
+
+	struct expr *move_expr;
 	switch(tree->type) {
 	case TT_L:
 		tl = (struct trace_tree_L *)tree;
@@ -487,13 +487,17 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		if(tg->ft == NULL) {
 			int tid = sw->next_table_id++;
 			// add a new table
-			tg->ft = header_make_flow_table(tg->spec, tid);
+			tg->ft = header_make_flow_table(tg->new_spec, tid);
 			msg = msg_flow_table_add(tg->ft);
 			xswitch_send(sw, msg);
 		}
 		// insert GOTO_TABLE into orig table
 		a = action();
-		expr_generate_action(tg->move_expr, tg->spec, tg->ft, a);
+		if(tg->old_spec)
+			move_expr = header_get_length(tg->old_spec);
+		else
+			move_expr = expr_value(0);
+		expr_generate_action(move_expr, tg->old_spec, tg->ft, tg->stack_base, a);
 
 		match_dump(ma, buf, 128);
 		action_dump(a, buf2, 128);

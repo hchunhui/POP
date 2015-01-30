@@ -312,6 +312,32 @@ static inline value_t value_extractl(const uint8_t *buf, int offset, int length)
 	return v;
 }
 
+static inline void value_unextract(uint8_t *buf, int offset, int length, value_t value)
+{
+	int i;
+	int bit;
+	for(i = 0; i < length; i++) {
+		int idx = offset + i;
+		bit = (value.v[i/8] >> (7 - i%8)) & 1;
+		buf[idx/8] &= ~(1 << (7 - idx%8));
+		if(bit)
+			buf[idx/8] |= 1 << (7 - idx%8);
+	}
+}
+
+static inline void value_unextractl(uint8_t *buf, int offset, int length, value_t value)
+{
+	int i;
+	int bit;
+	for(i = 0; i < length; i++) {
+		int idx = offset + i;
+		bit = (value.v[i/8] >> (i%8)) & 1;
+		buf[idx/8] &= ~(1 << (idx%8));
+		if(bit)
+			buf[idx/8] |= 1 << (idx%8);
+	}
+}
+
 /* value_t equal */
 static inline bool value_equal(value_t a, value_t b)
 {

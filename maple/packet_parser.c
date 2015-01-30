@@ -188,7 +188,8 @@ static void expr_gen(struct expr *e, struct header *spec, struct action *a, int 
 }
 
 void expr_generate_action(struct expr *e,
-			  struct header *spec, struct flow_table *ft, struct action *a)
+			  struct header *spec, struct flow_table *ft, int base,
+			  struct action *a)
 {
 	int tid = flow_table_get_tid(ft);
 	switch(e->type) {
@@ -198,9 +199,21 @@ void expr_generate_action(struct expr *e,
 		break;
 	default:
 		/* The expr is complex, do generic procedure */
-		expr_gen(e, spec, a, 0);
-		action_add_move_packet(a, MOVE_FORWARD, MATCH_FIELD_METADATA, R_offset(0), R_length);
+		expr_gen(e, spec, a, base);
+		action_add_move_packet(a, MOVE_FORWARD, MATCH_FIELD_METADATA, R_offset(base), R_length);
 		action_add_goto_table(a, tid, 0);
+		break;
+	}
+}
+
+void expr_generate_action_backward(struct expr *e, int base, struct action *a)
+{
+	switch(e->type) {
+	case EXPR_VALUE:
+		action_add_move_packet_imm(a, MOVE_BACKWARD, e->u.value);
+		break;
+	default:
+		action_add_move_packet(a, MOVE_BACKWARD, MATCH_FIELD_METADATA, R_offset(base), R_length);
 		break;
 	}
 }
@@ -327,14 +340,14 @@ struct packet_parser
 {
 	struct {
 		struct header *spec;
-		const uint8_t *data;
+		uint8_t *data;
 		int length;
 	} stack[32];
 	int stack_top;
 };
 #define STACK_TOP(pp) ((pp)->stack[(pp)->stack_top])
 
-struct packet_parser *packet_parser(struct header *spec, const uint8_t *data, int length)
+struct packet_parser *packet_parser(struct header *spec, uint8_t *data, int length)
 {
 	struct packet_parser *pp = malloc(sizeof(struct packet_parser));
 	pp->stack[0].spec = spec;
@@ -357,10 +370,11 @@ void packet_parser_reset(struct packet_parser *pp)
 void packet_parser_pull(struct packet_parser *pp,
 			struct header **old_spec,
 			value_t *sel_value,
-			struct header **new_spec)
+			struct header **new_spec,
+			int *next_stack_top)
 {
 	struct header *cur_spec = STACK_TOP(pp).spec;
-	const uint8_t *cur_data = STACK_TOP(pp).data;
+	uint8_t *cur_data = STACK_TOP(pp).data;
 	int cur_length = STACK_TOP(pp).length;
 	int i = cur_spec->sel_idx;
 	assert(i >= 0);
@@ -374,6 +388,7 @@ void packet_parser_pull(struct packet_parser *pp,
 		if(value_equal(cur_spec->next[j].v, v)) {
 			int offset = expr_interp(cur_spec->length, pp);
 			pp->stack_top++;
+			*next_stack_top = pp->stack_top;
 			assert(pp->stack_top < 32);
 			STACK_TOP(pp).data = cur_data + offset;
 			STACK_TOP(pp).spec = cur_spec->next[j].h;
@@ -384,6 +399,27 @@ void packet_parser_pull(struct packet_parser *pp,
 		}
 	}
 	assert(0);
+}
+
+void packet_parser_push(struct packet_parser *pp, struct header **new_spec,
+			int *prev_stack_top)
+{
+	assert(pp->stack_top > 0);
+	*prev_stack_top = pp->stack_top;
+	pp->stack_top--;
+	*new_spec = STACK_TOP(pp).spec;
+}
+
+void packet_parser_mod(struct packet_parser *pp, const char *field, value_t value,
+		       struct header **spec)
+{
+	int offset, length;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	*spec = cur_spec;
+
+	header_get_field(cur_spec, field, &offset, &length);
+	assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+	value_unextract(STACK_TOP(pp).data, offset, length, value);
 }
 
 value_t packet_parser_read(struct packet_parser *pp, const char *field)
