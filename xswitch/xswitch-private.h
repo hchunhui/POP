@@ -120,6 +120,15 @@ struct action
 				int dst_length;
 				value_t val;
 			} set_field;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} add_field;
+			struct {
+				int dst_offset;
+				int dst_length;
+			} del_field;
 		} u;
 	} a[ACTION_NUM_ACTIONS];
 };

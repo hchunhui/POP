@@ -87,6 +87,27 @@ void action_add_set_field(struct action *a, int dst_offset, int dst_length, valu
 	a->num_actions++;
 }
 
+void action_add_add_field(struct action *a, int dst_offset, int dst_length, value_t val)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_ADD_FIELD;
+	a->a[n].u.add_field.dst_offset = dst_offset;
+	a->a[n].u.add_field.dst_length = dst_length;
+	a->a[n].u.add_field.val = val;
+	a->num_actions++;
+}
+
+void action_add_del_field(struct action *a, int dst_offset, int dst_length)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_DEL_FIELD;
+	a->a[n].u.del_field.dst_offset = dst_offset;
+	a->a[n].u.del_field.dst_length = dst_length;
+	a->num_actions++;
+}
+
 void action_add_move_packet(struct action *a, enum move_direction dir,
 			    enum match_field_type type, int offset, int length)
 {

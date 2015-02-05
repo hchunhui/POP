@@ -137,6 +137,8 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 	struct pof_action_drop *ad;
 	struct pof_action_output *ao;
 	struct pof_action_set_field *asf;
+	struct pof_action_add_field *aaf;
+	struct pof_action_delete_field *adf;
 
 	switch(ae->type) {
 	case AC_DROP:
@@ -170,6 +172,23 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 		asf->field_setting.len = htons(u16(ae->u.set_field.dst_length));
 		memcpy(asf->field_setting.value, ae->u.set_field.val.v, VALUE_LEN);
 		memcpy(asf->field_setting.mask, ae->u.set_field.val.v, VALUE_LEN);
+		break;
+	case AC_ADD_FIELD:
+		ma->type = htons(POFAT_ADD_FIELD);
+		ma->len = htons(4 + sizeof(*aaf));
+		aaf = (void *)(ma->action_data);
+		aaf->tag_id = htons(0); //?
+		aaf->tag_pos = htons(u16(ae->u.add_field.dst_offset));
+		aaf->tag_len = htonl(u32(ae->u.add_field.dst_length));
+		memcpy(aaf->tag_value, ae->u.add_field.val.v, VALUE_LEN);
+		break;
+	case AC_DEL_FIELD:
+		ma->type = htons(POFAT_DELETE_FIELD);
+		ma->len = htons(4 + sizeof(*adf));
+		adf = (void *)(ma->action_data);
+		adf->tag_pos = htons(u16(ae->u.del_field.dst_offset));
+		adf->len_type = 0;
+		adf->tag_len.value = htonl(u32(ae->u.del_field.dst_length));
 		break;
 	default:
 		return false;
