@@ -16,6 +16,8 @@ enum port_status {
 };
 
 /* xswitch */
+struct xswitch *xswitch(dpid_t dpid, int ports, void *conn);
+void xswitch_free(struct xswitch *sw);
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
 dpid_t xswitch_get_dpid(struct xswitch *sw);
 int xswitch_get_num_ports(struct xswitch *sw);

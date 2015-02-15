@@ -1,6 +1,6 @@
 CC = cc
 AR = ar
-CFLAGS = -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
+CFLAGS = -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
 LDFLAGS = ${EXTRA_LDFLAGS}
 OBJS = ${SRCS:.c=.o} ${EXTRA_OBJS}
 

@@ -9,8 +9,6 @@
 #include "maple/maple.h"
 #include "topo/topo.h"
 
-#include "io/sw.h"
-
 void xswitch_init(void)
 {
 	maple_init();
@@ -18,7 +16,7 @@ void xswitch_init(void)
 
 void xswitch_send(struct xswitch *sw, struct msgbuf *b)
 {
-	b->sw = sw->sw;
+	b->sw = sw->conn;
 	send_msgbuf(b);
 }
 
@@ -32,24 +30,37 @@ int xswitch_get_num_ports(struct xswitch *sw)
 	return sw->n_ports;
 }
 
-struct xswitch *xswitch_on_accept(struct sw *_sw)
+struct xswitch *xswitch(dpid_t dpid, int ports, void *conn)
 {
 	struct xswitch *sw;
 	struct msgbuf *msg;
 
 	sw = malloc(sizeof *sw);
-	sw->dpid = 0;
-	sw->n_ports = 0;
-	sw->n_ready_ports = 0;
+	sw->dpid = dpid;
+	sw->n_ports = sw->n_ready_ports = ports;
+	sw->conn = conn;
 
-	_sw->xsw = sw;
-	sw->sw = _sw;
-
-	fprintf(stderr, "sending hello\n");
-	msg = msg_hello();
-	xswitch_send(sw, msg);
-	sw->state = XS_HELLO;
+	if(dpid) {
+		sw->state = XS_RUNNING;
+		xswitch_up(sw);
+	} else {
+		sw->state = XS_HELLO;
+		msg = msg_hello();
+		xswitch_send(sw, msg);
+	}
 	return sw;
+}
+
+void xswitch_free(struct xswitch *sw)
+{
+	if (sw->state == XS_RUNNING)
+		xswitch_down(sw);
+        free(sw);
+}
+
+struct xswitch *xswitch_on_accept(void *conn)
+{
+	return xswitch(0, 0, conn);
 }
 
 void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
@@ -91,13 +102,9 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 	msgbuf_delete(msg);
 }
 
-void xswitch_on_close(struct sw *_sw)
+void xswitch_on_close(struct xswitch *sw)
 {
-	struct xswitch *sw = _sw->xsw;
-	if (sw->state == XS_RUNNING)
-		xswitch_down(sw);
-	//rconn_destroy(sw->rconn);
-        free(sw);
+	xswitch_free(sw);
 }
 
 static void init_table0(struct xswitch *sw)

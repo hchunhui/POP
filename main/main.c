@@ -16,9 +16,9 @@
 #include "pof/pof_global.h"
 
 extern void xswitch_init(void);
-extern struct xswitch *xswitch_on_accept(struct sw *_sw);
+extern struct xswitch *xswitch_on_accept(void *conn);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
-extern void xswitch_on_close(struct sw *_sw);
+extern void xswitch_on_close(struct xswitch *sw);
 extern void xswitch_on_timeout(void);
 
 int realtime = 0;
@@ -27,21 +27,22 @@ int verbose  = 0;
 void
 accept_cb_func(struct sw *sw)
 {
-	xswitch_on_accept(sw);
+	sw->xsw = xswitch_on_accept(sw);
 	printf("Connected.\n");
 }
 
 void
 close_cb_func(struct sw *sw)
 {
-	xswitch_on_close(sw);
+	xswitch_on_close(sw->xsw);
 	printf("Closed.\n");
 }
 
 void
 recv_cb_func(struct msgbuf *msg)
 {
-	xswitch_on_recv(msg->sw->xsw, msg);
+	struct sw *sw = msg->sw;
+	xswitch_on_recv(sw->xsw, msg);
 }
 
 void

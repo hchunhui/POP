@@ -2,8 +2,6 @@
 #define _XSWITCH_PRIVATE_H_
 #include "xswitch.h"
 
-struct sw;
-
 /* xswitch */
 struct trace_tree;
 struct xswitch
@@ -17,13 +15,13 @@ struct xswitch
 	int n_ports;
 	int n_ready_ports;
 	//TODO port number
+
 	int hack_start_prio;
 	int next_table_id;
-	//struct rconn *rconn;
 	struct flow_table *table0;
 	struct trace_tree *trace_tree;
 
-	struct sw *sw;
+	void *conn;
 };
 
 void xswitch_up(struct xswitch *sw);

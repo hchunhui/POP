@@ -38,7 +38,6 @@
 
 /* --- */
 struct msgbuf;
-struct sw;
 struct msgbuf *recv_msgbuf(int cpuid);
 int send_msgbuf(struct msgbuf *msg);
 /* --- */
@@ -53,7 +52,7 @@ struct msgbuf {
 	size_t size;		/* Number of bytes in use. */
 
 	struct msgbuf *next;	/* Next in a list of msgbufs. */
-	struct sw *sw;
+	void *sw;
 };
 
 void msgbuf_use(struct msgbuf *, void *, size_t);
