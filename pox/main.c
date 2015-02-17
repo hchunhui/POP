@@ -13,6 +13,7 @@
 #define __unused __attribute__((unused))
 
 extern void xswitch_init(void);
+extern void xswitch_on_timeout(void);
 
 /* XXX */
 /* msgbuf queue: serialize xswitch_send() requests */
@@ -71,6 +72,17 @@ packet_in(PyObject *self __unused, PyObject *args)
 }
 
 static PyObject *
+port_status(PyObject *self __unused, PyObject *args)
+{
+	void *sw;
+	int port_id, down;
+	PyArg_ParseTuple(args, "kii", &sw, &port_id, &down);
+	xswitch_port_status(sw, port_id, down ? PORT_DOWN : PORT_UP);
+	xmit();
+	return Py_BuildValue("");
+}
+
+static PyObject *
 going_up(PyObject *self __unused, PyObject *args)
 {
 	uint32_t dpid;
@@ -104,10 +116,20 @@ going_down(PyObject *self __unused, PyObject *args)
 	return Py_BuildValue("");
 }
 
+static PyObject *
+timeout(PyObject *self __unused, PyObject *args __unused)
+{
+	xswitch_on_timeout();
+	xmit();
+	return Py_BuildValue("");
+}
+
 static PyMethodDef methods[] = {
 	{ "going_up", going_up, METH_VARARGS, "" },
 	{ "going_down", going_down, METH_VARARGS, "" },
 	{ "packet_in", packet_in, METH_VARARGS, "" },
+	{ "port_status", port_status, METH_VARARGS, "" },
+	{ "timeout", timeout, METH_VARARGS, "" },
 	{ NULL, NULL, 0, NULL }
 };
 
