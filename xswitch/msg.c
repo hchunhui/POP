@@ -391,7 +391,7 @@ struct msgbuf *msg_flow_table_del(struct flow_table *ft)
 	return msg;
 }
 
-struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
+struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,
 				 int priority, struct match *ma, struct action *a)
 {
 	int i;
@@ -410,7 +410,7 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 	mfe->idle_timeout = htons(0);
 	mfe->hard_timeout = htons(0);
 	mfe->priority = htons(u16(priority));
-	mfe->index = htonl(0); //??
+	mfe->index = htonl(index);
 
 	for(i = 0; i < ft->fields_num; i++) {
 		/* assume pof_match and pof_match_x is compatible */
@@ -430,6 +430,22 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 		       bytes);
 	}
 	mfe->instruction_num = u8(fill_instruction(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a));
+	return msg;
+}
+
+struct msgbuf *msg_flow_entry_del(struct flow_table *ft, int index)
+{
+	struct msgbuf *msg;
+	struct pof_flow_entry *mfe;
+
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_flow_entry),
+		     POFT_FLOW_MOD, &msg);
+	mfe = GET_BODY(msg);
+	mfe->command = POFFC_DELETE;
+
+	mfe->table_id = u8(ft->tid);
+	mfe->table_type = get_pof_table_type(ft->type);
+	mfe->index = htonl(index);
 	return msg;
 }
 

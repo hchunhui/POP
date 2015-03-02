@@ -6,11 +6,14 @@
 struct flow_table *flow_table(int tid, enum flow_table_type type, int size)
 {
 	struct flow_table *ft;
-	ft = malloc(sizeof(struct flow_table));
+	int sz = sizeof(unsigned long);
+	int msize = (size + sz - 1) / sz;
+	ft = malloc(sizeof(struct flow_table) + msize * sz);
 	ft->tid = tid;
 	ft->type = type;
 	ft->size = size;
 	ft->fields_num = 0;
+	memset(ft->index_map, 0, msize * sz);
 	return ft;
 }
 
@@ -52,4 +55,27 @@ void flow_table_get_offset_length(struct flow_table *ft, int idx,
 int flow_table_get_tid(struct flow_table *ft)
 {
 	return ft->tid;
+}
+
+int flow_table_get_entry_index(struct flow_table *ft)
+{
+	int i, j;
+	int sz = sizeof(unsigned long);
+	int m = (ft->size + sz - 1) / sz;
+	for(i = 0; i < m; i++)
+		if(ft->index_map[i] != ~(0ul))
+			for(j = 0; j < sz; j++)
+				if((ft->index_map[i] & (1 << j)) == 0) {
+					ft->index_map[i] |= 1 << j;
+					assert(i * sz + j < ft->size);
+					return i * sz + j;
+				}
+	assert(0);
+}
+
+void flow_table_put_entry_index(struct flow_table *ft, int index)
+{
+	int sz = sizeof(unsigned long);
+	assert(index >= 0 && index < ft->size);
+	ft->index_map[index / sz] &= ~(1 << (index % sz));
 }

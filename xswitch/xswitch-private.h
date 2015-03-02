@@ -54,6 +54,7 @@ struct flow_table
 	int size;
 	int fields_num;
 	struct match_field fields[FLOW_TABLE_NUM_FIELDS];
+	unsigned long index_map[0];
 };
 
 

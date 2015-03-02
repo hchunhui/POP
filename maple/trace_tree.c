@@ -23,6 +23,7 @@ struct trace_tree_E
 struct trace_tree_L
 {
 	struct trace_tree h;
+	int index;
 	struct action *ac;
 };
 
@@ -44,6 +45,7 @@ struct trace_tree_T
 	struct trace_tree h;
 	char name[32];
 	value_t value;
+	int barrier_index;
 	struct trace_tree *t, *f;
 };
 
@@ -58,6 +60,7 @@ struct trace_tree_D
 struct trace_tree_G
 {
 	struct trace_tree h;
+	int index;
 	struct flow_table *ft;
 	struct header *spec;
 	struct expr *move_expr;
@@ -78,6 +81,7 @@ static struct trace_tree *trace_tree_L(struct action *a)
 	struct trace_tree_L *t = malloc(sizeof *t);
 	t->h.type = TT_L;
 	t->ac = action_copy(a);
+	t->index = -1;
 	return (struct trace_tree *)t;
 }
 
@@ -107,6 +111,7 @@ static struct trace_tree *trace_tree_T(const char *name,
 	t->value = v;
 	t->t = tt;
 	t->f = tf;
+	t->barrier_index = -1;
 	return (struct trace_tree *)t;
 }
 
@@ -134,6 +139,7 @@ static struct trace_tree *trace_tree_G(struct header *spec,
 	t->move_expr = move_expr;
 	t->hack_start_prio = 0;
 	t->t = tt;
+	t->index = -1;
 	return (struct trace_tree *)t;
 }
 
@@ -371,7 +377,55 @@ bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct ac
 	return n1 != n2;
 }
 
-bool trace_tree_invalidate(struct trace_tree **tree,
+static void revoke_rule(struct xswitch *sw, struct flow_table *ft, struct trace_tree *tree)
+{
+	int i;
+	struct trace_tree_L *tl;
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
+
+	struct msgbuf *msg;
+	switch(tree->type) {
+	case TT_L:
+		tl = (struct trace_tree_L *)tree;
+		msg = msg_flow_entry_del(ft, tl->index);
+		xswitch_send(sw, msg);
+		flow_table_put_entry_index(ft, tl->index);
+		return;
+	case TT_V:
+		tv = (struct trace_tree_V *)tree;
+		for(i = 0; i < tv->num_branches; i++) {
+			revoke_rule(sw, ft, tv->branches[i].tree);
+		}
+		return;
+	case TT_T:
+		tt = (struct trace_tree_T *)tree;
+		revoke_rule(sw, ft, tt->f);
+		msg = msg_flow_entry_del(ft, tt->barrier_index);
+		xswitch_send(sw, msg);
+		flow_table_put_entry_index(ft, tt->barrier_index);
+		revoke_rule(sw, ft, tt->t);
+		return;
+	case TT_G:
+		tg = (struct trace_tree_G *)tree;
+		msg = msg_flow_entry_del(ft, tg->index);
+		xswitch_send(sw, msg);
+		flow_table_put_entry_index(ft, tg->index);
+		revoke_rule(sw, tg->ft, tg->t);
+		return;
+	case TT_D:
+		td = (struct trace_tree_D *)tree;
+		revoke_rule(sw, ft, td->t);
+		return;
+	case TT_E:
+		return;
+	}
+	assert(0);
+}
+
+bool trace_tree_invalidate(struct trace_tree **tree, struct xswitch *sw, struct flow_table *ft,
 			   bool (*p)(void *p_data, const char *name, void *arg), void *p_data)
 {
 	int i;
@@ -390,26 +444,27 @@ bool trace_tree_invalidate(struct trace_tree **tree,
 		tv = (struct trace_tree_V *)t;
 		b = false;
 		for(i = 0; i < tv->num_branches; i++) {
-			b1 = trace_tree_invalidate(&(tv->branches[i].tree), p, p_data);
+			b1 = trace_tree_invalidate(&(tv->branches[i].tree), sw, ft, p, p_data);
 			b = b || b1;
 		}
 		return b;
 	case TT_T:
 		tt = (struct trace_tree_T *)t;
-		b = trace_tree_invalidate(&(tt->t), p, p_data);
-		b1 = trace_tree_invalidate(&(tt->f), p, p_data);
+		b = trace_tree_invalidate(&(tt->t), sw, ft, p, p_data);
+		b1 = trace_tree_invalidate(&(tt->f), sw, ft, p, p_data);
 		return b || b1;
 	case TT_D:
 		td = (struct trace_tree_D *)t;
 		if(p(p_data, td->name, td->arg)) {
+			revoke_rule(sw, ft, td->t);
 			trace_tree_free(td->t);
 			td->t = trace_tree_E();
 			return true;
 		}
-		return trace_tree_invalidate(&(td->t), p, p_data);
+		return trace_tree_invalidate(&(td->t), sw, ft, p, p_data);
 	case TT_G:
 		tg = (struct trace_tree_G *)t;
-		return trace_tree_invalidate(&(tg->t), p, p_data);
+		return trace_tree_invalidate(&(tg->t), sw, tg->ft, p, p_data);
 	}
 	assert(0);
 }
@@ -422,7 +477,7 @@ static void init_entry(struct xswitch *sw, struct flow_table *ft, int *hack_star
 	ma = match();
 	ac = action();
 	action_add(ac, AC_PACKET_IN, 0);
-	msg = msg_flow_entry_add(ft, *hack_start_prio, ma, ac);
+	msg = msg_flow_entry_add(ft, flow_table_get_entry_index(ft), *hack_start_prio, ma, ac);
 	(*hack_start_prio)++;
 	match_free(ma);
 	action_free(ac);
@@ -451,7 +506,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		action_dump(tl->ac, buf2, 128);
 		fprintf(stderr, "tid %d: %2d, %s, %s\n",
 			flow_table_get_tid(ft), priority, buf, buf2);
-		msg = msg_flow_entry_add(ft, priority, ma, tl->ac);
+		tl->index = flow_table_get_entry_index(ft);
+		msg = msg_flow_entry_add(ft, tl->index, priority, ma, tl->ac);
 		xswitch_send(sw, msg);
 		return priority + 1;
 	case TT_V:
@@ -477,7 +533,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		action_dump(ac_pi, buf, 128);
 		fprintf(stderr, "tid %d: %2d, BARRIER, %s\n",
 			flow_table_get_tid(ft), priority, buf);
-		msg = msg_flow_entry_add(ft, priority, maa, ac_pi);
+		tt->barrier_index = flow_table_get_entry_index(ft);
+		msg = msg_flow_entry_add(ft, tt->barrier_index, priority, maa, ac_pi);
 		xswitch_send(sw, msg);
 		priority = emit_rule(sw, ft, tt->t, maa, priority + 1, ac_pi);
 		match_free(maa);
@@ -500,7 +557,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		fprintf(stderr, "tid %d: %2d, %s, %s\n",
 			flow_table_get_tid(ft), priority, buf, buf2);
 
-		msg = msg_flow_entry_add(ft, priority, ma, a);
+		tg->index = flow_table_get_entry_index(ft);
+		msg = msg_flow_entry_add(ft, tg->index, priority, ma, a);
 		xswitch_send(sw, msg);
 		action_free(a);
 
