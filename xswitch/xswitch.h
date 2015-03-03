@@ -3,7 +3,6 @@
 #include "types.h"
 
 struct msgbuf;
-struct vconn;
 
 struct xswitch;
 struct flow_table;
@@ -100,8 +99,10 @@ struct msgbuf *msg_get_config_request(void);
 struct msgbuf *msg_flow_table_add(struct flow_table *ft);
 struct msgbuf *msg_flow_table_del(struct flow_table *ft);
 struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,
-				 int priority, struct match *ma, struct action *a);
+				  int priority, struct match *ma, struct action *a);
 struct msgbuf *msg_flow_entry_del(struct flow_table *ft, int index);
+struct msgbuf *msg_flow_entry_mod(struct flow_table *ft, int index,
+				  int priority, struct match *ma, struct action *a);
 struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, struct action *a);
 
 #endif /* _XSWITCH_H_ */

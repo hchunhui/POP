@@ -23,8 +23,8 @@ struct trace_tree_E
 struct trace_tree_L
 {
 	struct trace_tree h;
-	int index;
 	struct action *ac;
+	int index;
 };
 
 struct trace_tree_Vb {
@@ -45,8 +45,8 @@ struct trace_tree_T
 	struct trace_tree h;
 	char name[32];
 	value_t value;
-	int barrier_index;
 	struct trace_tree *t, *f;
+	int barrier_index;
 };
 
 struct trace_tree_D
@@ -60,12 +60,11 @@ struct trace_tree_D
 struct trace_tree_G
 {
 	struct trace_tree h;
-	int index;
 	struct flow_table *ft;
 	struct header *spec;
 	struct expr *move_expr;
-	int hack_start_prio;
 	struct trace_tree *t;
+	int index;
 };
 
 /* constructors */
@@ -137,7 +136,6 @@ static struct trace_tree *trace_tree_G(struct header *spec,
 	t->ft = NULL;
 	t->spec = spec;
 	t->move_expr = move_expr;
-	t->hack_start_prio = 0;
 	t->t = tt;
 	t->index = -1;
 	return (struct trace_tree *)t;
@@ -238,6 +236,31 @@ void trace_tree_print(struct trace_tree *tree)
 		fprintf(stderr, "(L)");
 		break;
 	}
+}
+
+/* helper */
+static void init_entry(struct xswitch *sw, struct flow_table *ft)
+{
+	struct match *ma;
+	struct msgbuf *msg;
+	struct action *ac;
+	int index;
+	ma = match();
+	ac = action();
+	action_add(ac, AC_PACKET_IN, 0);
+	index = flow_table_get_entry_index(ft);
+	assert(index == 0);
+	msg = msg_flow_entry_add(ft, index, 0, ma, ac);
+	match_free(ma);
+	action_free(ac);
+	xswitch_send(sw, msg);
+}
+
+static void fini_entry(struct xswitch *sw, struct flow_table *ft)
+{
+	struct msgbuf *msg;
+	msg = msg_flow_entry_del(ft, 0);
+	xswitch_send(sw, msg);
 }
 
 /* algorithm */
@@ -414,6 +437,9 @@ static void revoke_rule(struct xswitch *sw, struct flow_table *ft, struct trace_
 		xswitch_send(sw, msg);
 		flow_table_put_entry_index(ft, tg->index);
 		revoke_rule(sw, tg->ft, tg->t);
+		fini_entry(sw, tg->ft);
+		msg = msg_flow_table_del(tg->ft);
+		xswitch_send(sw, msg);
 		return;
 	case TT_D:
 		td = (struct trace_tree_D *)tree;
@@ -469,21 +495,6 @@ bool trace_tree_invalidate(struct trace_tree **tree, struct xswitch *sw, struct 
 	assert(0);
 }
 
-static void init_entry(struct xswitch *sw, struct flow_table *ft, int *hack_start_prio)
-{
-	struct match *ma;
-	struct msgbuf *msg;
-	struct action *ac;
-	ma = match();
-	ac = action();
-	action_add(ac, AC_PACKET_IN, 0);
-	msg = msg_flow_entry_add(ft, flow_table_get_entry_index(ft), *hack_start_prio, ma, ac);
-	(*hack_start_prio)++;
-	match_free(ma);
-	action_free(ac);
-	xswitch_send(sw, msg);
-}
-
 static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		     struct trace_tree *tree, struct match *ma, int priority,
 		     struct action *ac_pi)
@@ -506,8 +517,12 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		action_dump(tl->ac, buf2, 128);
 		fprintf(stderr, "tid %d: %2d, %s, %s\n",
 			flow_table_get_tid(ft), priority, buf, buf2);
-		tl->index = flow_table_get_entry_index(ft);
-		msg = msg_flow_entry_add(ft, tl->index, priority, ma, tl->ac);
+		if(tl->index == -1) {
+			tl->index = flow_table_get_entry_index(ft);
+			msg = msg_flow_entry_add(ft, tl->index, priority, ma, tl->ac);
+		} else {
+			msg = msg_flow_entry_mod(ft, tl->index, priority, ma, tl->ac);
+		}
 		xswitch_send(sw, msg);
 		return priority + 1;
 	case TT_V:
@@ -533,8 +548,12 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		action_dump(ac_pi, buf, 128);
 		fprintf(stderr, "tid %d: %2d, BARRIER, %s\n",
 			flow_table_get_tid(ft), priority, buf);
-		tt->barrier_index = flow_table_get_entry_index(ft);
-		msg = msg_flow_entry_add(ft, tt->barrier_index, priority, maa, ac_pi);
+		if(tt->barrier_index == -1) {
+			tt->barrier_index = flow_table_get_entry_index(ft);
+			msg = msg_flow_entry_add(ft, tt->barrier_index, priority, maa, ac_pi);
+		} else {
+			msg = msg_flow_entry_mod(ft, tt->barrier_index, priority, maa, ac_pi);
+		}
 		xswitch_send(sw, msg);
 		priority = emit_rule(sw, ft, tt->t, maa, priority + 1, ac_pi);
 		match_free(maa);
@@ -547,6 +566,7 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 			tg->ft = header_make_flow_table(tg->spec, tid);
 			msg = msg_flow_table_add(tg->ft);
 			xswitch_send(sw, msg);
+			init_entry(sw, tg->ft);
 		}
 		// insert GOTO_TABLE into orig table
 		a = action();
@@ -557,15 +577,17 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		fprintf(stderr, "tid %d: %2d, %s, %s\n",
 			flow_table_get_tid(ft), priority, buf, buf2);
 
-		tg->index = flow_table_get_entry_index(ft);
-		msg = msg_flow_entry_add(ft, tg->index, priority, ma, a);
+		if(tg->index == -1) {
+			tg->index = flow_table_get_entry_index(ft);
+			msg = msg_flow_entry_add(ft, tg->index, priority, ma, a);
+		} else {
+			msg = msg_flow_entry_mod(ft, tg->index, priority, ma, a);
+		}
 		xswitch_send(sw, msg);
 		action_free(a);
 
-		init_entry(sw, tg->ft, (&tg->hack_start_prio));
 		maa = match();
-		tg->hack_start_prio =
-			emit_rule(sw, tg->ft, tg->t, maa, tg->hack_start_prio, ac_pi);
+		emit_rule(sw, tg->ft, tg->t, maa, 1, ac_pi);
 		match_free(maa);
 		return priority + 1;
 	case TT_D:
@@ -582,9 +604,7 @@ void trace_tree_emit_rule(struct xswitch *sw, struct trace_tree *tree)
 	struct match *ma = match();
 	struct action *ac_pi = action();
 	action_add(ac_pi, AC_PACKET_IN, 0);
-	init_entry(sw, sw->table0, &(sw->hack_start_prio));
-	sw->hack_start_prio =
-		emit_rule(sw, sw->table0, tree, ma, sw->hack_start_prio, ac_pi) + 1;
+	emit_rule(sw, sw->table0, tree, ma, 1, ac_pi);
 	action_free(ac_pi);
 	match_free(ma);
 }

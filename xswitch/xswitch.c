@@ -134,7 +134,6 @@ static void init_table0(struct xswitch *sw)
 	ac = action();
 	action_add(ac, AC_PACKET_IN, 0);
 	msg = msg_flow_entry_add(sw->table0, flow_table_get_entry_index(sw->table0), 0, ma, ac);
-	sw->hack_start_prio = 1;
 	match_free(ma);
 	action_free(ac);
 	xswitch_send(sw, msg);
