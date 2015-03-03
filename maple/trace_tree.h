@@ -7,11 +7,12 @@ struct trace_tree;
 struct trace;
 struct action;
 struct xswitch;
+struct flow_table;
 struct trace_tree *trace_tree(void);
 void trace_tree_free(struct trace_tree *t);
 void trace_tree_print(struct trace_tree *tree);
 bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct action *a);
-bool trace_tree_invalidate(struct trace_tree **tree,
+bool trace_tree_invalidate(struct trace_tree **tree, struct xswitch *sw, struct flow_table *ft,
 			   bool (*p)(void *p_data, const char *name, void *arg), void *p_data);
 void trace_tree_emit_rule(struct xswitch *sw, struct trace_tree *tree);
 

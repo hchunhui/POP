@@ -113,7 +113,7 @@ static void init_table0(struct xswitch *sw)
 	struct match *ma;
 	struct action *ac;
 	/* init match fields */
-	sw->table0 = flow_table(0, FLOW_TABLE_TYPE_MM, 10);
+	sw->table0 = flow_table(0, FLOW_TABLE_TYPE_MM, 1024);
 	flow_table_add_field(sw->table0, "in_port", MATCH_FIELD_METADATA, 16, 8);
 	flow_table_add_field(sw->table0, "dl_dst", MATCH_FIELD_PACKET, 0, 48);
 	flow_table_add_field(sw->table0, "dl_src", MATCH_FIELD_PACKET, 48, 48);
@@ -133,8 +133,7 @@ static void init_table0(struct xswitch *sw)
 	ma = match();
 	ac = action();
 	action_add(ac, AC_PACKET_IN, 0);
-	msg = msg_flow_entry_add(sw->table0, 0, ma, ac);
-	sw->hack_start_prio = 1;
+	msg = msg_flow_entry_add(sw->table0, flow_table_get_entry_index(sw->table0), 0, ma, ac);
 	match_free(ma);
 	action_free(ac);
 	xswitch_send(sw, msg);

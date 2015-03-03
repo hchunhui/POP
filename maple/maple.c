@@ -168,10 +168,7 @@ void maple_invalidate(bool (*p)(void *p_data, const char *name, void *arg), void
 	for(i = 0; i < num_switches; i++) {
 		struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 		struct trace_tree *tt = cur_sw->trace_tree;
-		if(trace_tree_invalidate(&tt, p, p_data)) {
-			fprintf(stderr, "---- flow table for 0x%x ---\n", cur_sw->dpid);
-			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
-		}
+		trace_tree_invalidate(&tt, cur_sw, cur_sw->table0, p, p_data);
 	}
 }
 

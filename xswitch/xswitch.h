@@ -3,7 +3,6 @@
 #include "types.h"
 
 struct msgbuf;
-struct vconn;
 
 struct xswitch;
 struct flow_table;
@@ -32,7 +31,9 @@ void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length);
 int flow_table_get_field_index(struct flow_table *ft, const char *name);
 int flow_table_get_tid(struct flow_table *ft);
-
+void flow_table_get_offset_length(struct flow_table *ft, int idx, int *offset, int *length);
+int flow_table_get_entry_index(struct flow_table *ft);
+void flow_table_put_entry_index(struct flow_table *ft, int index);
 
 /* match */
 struct match *match(void);
@@ -111,8 +112,11 @@ struct msgbuf *msg_get_config_request(void);
 
 struct msgbuf *msg_flow_table_add(struct flow_table *ft);
 struct msgbuf *msg_flow_table_del(struct flow_table *ft);
-struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
-				 int priority, struct match *ma, struct action *a);
+struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,
+				  int priority, struct match *ma, struct action *a);
+struct msgbuf *msg_flow_entry_del(struct flow_table *ft, int index);
+struct msgbuf *msg_flow_entry_mod(struct flow_table *ft, int index,
+				  int priority, struct match *ma, struct action *a);
 struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, struct action *a);
 
 #endif /* _XSWITCH_H_ */

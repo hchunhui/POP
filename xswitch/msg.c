@@ -435,8 +435,8 @@ struct msgbuf *msg_flow_table_del(struct flow_table *ft)
 	return msg;
 }
 
-struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
-				 int priority, struct match *ma, struct action *a)
+struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,
+				  int priority, struct match *ma, struct action *a)
 {
 	int i;
 	struct msgbuf *msg;
@@ -454,7 +454,65 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft,
 	mfe->idle_timeout = htons(0);
 	mfe->hard_timeout = htons(0);
 	mfe->priority = htons(u16(priority));
-	mfe->index = htonl(0); //??
+	mfe->index = htonl(index);
+
+	for(i = 0; i < ft->fields_num; i++) {
+		/* assume pof_match and pof_match_x is compatible */
+		fill_match((struct pof_match *)&(mfe->match[i]), &(ft->fields[i]));
+		memset(mfe->match[i].value, 0, POF_MAX_FIELD_LENGTH_IN_BYTE);
+		memset(mfe->match[i].mask, 0, POF_MAX_FIELD_LENGTH_IN_BYTE);
+	}
+	for(i = 0; i < ma->fields_num; i++) {
+		int idx = flow_table_get_field_index(ft, ma->m[i].name);
+		assert(idx >= 0);
+		int bytes = (ft->fields[idx].length + 7) / 8;
+		memcpy(mfe->match[idx].value,
+		       ma->m[i].value.v,
+		       bytes);
+		memcpy(mfe->match[idx].mask,
+		       ma->m[i].mask.v,
+		       bytes);
+	}
+	mfe->instruction_num = u8(fill_instructions(mfe->instruction, POF_MAX_INSTRUCTION_NUM, a));
+	return msg;
+}
+
+struct msgbuf *msg_flow_entry_del(struct flow_table *ft, int index)
+{
+	struct msgbuf *msg;
+	struct pof_flow_entry *mfe;
+
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_flow_entry),
+		     POFT_FLOW_MOD, &msg);
+	mfe = GET_BODY(msg);
+	mfe->command = POFFC_DELETE;
+
+	mfe->table_id = u8(ft->tid);
+	mfe->table_type = get_pof_table_type(ft->type);
+	mfe->index = htonl(index);
+	return msg;
+}
+
+struct msgbuf *msg_flow_entry_mod(struct flow_table *ft, int index,
+				  int priority, struct match *ma, struct action *a)
+{
+	int i;
+	struct msgbuf *msg;
+	struct pof_flow_entry *mfe;
+
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_flow_entry),
+		     POFT_FLOW_MOD, &msg);
+	mfe = GET_BODY(msg);
+	mfe->command = POFFC_MODIFY;
+	mfe->match_field_num = u8(ft->fields_num);
+	mfe->instruction_num = 0; //set later
+
+	mfe->table_id = u8(ft->tid);
+	mfe->table_type = get_pof_table_type(ft->type);
+	mfe->idle_timeout = htons(0);
+	mfe->hard_timeout = htons(0);
+	mfe->priority = htons(u16(priority));
+	mfe->index = htonl(index);
 
 	for(i = 0; i < ft->fields_num; i++) {
 		/* assume pof_match and pof_match_x is compatible */

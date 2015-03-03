@@ -16,7 +16,6 @@ struct xswitch
 	int n_ready_ports;
 	//TODO port number
 
-	int hack_start_prio;
 	int next_table_id;
 	struct flow_table *table0;
 	struct trace_tree *trace_tree;
@@ -54,6 +53,7 @@ struct flow_table
 	int size;
 	int fields_num;
 	struct match_field fields[FLOW_TABLE_NUM_FIELDS];
+	unsigned long index_map[0];
 };
 
 
