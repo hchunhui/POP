@@ -26,7 +26,7 @@ struct xswitch
 
 void xswitch_up(struct xswitch *sw);
 void xswitch_down(struct xswitch *sw);
-void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len);
+void xswitch_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len);
 void xswitch_port_status(struct xswitch *sw, int port, enum port_status status);
 
 /* msg */
@@ -74,7 +74,7 @@ struct match
 struct action
 {
 	int num_actions;
-	struct {
+	struct action_entry {
 		enum action_type type;
 		union {
 			int arg;
@@ -104,10 +104,29 @@ struct action
 				value_t val;
 			} write_metadata;
 			struct {
+				enum move_direction dir;
 				enum match_field_type type;
 				int offset;
 				int length;
 			} move_packet;
+			struct {
+				enum move_direction dir;
+				int value;
+			} move_packet_imm;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} set_field;
+			struct {
+				int dst_offset;
+				int dst_length;
+				value_t val;
+			} add_field;
+			struct {
+				int dst_offset;
+				int dst_length;
+			} del_field;
 		} u;
 	} a[ACTION_NUM_ACTIONS];
 };

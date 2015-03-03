@@ -42,19 +42,41 @@ void trace_IE(const char *name)
 	trace.num_inv_events++;
 }
 
-void trace_G(struct header *spec, struct expr *move_expr)
+void trace_G(struct header *old_spec, struct header *new_spec, int stack_base)
 {
 	int i = trace.num_events;
 	trace.events[i].type = EV_G;
-	trace.events[i].u.g.spec = spec;
-	trace.events[i].u.g.move_expr = move_expr;
+	trace.events[i].u.g.old_spec = old_spec;
+	trace.events[i].u.g.new_spec = new_spec;
+	trace.events[i].u.g.stack_base = stack_base;
 	trace.num_events++;
+}
+
+void trace_P(struct header *new_spec, int stack_base)
+{
+	int i = trace.num_mod_events;
+	trace.mod_events[i].type = MEV_P;
+	trace.mod_events[i].u.p.new_spec = new_spec;
+	trace.mod_events[i].u.p.stack_base = stack_base;
+	trace.num_mod_events++;
+}
+
+void trace_M(const char *name, value_t value, struct header *spec)
+{
+	int i = trace.num_mod_events;
+	trace.mod_events[i].type = MEV_M;
+	strncpy(trace.mod_events[i].u.m.name, name, 32);
+	trace.mod_events[i].u.m.name[31] = 0;
+	trace.mod_events[i].u.m.value = value;
+	trace.mod_events[i].u.m.spec = spec;
+	trace.num_mod_events++;
 }
 
 void trace_clear(void)
 {
 	trace.num_events = 0;
 	trace.num_inv_events = 0;
+	trace.num_mod_events = 0;
 }
 
 struct trace *trace_get(void)

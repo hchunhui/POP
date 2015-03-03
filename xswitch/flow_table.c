@@ -23,6 +23,9 @@ void flow_table_add_field(struct flow_table *ft,
 			  const char *name, enum match_field_type type, int offset, int length)
 {
 	struct match_field *f = ft->fields + ft->fields_num;
+	/* XXX: hack */
+	if(strlen(name) >= 2 && name[0] == '_' && name[1] == '_')
+		return;
 	assert(ft->fields_num < FLOW_TABLE_NUM_FIELDS);
 	strncpy(f->name, name, MATCH_FIELD_NAME_LEN);
 	f->name[MATCH_FIELD_NAME_LEN - 1] = 0;
@@ -39,14 +42,6 @@ int flow_table_get_field_index(struct flow_table *ft, const char *name)
 		if(strcmp(name, ft->fields[i].name) == 0)
 			return i;
 	return -1;
-}
-
-void flow_table_get_offset_length(struct flow_table *ft, int idx,
-				  int *offset, int *length)
-{
-	assert(idx >= 0 && idx < ft->fields_num);
-	*offset = ft->fields[idx].offset;
-	*length = ft->fields[idx].length;
 }
 
 int flow_table_get_tid(struct flow_table *ft)

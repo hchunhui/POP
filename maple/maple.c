@@ -30,10 +30,12 @@ void pull_header(struct packet *pkt)
 {
 	value_t sel_value;
 	struct header *old_spec, *new_spec;
+	int next_stack_top;
 	/* XXX: hack */
-	packet_parser_pull(pkt->pp, &old_spec, &sel_value, &new_spec);
+	packet_parser_pull(pkt->pp, &old_spec, &sel_value, &new_spec, &next_stack_top);
 	trace_R(header_get_sel(old_spec), sel_value);
-	trace_G(new_spec, header_get_length(old_spec));
+	trace_G(old_spec, new_spec, next_stack_top);
+	printf("current header: %s\n", header_get_name(new_spec));
 }
 
 const char *read_header_type(struct packet *pkt)
@@ -60,6 +62,21 @@ const uint8_t *read_payload(struct packet *pkt, int *length)
 {
 	pkt->hack_get_payload = true;
 	return packet_parser_get_payload(pkt->pp, length);
+}
+
+void push_header(struct packet *pkt)
+{
+	struct header *new_spec;
+	int prev_stack_top;
+	packet_parser_push(pkt->pp, &new_spec, &prev_stack_top);
+	trace_P(new_spec, prev_stack_top);
+}
+
+void mod_packet(struct packet *pkt, const char *field, value_t value)
+{
+	struct header *spec;
+	packet_parser_mod(pkt->pp, field, value, &spec);
+	trace_M(field, value, spec);
 }
 
 void record(const char *name)
@@ -193,7 +210,7 @@ static bool cmpname_p(void *pname, const char *name, void *arg __attribute__((un
 	return false;
 }
 
-void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
+void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len)
 {
 	int i;
 	struct route *r;
@@ -201,6 +218,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	edge_t *edges;
 	int num_edges;
 	struct trace *trace;
+	struct action *ac_mod;
 
 	/* init */
 	trace_clear();
@@ -208,7 +226,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	/* run */
 	pkt.pp = packet_parser(header_spec, packet, packet_len);
 	pkt.hack_get_payload = false;
-	trace_G(header_spec, expr_value(0));
+	trace_G(NULL, header_spec, 0);
 
 	r = f(&pkt);
 
@@ -218,7 +236,39 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 	trace = trace_get();
 
 	/* learn */
+	/* XXX */
+	ac_mod = action();
+	for(i = 0; i < trace->num_mod_events; i++) {
+		int offset, length;
+		struct header *cur_spec;
+
+		switch(trace->mod_events[i].type) {
+		case MEV_P:
+			cur_spec = trace->mod_events[i].u.p.new_spec;
+			expr_generate_action_backward(
+				header_get_length(cur_spec),
+				trace->mod_events[i].u.p.stack_base, ac_mod);
+			break;
+		case MEV_M:
+			cur_spec = trace->mod_events[i].u.m.spec;
+			header_get_field(cur_spec,
+					 trace->mod_events[i].u.m.name,
+					 &offset,
+					 &length);
+			action_add_set_field(ac_mod, offset, length,
+					     trace->mod_events[i].u.m.value);
+			break;
+		}
+	}
+
 	edges = route_get_edges(r, &num_edges);
+	struct {
+		struct entity *ent;
+		struct xswitch *sw;
+		struct action *ac;
+		int in;
+	} sw_actions[num_edges];
+	int n_actions = 0;
 	for(i = 0; i < num_edges; i++) {
 		struct entity *cur_ent = edges[i].ent1;
 		int out_port = edges[i].port1;
@@ -229,35 +279,54 @@ void maple_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int
 			edges[i].port2);
 		if(cur_ent) {
 			struct xswitch *cur_sw = entity_get_xswitch(cur_ent);
-			struct action *a = action();
-			int j;
-
-			action_add(a, AC_OUTPUT, out_port);
-
-			assert(cur_sw);
-
-			if(!edges[i].ent2) {
-				struct msgbuf *mb;
-				mb = msg_packet_out(0, packet, packet_len, a);
-				xswitch_send(cur_sw, mb);
+			int j, entry;
+			bool flag = true;
+			for(j = 0; j < n_actions; j++)
+				if(cur_ent == sw_actions[j].ent) {
+					flag = false;
+					entry = j;
+					break;
+				}
+			if(flag) {
+				entry = n_actions;
+				n_actions++;
+				sw_actions[entry].ent = cur_ent;
+				sw_actions[entry].sw = cur_sw;
+				sw_actions[entry].ac = action();
+				if(edges[i].ent2 == NULL) {
+					struct msgbuf *mb;
+					struct action *a0 = action();
+					action_add(a0, AC_OUTPUT, out_port);
+					mb = msg_packet_out(0, packet, packet_len, a0);
+					xswitch_send(cur_sw, mb);
+					action_free(a0);
+					sw_actions[entry].ac = action_copy(ac_mod);
+				}
 			}
-
+			action_add(sw_actions[entry].ac, AC_OUTPUT, out_port);
 			for(j = 0; j < num_edges; j++) {
 				if(edges[j].ent2 == cur_ent)
 					break;
 			}
 			assert(j < num_edges);
-			mod_in_port(trace, edges[j].port2);
-
-			if(trace_tree_augment(&(cur_sw->trace_tree), trace, a)) {
-				fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
-				trace_tree_print(cur_sw->trace_tree);
-				fprintf(stderr, "\n");
-				trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
-			}
-			action_free(a);
+			sw_actions[entry].in = edges[j].port2;
 		}
 	}
+	for(i = 0; i < n_actions; i++) {
+		struct xswitch *cur_sw = sw_actions[i].sw;
+		struct entity *cur_ent = sw_actions[i].ent;
+		struct action *cur_ac = sw_actions[i].ac;
+		mod_in_port(trace, sw_actions[i].in);
+		if(trace_tree_augment(&(cur_sw->trace_tree), trace, cur_ac)) {
+			fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
+			trace_tree_print(cur_sw->trace_tree);
+			fprintf(stderr, "\n");
+			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
+		}
+		action_free(cur_ac);
+	}
+
+	action_free(ac_mod);
 
 	if((!pkt.hack_get_payload) && num_edges == 0) {
 		struct action *a = action();

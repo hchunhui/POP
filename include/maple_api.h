@@ -9,6 +9,8 @@ const char *read_header_type(struct packet *pkt);
 value_t read_packet(struct packet *pkt, const char *field);
 bool test_equal(struct packet *pkt, const char *field, value_t value);
 const uint8_t *read_payload(struct packet *pkt, int *length);
+void mod_packet(struct packet *pkt, const char *field, value_t value);
+void push_header(struct packet *pkt);
 
 void record(const char *name);
 void invalidate(const char *name);

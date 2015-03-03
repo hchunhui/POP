@@ -149,7 +149,7 @@ void xswitch_up(struct xswitch *sw)
 	topo_switch_up(sw);
 }
 
-void xswitch_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
+void xswitch_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len)
 {
 	int i;
 	fprintf(stderr, "packet in, dpid: 0x%x, in_port: %u, total_len: %u\n",

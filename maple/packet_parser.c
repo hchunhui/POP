@@ -119,7 +119,7 @@ static uint32_t expr_interp(struct expr *e, struct packet_parser *pp)
  * r{0, 1, 2, ...} are viewed as a "register stack",
  * "stage" points to the top of the stack.
  */
-static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, int stage)
+static void expr_gen(struct expr *e, struct header *spec, struct action *a, int stage)
 {
 	enum action_oper_type op_type;
 	int offset, length;
@@ -129,10 +129,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		 *   xor  r(stage), r(stage)
 		 *   add  r(stage), packet(offset, length)
 		 */
-		flow_table_get_offset_length(ft,
-					     flow_table_get_field_index(ft, e->u.field),
-					     &offset,
-					     &length);
+		header_get_field(spec, e->u.field, &offset, &length);
 		action_add_calc_r(a, AC_OP_XOR,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length);
@@ -152,7 +149,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		 * then do:
 		 *   nori r(stage), 0
 		 */
-		expr_gen(e->u.sub_expr, ft, a, stage);
+		expr_gen(e->u.sub_expr, spec, a, stage);
 		action_add_calc_i(a, AC_OP_NOR,
 				  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 				  0);
@@ -172,7 +169,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 		case EXPR_XOR: op_type = AC_OP_XOR; break;
 		default: assert(0);
 		}
-		expr_gen(e->u.binop.left, ft, a, stage);
+		expr_gen(e->u.binop.left, spec, a, stage);
 
 		/* before generate the right expr, check if we can do it better */
 		if(e->u.binop.right->type == EXPR_VALUE) {
@@ -181,7 +178,7 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 					  e->u.binop.right->u.value);
 		} else {
 			/* fall back to generic procedure */
-			expr_gen(e->u.binop.right, ft, a, stage + 1);
+			expr_gen(e->u.binop.right, spec, a, stage + 1);
 			action_add_calc_r(a, op_type,
 					  MATCH_FIELD_METADATA, R_offset(stage), R_length,
 					  MATCH_FIELD_METADATA, R_offset(stage+1), R_length);
@@ -190,28 +187,33 @@ static void expr_gen(struct expr *e, struct flow_table *ft, struct action *a, in
 	}
 }
 
-void expr_generate_action(struct expr *e, struct flow_table *ft, struct action *a)
+void expr_generate_action(struct expr *e,
+			  struct header *spec, struct flow_table *ft, int base,
+			  struct action *a)
 {
-	int offset, length;
+	int tid = flow_table_get_tid(ft);
 	switch(e->type) {
 	case EXPR_VALUE:
 		/* Fixed value is the most common case */
-		action_add_goto_table(a, flow_table_get_tid(ft), e->u.value);
-		break;
-	case EXPR_FIELD:
-		/* Handle a single field name is simple */
-		flow_table_get_offset_length(ft,
-					     flow_table_get_field_index(ft, e->u.field),
-					     &offset,
-					     &length);
-		action_add_move_packet(a, MATCH_FIELD_PACKET, offset, length);
-		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		action_add_goto_table(a, tid, e->u.value);
 		break;
 	default:
 		/* The expr is complex, do generic procedure */
-		expr_gen(e, ft, a, 0);
-		action_add_move_packet(a, MATCH_FIELD_METADATA, R_offset(0), R_length);
-		action_add_goto_table(a, flow_table_get_tid(ft), 0);
+		expr_gen(e, spec, a, base);
+		action_add_move_packet(a, MOVE_FORWARD, MATCH_FIELD_METADATA, R_offset(base), R_length);
+		action_add_goto_table(a, tid, 0);
+		break;
+	}
+}
+
+void expr_generate_action_backward(struct expr *e, int base, struct action *a)
+{
+	switch(e->type) {
+	case EXPR_VALUE:
+		action_add_move_packet_imm(a, MOVE_BACKWARD, e->u.value);
+		break;
+	default:
+		action_add_move_packet(a, MOVE_BACKWARD, MATCH_FIELD_METADATA, R_offset(base), R_length);
 		break;
 	}
 }
@@ -254,6 +256,18 @@ void header_add_field(struct header *h, const char *name, int offset, int length
 	h->fields[i].offset = offset;
 	h->fields[i].length = length;
 	h->num_fields++;
+}
+
+void header_get_field(struct header *h, const char *name, int *offset, int *length)
+{
+	int i;
+	for(i = 0; i < h->num_fields; i++)
+		if(strcmp(name, h->fields[i].name) == 0) {
+			*offset = h->fields[i].offset;
+			*length = h->fields[i].length;
+			return;
+		}
+	assert(0);
 }
 
 void header_set_length(struct header *h, struct expr *e)
@@ -324,21 +338,22 @@ void header_free(struct header *h)
 
 struct packet_parser
 {
-	struct header *start;
-	struct header *current;
-	const uint8_t *head;
-	const uint8_t *data;
-	int length;
+	struct {
+		struct header *spec;
+		uint8_t *data;
+		int length;
+	} stack[32];
+	int stack_top;
 };
+#define STACK_TOP(pp) ((pp)->stack[(pp)->stack_top])
 
-struct packet_parser *packet_parser(struct header *spec, const uint8_t *data, int length)
+struct packet_parser *packet_parser(struct header *spec, uint8_t *data, int length)
 {
 	struct packet_parser *pp = malloc(sizeof(struct packet_parser));
-	pp->head = data;
-	pp->data = data;
-	pp->length = length;
-	pp->start = spec;
-	pp->current = pp->start;
+	pp->stack[0].spec = spec;
+	pp->stack[0].data = data;
+	pp->stack[0].length = length;
+	pp->stack_top = 0;
 	return pp;
 }
 
@@ -349,85 +364,103 @@ void packet_parser_free(struct packet_parser *pp)
 
 void packet_parser_reset(struct packet_parser *pp)
 {
-	pp->head = pp->data;
-	pp->current = pp->start;
+	pp->stack_top = 0;
 }
 
 void packet_parser_pull(struct packet_parser *pp,
 			struct header **old_spec,
 			value_t *sel_value,
-			struct header **new_spec)
+			struct header **new_spec,
+			int *next_stack_top)
 {
-	int i = pp->current->sel_idx;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	uint8_t *cur_data = STACK_TOP(pp).data;
+	int cur_length = STACK_TOP(pp).length;
+	int i = cur_spec->sel_idx;
 	assert(i >= 0);
 	int j;
-	value_t v = value_extract(pp->head,
-				  pp->current->fields[i].offset,
-				  pp->current->fields[i].length);
-	*old_spec = pp->current;
+	value_t v = value_extract(cur_data,
+				  cur_spec->fields[i].offset,
+				  cur_spec->fields[i].length);
+	*old_spec = cur_spec;
 	*sel_value = v;
-	for(j = 0; j < pp->current->num_next; j++) {
-		if(value_equal(pp->current->next[j].v, v)) {
-			pp->head += expr_interp(pp->current->length, pp);
-			pp->current = pp->current->next[j].h;
-			assert(pp->head <= pp->data + pp->length);
-			*new_spec = pp->current;
+	for(j = 0; j < STACK_TOP(pp).spec->num_next; j++) {
+		if(value_equal(cur_spec->next[j].v, v)) {
+			int offset = expr_interp(cur_spec->length, pp);
+			pp->stack_top++;
+			*next_stack_top = pp->stack_top;
+			assert(pp->stack_top < 32);
+			STACK_TOP(pp).data = cur_data + offset;
+			STACK_TOP(pp).spec = cur_spec->next[j].h;
+			STACK_TOP(pp).length = cur_length - offset;
+			assert(STACK_TOP(pp).length >= 0);
+			*new_spec = STACK_TOP(pp).spec;
 			return;
 		}
 	}
 	assert(0);
 }
 
+void packet_parser_push(struct packet_parser *pp, struct header **new_spec,
+			int *prev_stack_top)
+{
+	assert(pp->stack_top > 0);
+	*prev_stack_top = pp->stack_top;
+	pp->stack_top--;
+	*new_spec = STACK_TOP(pp).spec;
+}
+
+void packet_parser_mod(struct packet_parser *pp, const char *field, value_t value,
+		       struct header **spec)
+{
+	int offset, length;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	*spec = cur_spec;
+
+	header_get_field(cur_spec, field, &offset, &length);
+	assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+	value_unextract(STACK_TOP(pp).data, offset, length, value);
+}
+
 value_t packet_parser_read(struct packet_parser *pp, const char *field)
 {
-	int i;
-	for(i = 0; i < pp->current->num_fields; i++) {
-		if(strcmp(field, pp->current->fields[i].name) == 0) {
-			int offset = pp->current->fields[i].offset;
-			int length = pp->current->fields[i].length;
-			assert(pp->head + (offset + length + 7) / 8 <= pp->data + pp->length);
-			return value_extract(pp->head, offset, length);
-		}
-	}
-	assert(0);
+	int offset, length;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+	header_get_field(cur_spec, field, &offset, &length);
+	assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+	return value_extract(STACK_TOP(pp).data, offset, length);
 }
 
 uint32_t packet_parser_read_to_32(struct packet_parser *pp, const char *field)
 {
-	int i;
-	for(i = 0; i < pp->current->num_fields; i++) {
-		if(strcmp(field, pp->current->fields[i].name) == 0) {
-			int offset = pp->current->fields[i].offset;
-			int length = pp->current->fields[i].length;
-			value_t v;
-			assert(pp->head + (offset + length + 7) / 8 <= pp->data + pp->length);
-			v = value_extract(pp->head, offset, length);
-			if(length < 8)
-				return value_bits_to_8(length, v);
-			else if (length == 8)
-				return value_to_8(v);
-			else if(length == 16)
-				return value_to_16(v);
-			else if(length == 32)
-				return value_to_32(v);
-			else {
-				assert(0);
-			}
-		}
-	}
+	int offset, length;
+	value_t v;
+	struct header *cur_spec = STACK_TOP(pp).spec;
+
+	header_get_field(cur_spec, field, &offset, &length);
+	assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
+	v = value_extract(STACK_TOP(pp).data, offset, length);
+	if(length < 8)
+		return value_bits_to_8(length, v);
+	else if (length == 8)
+		return value_to_8(v);
+	else if(length == 16)
+		return value_to_16(v);
+	else if(length == 32)
+		return value_to_32(v);
 	assert(0);
 }
 
 const char *packet_parser_read_type(struct packet_parser *pp)
 {
-	return pp->current->name;
+	return STACK_TOP(pp).spec->name;
 }
 
 const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length)
 {
-	int header_length = expr_interp(pp->current->length, pp);
-	const uint8_t *head = pp->head + header_length;
+	int header_length = expr_interp(STACK_TOP(pp).spec->length, pp);
+	const uint8_t *head = STACK_TOP(pp).data + header_length;
 	if(length)
-		*length = pp->length - (head - pp->data);
+		*length = STACK_TOP(pp).length - header_length;
 	return head;
 }
