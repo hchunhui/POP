@@ -30,7 +30,7 @@
 #include "msgqueue.h"
 #include "msgbuf.h"
 
-#include "pof/pof_global.h"
+#include "pof_header.h"
 
 static struct master master;
 static struct worker workers[NR_WORKERS] __attribute__((aligned(64)));

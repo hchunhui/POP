@@ -13,8 +13,6 @@
 #include "io/io.h"
 #include "io/sw.h"
 
-#include "pof/pof_global.h"
-
 extern void xswitch_init(void);
 extern struct xswitch *xswitch_on_accept(void *conn);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);

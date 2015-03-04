@@ -11,7 +11,7 @@
 
 #include "msgqueue.h"
 #include "msgbuf.h"
-#include "pof/pof_global.h"
+#include "pof_header.h"
 
 /*
  * Return value:

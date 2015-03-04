@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <assert.h>
 #include "xswitch-private.h"
-#include "pof/pof_global.h"
+#include "pof_global.h"
 #include "io/msgbuf.h"
 
 /* helper functions */

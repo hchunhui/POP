@@ -21,7 +21,6 @@
 #include "io/sw.h"
 #include "io/io.h"
 
-#include "pof/pof_global.h"
 #include "openflow/openflow.h"
 
 #ifndef __unused
@@ -35,7 +34,7 @@ void
 accept_cb_func(struct sw *sw)
 {
 	struct msgbuf *msg = msgbuf_new(1024); // XXX
-	struct pof_header *p = (struct pof_header *)msg->data;
+	struct ofp_header *p = (struct ofp_header *)msg->data;
 
 	msg->sw = sw;
 
@@ -59,7 +58,7 @@ close_cb_func(struct sw *sw __unused)
 void
 recv_cb_func(struct msgbuf *msg)
 {
-	struct pof_header *p = (struct pof_header *)msg->data;
+	struct ofp_header *p = (struct ofp_header *)msg->data;
 
 	if (p->type == OFPT_PACKET_IN) {
 		p->type = OFPT_PACKET_OUT;
@@ -70,7 +69,7 @@ recv_cb_func(struct msgbuf *msg)
 void
 recv_cb_func(struct msgbuf *msg)
 {
-	struct pof_header *p = (struct pof_header *)msg->data;
+	struct ofp_header *p = (struct ofp_header *)msg->data;
 	struct sw *sw = msg->sw;
 
 	if (p->type == OFPT_PACKET_IN) {
