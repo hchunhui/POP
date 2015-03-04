@@ -2,15 +2,17 @@ CC = cc
 AR = ar
 CFLAGS = -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
 LDFLAGS = ${EXTRA_LDFLAGS}
-OBJS = ${SRCS:.c=.o} ${EXTRA_OBJS}
+OBJS = ${SRCS:.c=.o}
 
-.PHONY: clean check-syntax
+.PHONY: all clean check-syntax
+
+all: ${LIB} ${PROG}
 
 ${LIB}: .depends ${OBJS}
-	${AR} rcs ${LIB} ${OBJS}
+	${AR} rcs ${LIB} ${OBJS} ${EXTRA_OBJS}
 
 ${PROG}: .depends ${OBJS}
-	${CC} -Wl,--start-group ${OBJS} -Wl,--end-group -o ${PROG} ${CFLAGS} ${LDFLAGS}
+	${CC} -Wl,--start-group ${OBJS} ${EXTRA_OBJS} -Wl,--end-group -o ${PROG} ${CFLAGS} ${LDFLAGS}
 
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
