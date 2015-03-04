@@ -9,6 +9,6 @@ struct pof_header {
 	uint16_t length;  /* Length including this pof_header. */
 	uint32_t xid;     /* Transaction id associated with this packet.
 			     Replies use the same id as was in the request to facilitate pairing. */
-} pof_header;
+};
 
 #endif /* _POF_HEADER_H_ */
