@@ -7,7 +7,7 @@ EXTRA_OBJS = \
 	${TOPDIR}/xswitch/libxswitch.a \
 	${TOPDIR}/io/msgbuf.o
 
-EXTRA_CFLAGS = -shared -O2 -fno-strict-aliasing -Wall -g -I/usr/include/python2.7
+EXTRA_CFLAGS = -shared -O2 -Wall -g -I/usr/include/python2.7
 EXTRA_LDFLAGS =
 
 -include ${TOPDIR}/Makefile.comm
