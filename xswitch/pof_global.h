@@ -92,10 +92,38 @@
 #define POFD_BACKWARD (1)
 
 
+#define POFSwitch_VERSION_1_1_8   (1)
+#define POFSwitch_VERSION_1_1_9   (2)
+#define POFSwitch_VERSION_1_4_0   (3)
+#define POFSwitch_VERSION_1_5_0   (4)
+
+#define POFSwitch_VERSION_1_1_8_STR   "POFSwitch-1.1.8"
+#define POFSwitch_VERSION_1_1_9_STR   "POFSwitch-1.1.9"
+#define POFSwitch_VERSION_1_4_0_STR   "POFSwitch-1.4.0"
+#define POFSwitch_VERSION_1_5_0_STR   "POFSwitch-1.5.0"
+
+#if     ( POFSWITCH_VERSION_NO == POFSwitch_VERSION_1_1_8 )
+#define POFSwitch_VERSION_STR POFSwitch_VERSION_1_1_8_STR
+#define POF_SD2N (1)
+#elif   ( POFSWITCH_VERSION_NO == POFSwitch_VERSION_1_1_9 )
+#define POFSwitch_VERSION_STR POFSwitch_VERSION_1_1_9_STR
 #define POF_SD2N (1)
 #define POF_SD2N_AFTER1015 (1)
-//#define POF_MULTIPLE_SLOTS (1)
-//#define POF_SHT_VXLAN (1)
+#elif   ( POFSWITCH_VERSION_NO == POFSwitch_VERSION_1_4_0 )
+#define POFSwitch_VERSION_STR POFSwitch_VERSION_1_4_0_STR
+#define POF_SD2N (1)
+#define POF_SD2N_AFTER1015 (1)
+#define POF_MULTIPLE_SLOTS (1)
+#elif   ( POFSWITCH_VERSION_NO == POFSwitch_VERSION_1_5_0 )
+#define POFSwitch_VERSION_STR POFSwitch_VERSION_1_5_0_STR
+#define POF_SD2N (1)
+#define POF_SD2N_AFTER1015 (1)
+#define POF_MULTIPLE_SLOTS (1)
+#define POF_SHT_VXLAN (1)
+#else
+#error Please specify POFSwitch_VERSION_NO
+#endif // POFSWITCH_VERSION_NO
+
 
 typedef enum pof_slot_id {
 	POFSID_ALL = 0xFFFF, 

@@ -83,6 +83,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	fprintf(stderr, "POF Version: %s\n", pof_version);
 	init_io_module();
 	xswitch_init();
 

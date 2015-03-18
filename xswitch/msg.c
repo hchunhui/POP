@@ -7,6 +7,8 @@
 #include "pof_global.h"
 #include "io/msgbuf.h"
 
+const char pof_version[] = POFSwitch_VERSION_STR;
+
 /* helper functions */
 static inline uint32_t alloc_xid(void)
 {
@@ -417,6 +419,7 @@ struct msgbuf *msg_flow_table_add(struct flow_table *ft)
 		key_len += ft->fields[i].length;
 	}
 	mft->key_len = htons(u16(key_len));
+	mft->slotID = htons(0);
 	fprintf(stderr, "----key_len: %d, fields_num: %d\n", key_len, ft->fields_num);
 	return msg;
 }
@@ -432,6 +435,7 @@ struct msgbuf *msg_flow_table_del(struct flow_table *ft)
 	mft->command = POFTC_DELETE;
 	mft->tid = u8(ft->tid);
 	mft->type = get_pof_table_type(ft->type);
+	mft->slotID = htons(0);
 	return msg;
 }
 
@@ -455,6 +459,7 @@ struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,
 	mfe->hard_timeout = htons(0);
 	mfe->priority = htons(u16(priority));
 	mfe->index = htonl(index);
+	mfe->slotID = htons(0);
 
 	for(i = 0; i < ft->fields_num; i++) {
 		/* assume pof_match and pof_match_x is compatible */
@@ -490,6 +495,7 @@ struct msgbuf *msg_flow_entry_del(struct flow_table *ft, int index)
 	mfe->table_id = u8(ft->tid);
 	mfe->table_type = get_pof_table_type(ft->type);
 	mfe->index = htonl(index);
+	mfe->slotID = htons(0);
 	return msg;
 }
 
@@ -513,6 +519,7 @@ struct msgbuf *msg_flow_entry_mod(struct flow_table *ft, int index,
 	mfe->hard_timeout = htons(0);
 	mfe->priority = htons(u16(priority));
 	mfe->index = htonl(index);
+	mfe->slotID = htons(0);
 
 	for(i = 0; i < ft->fields_num; i++) {
 		/* assume pof_match and pof_match_x is compatible */
@@ -549,6 +556,9 @@ struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, stru
 		     &msg);
 	mpo = GET_BODY(msg);
 	mpo->buffer_id = htonl(0xffffffff);
+#ifdef POF_MULTIPLE_SLOTS
+	mpo->slotID = htons(0);
+#endif
 	mpo->in_port = htons(u16(in_port));
 	mpo->actions_len = htons(num_actions * sizeof(struct pof_action));
 	fill_actions(mpo->actions, num_actions, a);
