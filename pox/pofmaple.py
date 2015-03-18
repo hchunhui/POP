@@ -1,5 +1,5 @@
 from pox.core import core
-from pox.openflow import libopenflow_01
+import pox.openflow.libopenflow_01 as of
 from pox.lib.recoco import Timer
 import pofmaple_pox
 
@@ -17,7 +17,7 @@ class handler (object):
   def _handle_PortStatus(self, event):
     desc = event.ofp.desc
     if desc.openflowEnable != 0:
-      mask = libopenflow_01.ofp_port_state_rev_map['OFPPS_LINK_DOWN']
+      mask = of.ofp_port_state_rev_map['OFPPS_LINK_DOWN']
       pofmaple_pox.port_status(self.sw, desc.portId, desc.state & mask)
 
   def _handle_ConnectionDown (self, event):
@@ -30,8 +30,12 @@ class pofmaple_handler (object):
     self.timer = Timer(5, pofmaple_pox.timeout, recurring = True)
 
   def _handle_ConnectionUp (self, event):
+    ports_list = core.PofManager.get_all_ports(event.dpid)
+    for port in ports_list:
+      phy_port = port.desc
+      if phy_port.openflowEnable == 0:
+        core.PofManager.set_port_pof_enable(event.dpid, phy_port.portId)
     handler(event.connection)
-
 
 def launch ():
   core.registerNew(pofmaple_handler)

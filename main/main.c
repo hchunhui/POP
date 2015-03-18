@@ -13,6 +13,7 @@
 #include "io/io.h"
 #include "io/sw.h"
 
+extern const char *msg_get_pof_version(void);
 extern void xswitch_init(void);
 extern struct xswitch *xswitch_on_accept(void *conn);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
@@ -83,7 +84,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	fprintf(stderr, "POF Version: %s\n", pof_version);
+	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
 	init_io_module();
 	xswitch_init();
 

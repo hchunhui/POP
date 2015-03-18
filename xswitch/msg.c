@@ -7,7 +7,10 @@
 #include "pof_global.h"
 #include "io/msgbuf.h"
 
-const char pof_version[] = POFSwitch_VERSION_STR;
+const char *msg_get_pof_version(void)
+{
+	return POFSwitch_VERSION_STR;
+}
 
 /* helper functions */
 static inline uint32_t alloc_xid(void)

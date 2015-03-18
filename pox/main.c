@@ -12,6 +12,7 @@
 
 #define __unused __attribute__((unused))
 
+extern const char *msg_get_pof_version(void);
 extern void xswitch_init(void);
 extern void xswitch_on_timeout(void);
 
@@ -139,6 +140,7 @@ initpofmaple_pox(void)
 	Py_InitModule("pofmaple_pox", methods);
 	mb_h = NULL;
 	in_xmit = false;
+	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
 	xswitch_init();
 	xmit();
 }
