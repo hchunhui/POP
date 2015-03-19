@@ -594,6 +594,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 	struct pof_packet_in *pi;
 	struct msgbuf *rmsg;
 	int i;
+	int port_id;
 	oh = GET_HEAD(msg);
 	switch(oh->type) {
 	case POFT_ECHO_REQUEST:
@@ -642,12 +643,17 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		break;
 	case POFT_PORT_STATUS:
 		ps = GET_BODY(msg);
+#ifdef POF_MULTIPLE_SLOTS
+		port_id = ntohs(ps->desc.port_id);
+#else
+		port_id = ntohl(ps->desc.port_id);
+#endif
 		fprintf(stderr, "recive port status:\n"
 			" reason: %d\n"
 			" port_id: 0x%x, name: %s\n"
 			" of_enable: %s\n"
 			" state: 0x%x\n",
-			ps->reason, ntohl(ps->desc.port_id), ps->desc.name,
+			ps->reason, port_id, ps->desc.name,
 			ps->desc.of_enable?"TRUE":"FALSE",
 			ntohl(ps->desc.state));
 		/* All ports are not Openflow(POF) enabled by default, enable it. */
@@ -667,9 +673,9 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 				xswitch_up(sw);
 		} else {
 			if (ntohl(ps->desc.state) & POFPS_LINK_DOWN)
-				xswitch_port_status(sw, ntohl(ps->desc.port_id), PORT_DOWN);
+				xswitch_port_status(sw, port_id, PORT_DOWN);
 			else
-				xswitch_port_status(sw, ntohl(ps->desc.port_id), PORT_UP);
+				xswitch_port_status(sw, port_id, PORT_UP);
 		}
 		break;
 	default:
