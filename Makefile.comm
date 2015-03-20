@@ -1,4 +1,5 @@
 CC = cc
+LD = cc
 AR = ar
 CFLAGS = -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
 LDFLAGS = ${EXTRA_LDFLAGS}
@@ -8,11 +9,13 @@ OBJS = ${SRCS:.c=.o}
 
 all: ${LIB} ${PROG}
 
-${LIB}: .depends ${OBJS}
+${LIB}: .depends ${OBJS} ${EXTRA_OBJS}
 	${AR} rcs ${LIB} ${OBJS} ${EXTRA_OBJS}
 
-${PROG}: .depends ${OBJS}
-	${CC} -Wl,--start-group ${OBJS} ${EXTRA_OBJS} -Wl,--end-group -o ${PROG} ${CFLAGS} ${LDFLAGS}
+${PROG}: .depends ${OBJS} ${EXTRA_OBJS}
+	${LD} -Wl,--start-group ${OBJS} ${EXTRA_OBJS} -Wl,--end-group -o ${PROG} ${CFLAGS} ${LDFLAGS}
+
+.SUFFIXES: .c .o
 
 .c.o:
 	${CC} ${CFLAGS} -c $< -o $@
