@@ -31,7 +31,7 @@ void topo_print(void)
 		num_switches, num_hosts);
 }
 
-static bool host_p(void *phost, const char *name, void *arg)
+static bool host_p(void *phost, const char *name, const void *arg)
 {
 	if(strcmp(name, "topo_hosts") == 0 &&
 	   hosts == arg)
@@ -52,7 +52,7 @@ static bool host_p(void *phost, const char *name, void *arg)
 	return false;
 }
 
-static bool switch_p(void *pswitch, const char *name, void *arg)
+static bool switch_p(void *pswitch, const char *name, const void *arg)
 {
 	if(strcmp(name, "topo_switches") == 0 &&
 	   switches == arg)

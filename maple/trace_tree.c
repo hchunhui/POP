@@ -53,7 +53,7 @@ struct trace_tree_D
 {
 	struct trace_tree h;
 	char name[32];
-	void *arg;
+	const void *arg;
 	struct trace_tree *t;
 };
 
@@ -116,7 +116,7 @@ static struct trace_tree *trace_tree_T(const char *name,
 }
 
 static struct trace_tree *trace_tree_D(const char *name,
-				       void *arg,
+				       const void *arg,
 				       struct trace_tree *tt)
 {
 	struct trace_tree_D *t = malloc(sizeof *t);
@@ -450,7 +450,7 @@ static void revoke_rule(struct xswitch *sw, struct flow_table *ft, struct trace_
 }
 
 bool trace_tree_invalidate(struct trace_tree **tree, struct xswitch *sw, struct flow_table *ft,
-			   bool (*p)(void *p_data, const char *name, void *arg), void *p_data)
+			   bool (*p)(void *p_data, const char *name, const void *arg), void *p_data)
 {
 	int i;
 	bool b, b1;

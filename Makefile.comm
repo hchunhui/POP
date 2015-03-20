@@ -1,7 +1,7 @@
 CC = cc
 LD = cc
 AR = ar
-CFLAGS = -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
+CFLAGS = -Werror=cast-qual -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
 LDFLAGS = ${EXTRA_LDFLAGS}
 OBJS = ${SRCS:.c=.o}
 

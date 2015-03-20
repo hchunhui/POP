@@ -20,7 +20,7 @@ struct entity
 	struct entity_adj adjs[MAX_PORT_NUM];
 };
 
-static bool host_p(void *phost, const char *name, void *arg)
+static bool host_p(void *phost, const char *name, const void *arg)
 {
 	if(strcmp(name, "topo_host") == 0 &&
 	   (arg == phost || arg == NULL))
@@ -29,7 +29,7 @@ static bool host_p(void *phost, const char *name, void *arg)
 }
 
 
-static bool entity_adjs_p(void *adjs, const char *name, void *arg)
+static bool entity_adjs_p(void *adjs, const char *name, const void *arg)
 {
 	if(strncmp(name, "entity_adjs", 11) == 0 &&
 	   arg == adjs)
@@ -129,7 +129,7 @@ void entity_set_paddr(struct entity *e, uint32_t paddr)
 {
 	assert(e->type == ENTITY_TYPE_HOST);
 	e->u.addr.paddr = paddr;
-	maple_invalidate(host_p, (void *)e);
+	maple_invalidate(host_p, e);
 }
 
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)

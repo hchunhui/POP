@@ -93,35 +93,35 @@ void invalidate(const char *name)
 struct entity **get_hosts(int *pnum)
 {
 	struct entity **hosts = topo_get_hosts(pnum);
-	trace_RE("topo_hosts", (void *)hosts);
+	trace_RE("topo_hosts", hosts);
 	return hosts;
 }
 
 struct entity **get_switches(int *pnum)
 {
 	struct entity **switches = topo_get_switches(pnum);
-	trace_RE("topo_switches", (void *)switches);
+	trace_RE("topo_switches", switches);
 	return switches;
 }
 
 struct entity *get_switch(dpid_t dpid)
 {
 	struct entity *esw = topo_get_switch(dpid);
-	trace_RE("topo_switch", (void *)esw);
+	trace_RE("topo_switch", esw);
 	return esw;
 }
 
 struct entity *get_host_by_haddr(haddr_t addr)
 {
 	struct entity *eh = topo_get_host_by_haddr(addr);
-	trace_RE("topo_host", (void *)eh);
+	trace_RE("topo_host", eh);
 	return eh;
 }
 
 struct entity *get_host_by_paddr(uint32_t addr)
 {
 	struct entity *eh = topo_get_host_by_paddr(addr);
-	trace_RE("topo_host", (void *)eh);
+	trace_RE("topo_host", eh);
 	return eh;
 }
 
@@ -140,7 +140,7 @@ const struct entity_adj *get_entity_adjs(struct entity *e, int *pnum)
 	const struct entity_adj *adjs = entity_get_adjs(e, pnum);
 	char buf[32];
 	snprintf(buf, 32, "entity_adjs%d", *pnum);
-	trace_RE(buf, (void *)adjs);
+	trace_RE(buf, adjs);
 	return adjs;
 }
 
@@ -160,7 +160,7 @@ void print_entity(struct entity *e)
 }
 
 /* XXX */
-void maple_invalidate(bool (*p)(void *p_data, const char *name, void *arg), void *p_data)
+void maple_invalidate(bool (*p)(void *p_data, const char *name, const void *arg), void *p_data)
 {
 	int num_switches;
 	struct entity **switches = topo_get_switches(&num_switches);
@@ -202,7 +202,7 @@ static void mod_in_port(struct trace *trace, int in_port)
 	trace->events[i].u.r.value = value_from_8(in_port);
 }
 
-static bool cmpname_p(void *pname, const char *name, void *arg __attribute__((unused)))
+static bool cmpname_p(void *pname, const char *name, const void *arg __attribute__((unused)))
 {
 	if(strcmp(pname, name) == 0)
 		return true;
@@ -344,9 +344,9 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 
 	/* invalidate */
 	for(i = 0; i < trace->num_inv_events; i++) {
-		const char *name;
+		char *name;
 		name = trace->inv_events[i].name;
 		fprintf(stderr, "invalidate \"%s\":\n", name);
-		maple_invalidate(cmpname_p, (void *)name);
+		maple_invalidate(cmpname_p, name);
 	}
 }

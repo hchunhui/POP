@@ -24,7 +24,7 @@ void trace_T(const char *name, value_t value, bool result)
 	trace.num_events++;
 }
 
-void trace_RE(const char *name, void *arg)
+void trace_RE(const char *name, const void *arg)
 {
 	int i = trace.num_events;
 	trace.events[i].type = EV_RE;
