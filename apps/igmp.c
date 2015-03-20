@@ -107,32 +107,6 @@
 #include <assert.h>
 #include <string.h>
 
-/*debug log file*/
-#define LOG_FILE_NAME "/tmp/log_igmp_gehu.txt"
-#include <time.h>
-FILE *log_file;
-time_t timep;
-int no;
-bool is_log_file_init = false;
-void init_log(){
-	if ( (log_file = fopen(LOG_FILE_NAME, "a+")) == NULL){
-		perror("init error: open log_file error!\n");
-		exit(0);
-	}
-	is_log_file_init = true;
-}
-void write_log(char *log_info){
-	if(is_log_file_init == false)
-		init_log();
-	time(&timep);
-	fprintf(log_file, "\nNO:%d  Time:%s", ++no, ctime(&timep));
-	fprintf(log_file, "%s\n", log_info);
-	fflush(log_file);
-}
-char log_buf[1024]; //一条log记录最长的长度
-int log_buf_len = 0; //一条记录中已经有的字符数。
-/*end debug log file */
-
 /**************** Group Table ************************************************/
 /*组表结构：先对groupid进行一次hash，然后hash冲突的用链表散列，
  *		用双向链表存储组表项，每个组表项里面有一个指向成员链表的指针，链表中存储所有组内成员。
@@ -366,17 +340,11 @@ uint16_t checksum(const uint8_t *buff, int len){
 
 void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 {
-	int i;
 	if( checksum(buffer, len) != 0)
 		return;
 	if(len == IGMP_HEADER_LEN){ 	//igmp v1, v2`
 		struct igmphdr *igmp = (struct igmphdr *)buffer;
 		uint32_t groupid = igmp->groupid;
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:igmp v2, groupid=0x%x, src_ip=%x", __FILE__, __LINE__, groupid, src_ip);
-	write_log(log_buf);
-/*write to log end*/
 		switch( igmp->type ){
 			case QUERY_REPORT:
 				/*controller cannot receive query report packet*/
@@ -384,130 +352,15 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 			case V1_MEMBERSHIP_REPORT:
 				/*same as V2_MEMBERSHIP_REPORT...*/
 			case V2_MEMBERSHIP_REPORT:
-/*write to log */
-	lookup_origin_addr(groupid, src_ip);
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:lookup_origin_addr(groupid, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 				if( lookup_origin_addr(groupid, src_ip) == false){	//如果不存在，则加入
 					insert_gtb(groupid, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(groupid, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 					invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 				}
 				break;
 			case V2_LEAVE_GROUP:
-/*write to log*/
-	lookup_origin_addr(groupid, src_ip);
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:lookup_origin_addr(groupid, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 				if(lookup_origin_addr(groupid, src_ip) == true){ //如果存在则，删除
 					delete_origin_address(groupid, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:lookup_origin_addr(groupid, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 					invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 				}
 				break;
 			default:
@@ -516,12 +369,6 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 		}
 	}else if(len >= IGMP_V3_REPORT_HEADER_LEN){ //igmp v3
 		struct igmpv3_report *igmpv3_pkt = (struct igmpv3_report *)buffer;
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:igmp v3 packet:type = %u, numbers of records = %u ", __FILE__, __LINE__,
-			igmpv3_pkt->type, ntohs(igmpv3_pkt->ngrecord));
-	write_log(log_buf);
-/*write to log end*/
 		/*only deal with membership report*/
 		if(igmpv3_pkt->type != V3_MEMBERSHIP_REPORT)
 			return;
@@ -537,161 +384,30 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 			grecord += sizeof(uint16_t);
 			uint32_t grec_mcaddr = ntohl(*((uint32_t *)grecord));
 			grecord += sizeof(uint32_t);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:igmp v3 packet records[%d]:groupid=%x type=%x, nums=%u", __FILE__, __LINE__,
-			i, grec_mcaddr, grec_type, grec_nsrc);
-	write_log(log_buf);
-/*write to log end*/
+
 			switch( grec_type ){
 				case V3_MODE_IS_INCLUDE: 	//接收来自源，如果源为空则， 为退出报告，否则加入组
 					if( grec_nsrc == 0){ //INCLUDE{}, 表示退出报告
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == true){
 							delete_origin_address(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:delete_origin_address(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 							invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-		write_log(log_buf);
-/*write to log end*/
-					}
+						}
 					}else{ //不为0，表示对源进行控制，现在不对源进行控制，只进行插入
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == false)
 							insert_gtb(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
-
 						invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 					}
 					break;
 				case V3_MODE_IS_EXCLUDE:
 					if( grec_nsrc == 0){ //EXCLUDE{}, 表示组加入报告
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
 							insert_gtb(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 							invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 						}
 					}else{ //不为0，表示对源进行控制，现在不对源进行控制，只进行插入
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
 							insert_gtb(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 							invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 						}
 					}
 					break;
@@ -699,110 +415,20 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 					if( grec_nsrc == 0){
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == true){
 							delete_origin_address(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:delete_origin_address(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\ngrouptable as following, has %d groups:", group_num);
-
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 							invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
+
 						}
 					}else{
 						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
 							insert_gtb(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(grec_mcaddr, src_ip);", __FILE__, __LINE__);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "grouptable as following, has %d groups:", group_num);
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", debug_poad->address);
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
-						invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
+							invalidate(RECORD_NAME); //修改组表
 						}
 					}
 					break;
 				case V3_CHANGE_TO_EXCLUDE: //暂时当做插入处理
 					if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
 						insert_gtb(grec_mcaddr, src_ip);
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:insert_gtb(multiaddr:0x%x, src_ip:0x%x);", __FILE__, __LINE__, grec_mcaddr, src_ip);
-
-	//遍历组表，输出所有的组内容
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\ngrouptable as following, has %d groups:", group_num);
-
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		if(grouptable[i] == NULL)
-			continue;
-		struct GroupTable *debug_pgtb = grouptable[i];
-		while(debug_pgtb != NULL){
-			log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nGroupid:0x%x numbers of members:%u",
-					debug_pgtb->groupid, debug_pgtb->origin_len);
-			struct OriginAddr *debug_poad = debug_pgtb->origin_addrs;
-			while(debug_poad != NULL){
-				log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "\nsrc_ip:0x%x", (debug_poad->address));
-				debug_poad = debug_poad->next;
-			}
-
-			debug_pgtb = debug_pgtb->next;
-		}
-	}
-	write_log(log_buf);
-/*write to log end*/
 						invalidate(RECORD_NAME); //修改组表
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:invalidate(RECORD_NAME);", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 					}
 					break;
 				case V3_ALLOW_NEW_SOURCE: //不处理
@@ -814,11 +440,6 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 					break;
 			}
 			grecord += sizeof(uint32_t) * grec_nsrc + grec_auxdlen; //step to next record
-/*write to log*/
-	log_buf_len = 0;
-	log_buf_len += snprintf(log_buf+log_buf_len, 1024-log_buf_len, "%s:%d:next record", __FILE__, __LINE__);
-	write_log(log_buf);
-/*write to log end*/
 		}
 	}else{
 		/*error, drop */
