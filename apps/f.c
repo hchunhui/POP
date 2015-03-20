@@ -131,6 +131,12 @@ static struct route *handle_ipv4(struct packet *pkt)
 	}
 }
 
+
+void init_f(void)
+{
+	fprintf(stderr, "f init\n");
+}
+
 struct route *f(struct packet *pkt)
 {
 	/* inspect L2 header */

@@ -19,6 +19,7 @@ static struct header *header_spec;
 
 /* f */
 struct route *f(struct packet *pk);
+void *init_f(void);
 
 /* API for f */
 struct packet {
@@ -178,6 +179,7 @@ void maple_init(void)
 	fprintf(stderr, "loading header spec...\n");
 	header_spec = spec_parser_file("scripts/header.spec");
 	assert(header_spec);
+	init_f();
 }
 
 void maple_switch_up(struct xswitch *sw)
