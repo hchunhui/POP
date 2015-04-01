@@ -7,8 +7,9 @@
 
 #include "igmp.h"
 #include "spanning_tree.h"
+#include "map.h"
 
-static struct route *handle_sdnp(struct packet *pkt)
+static struct route *handle_sdnp(struct packet *pkt, struct map *env)
 {
 	int switches_num;
 	struct entity **switches = get_switches(&switches_num);
@@ -33,7 +34,7 @@ static struct route *handle_sdnp(struct packet *pkt)
 	return r;
 }
 
-static struct route *handle_ipv4_unicast(uint32_t hsrc_ip, uint32_t hdst_ip)
+static struct route *handle_ipv4_unicast(uint32_t hsrc_ip, uint32_t hdst_ip, struct map *env)
 {
 	int switches_num;
 	struct entity **switches = get_switches(&switches_num);
@@ -58,7 +59,7 @@ static struct route *handle_ipv4_unicast(uint32_t hsrc_ip, uint32_t hdst_ip)
 	return r;
 }
 
-static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip)
+static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip, struct map *env)
 {
 	int i;
 	int switches_num;
@@ -69,10 +70,7 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip)
 	int src_port, dst_port;
 	struct nodeinfo *visited;
 
-	uint32_t groupid = hdst_ip;
-	int ngroup_member = get_origin_len(groupid);
-	uint32_t *buffer = malloc(sizeof(uint32_t) * ngroup_member);
-	get_group_maddrs(groupid, buffer, ngroup_member);
+	struct igmp_addrs *l = igmp_get_maddrs(map_read(env, PTR("group_table")).p, hdst_ip);
 	r = route();
 
 	hsrc = get_host_by_paddr(hsrc_ip);
@@ -83,8 +81,9 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip)
 	src = get_host_adj_switch(hsrc, &src_port);
 
 	visited = get_tree(src, src_port, NULL, switches, switches_num);
-	for(i = 0; i < ngroup_member; i++) {
-		hdst = get_host_by_paddr(buffer[i]);
+	fprintf(stderr, "group_id: %08x, group_n: %d\n", hdst_ip, l->n);
+	for(i = 0; i < l->n; i++) {
+		hdst = get_host_by_paddr(l->addrs[i]);
 		if(hdst == NULL) {
 			fprintf(stderr, "ipv4_multicast: bad dst address.\n");
 			continue;
@@ -95,17 +94,16 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip)
 		route_union(r, rx);
 		route_free(rx);
 	}
-	free(buffer);
 	free(visited);
 	return r;
 }
 
-static struct route *handle_igmp(struct packet *pkt)
+static struct route *handle_igmp(struct packet *pkt, struct map *env)
 {
 	int len;
 	uint32_t hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
 	const uint8_t *payload = read_payload(pkt, &len);
-	process_igmp(hsrc_ip, payload, len);
+	process_igmp(map_read(env, PTR("group_table")).p, hsrc_ip, payload, len);
 	return route();
 }
 
@@ -116,39 +114,103 @@ static bool is_multicast_ip(uint32_t ip)
 	return false;
 }
 
-static struct route *handle_ipv4(struct packet *pkt)
+static struct route *handle_ipv4(struct packet *pkt, struct map *env)
 {
 	if(test_equal(pkt, "nw_proto", value_from_8(0x02))) {
-		return handle_igmp(pkt);
+		return handle_igmp(pkt, env);
 	} else {
 		uint32_t hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
 		uint32_t hdst_ip = value_to_32(read_packet(pkt, "nw_dst"));
 		if(is_multicast_ip(hdst_ip)) {
-			return handle_ipv4_multicast(hsrc_ip, hdst_ip);
+			return handle_ipv4_multicast(hsrc_ip, hdst_ip, env);
 		} else {
-			return handle_ipv4_unicast(hsrc_ip, hdst_ip);
+			return handle_ipv4_unicast(hsrc_ip, hdst_ip, env);
 		}
 	}
 }
 
-
-void init_f(void)
+#if 1
+void init_f(struct map *env)
 {
 	fprintf(stderr, "f init\n");
+	map_add_key(env, PTR("group_table"), PTR(igmp_init()),
+		    mapf_eq_map, mapf_free_map);
 }
 
-struct route *f(struct packet *pkt)
+struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port)
 {
 	/* inspect L2 header */
 	pull_header(pkt);
 
 	/* call handler */
 	if (strcmp(read_header_type(pkt), "sdnp") == 0) {
-		return handle_sdnp(pkt);
+		return handle_sdnp(pkt, env);
 	} else if(strcmp(read_header_type(pkt), "ipv4") == 0) {
-		return handle_ipv4(pkt);
+		return handle_ipv4(pkt, env);
 	} else {
 		fprintf(stderr, "unknown protocol: %s.\n", read_header_type(pkt));
 		return route();
 	}
 }
+
+#else
+void init_f(struct map *env)
+{
+	fprintf(stderr, "f init\n");
+	map_add_key(env, PTR("table"),
+		    PTR(map(mapf_eq_int, mapf_hash_int,
+			    mapf_dup_int, mapf_free_int)),
+		    mapf_eq_map, mapf_free_map);
+}
+
+static struct route *forward(struct entity *esw, int in_port, int out_port)
+{
+	struct route *r = route();
+	route_add_edge(r, edge(NULL, 0, esw, in_port));
+	route_add_edge(r, edge(esw, out_port, NULL, 0));
+	return r;
+}
+
+static struct route *flood(struct entity *esw, int in_port)
+{
+	int i;
+	struct route *r = route();
+	route_add_edge(r, edge(NULL, 0, esw, in_port));
+	for(i = 1; i <= 4; i++) {
+		if(i == in_port)
+			continue;
+		route_add_edge(r, edge(esw, i, NULL, 0));
+	}
+	return r;
+}
+
+struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port)
+{
+	int id = get_switch_dpid(me);
+	uint64_t dst = value_to_48(read_packet(pkt, "dl_dst"));
+	uint64_t src = value_to_48(read_packet(pkt, "dl_src"));
+	int out_port;
+	struct map *table, *ftable;
+
+	table = map_read(env, PTR("table")).p;
+	assert(table);
+
+	ftable = map_read(table, INT(id)).p;
+	if(ftable == NULL) {
+		ftable = map(mapf_eq_int, mapf_hash_int,
+			     mapf_dup_int, mapf_free_int);
+		map_add_key(table, INT(id), PTR(ftable),
+			    mapf_eq_map, mapf_free_map);
+	}
+
+	map_mod2(ftable, INT(src), INT(in_port), mapf_eq_int, mapf_free_int);
+
+	out_port = map_read(ftable, INT(dst)).v;
+
+	if(out_port != 0)
+		return forward(me, in_port, out_port);
+	else
+		return flood(me, in_port);
+}
+
+#endif

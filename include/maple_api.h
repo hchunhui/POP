@@ -12,8 +12,8 @@ const uint8_t *read_payload(struct packet *pkt, int *length);
 void mod_packet(struct packet *pkt, const char *field, value_t value);
 void push_header(struct packet *pkt);
 
-void record(const char *name);
-void invalidate(const char *name);
+void add_header(struct packet *pkt, const char *proto);
+void remove_header(struct packet *pkt);
 
 struct entity;
 struct entity **get_hosts(int *pnum);

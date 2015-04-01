@@ -34,11 +34,12 @@ void trace_RE(const char *name, const void *arg)
 	trace.num_events++;
 }
 
-void trace_IE(const char *name)
+void trace_IE(const char *name, const void *arg)
 {
 	int i = trace.num_inv_events;
 	strncpy(trace.inv_events[i].name, name, 32);
 	trace.inv_events[i].name[31] = 0;
+	trace.inv_events[i].arg = arg;
 	trace.num_inv_events++;
 }
 

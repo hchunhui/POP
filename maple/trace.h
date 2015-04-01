@@ -56,6 +56,7 @@ struct trace
 	int num_inv_events;
 	struct {
 		char name[32];
+		const void *arg;
 	} inv_events[1024];
 	int num_mod_events;
 	struct mod_event mod_events[1024];
@@ -64,7 +65,7 @@ struct trace
 void trace_R(const char *name, value_t value);
 void trace_T(const char *name, value_t value, bool result);
 void trace_RE(const char *name, const void *arg);
-void trace_IE(const char *name);
+void trace_IE(const char *name, const void *arg);
 void trace_G(struct header *old_spec, struct header *new_spec, int stack_base);
 void trace_P(struct header *new_spec, int stack_base);
 void trace_M(const char *name, value_t value, struct header *spec);

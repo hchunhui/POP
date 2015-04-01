@@ -106,217 +106,105 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include "map.h"
 
-/**************** Group Table ************************************************/
-/*组表结构：先对groupid进行一次hash，然后hash冲突的用链表散列，
- *		用双向链表存储组表项，每个组表项里面有一个指向成员链表的指针，链表中存储所有组内成员。
- */
-#define HASH_TABLE_SIZE 256
-#define Hash_key(key) ((key) % HASH_TABLE_SIZE)
-
-/*origin address*/
-struct OriginAddr{
-	struct OriginAddr *next;
-	uint32_t address; //src ip
-};
-/*group table*/
-struct GroupTable{
-	uint32_t groupid;                 // The group to route
-	struct OriginAddr *origin_addrs;  // The origin adresses
-	uint32_t origin_len;              // origin array numbers
-
-	struct GroupTable *next, *prev;   // Pointer to the next and prev group in line.
-    /*
-     *跟定时器有关的，可以再加。
-     */
-};
-static struct GroupTable *grouptable[HASH_TABLE_SIZE] = {NULL}; //grouptable
-static uint32_t group_num = 0; 		//组表元素个数
-
-/*return the pointer to the gourpid entry if in the table, or return NULL*/
-static struct GroupTable *_get_group_entry(uint32_t groupid){
-	struct GroupTable *ptb = grouptable[Hash_key(groupid)];
-	while(ptb != NULL){
-		if(ptb->groupid == groupid)
-			return ptb;
-		ptb = ptb->next;
-	}
-
-	return NULL;
+/*** group table ***/
+static bool mgt_eq(int_or_ptr_t k1, int_or_ptr_t k2)
+{
+	return k1.v == k2.v;
 }
-/*delete origin address from the group table entry*/
-static void _delete_origin_address(struct GroupTable *ptb, uint32_t origin_addr){
-	if(ptb == NULL)
-		return;
-	/*entry not empty*/
-	struct OriginAddr *cur = ptb->origin_addrs;
-	if(cur->address == origin_addr){  //first one
-		ptb->origin_addrs = cur->next;
-		ptb->origin_len --;
-		free(cur);
-	}else{
-		struct OriginAddr *last = cur;
-		cur = cur->next;
-		while(cur != NULL && cur->address != origin_addr){
-			last = cur;
-			cur = cur->next;
-		}
-		if(cur == NULL) //not found origin address
-			return;
-		if(cur->address == origin_addr){
-			last->next = cur->next;
-			ptb->origin_len --;
-			free(cur);
-		}
-	}
-}
-/*delete group table entry, ptb points to groupid table entry, i means pth in the hashtable[i]*/
-static void _delete_gtb(struct GroupTable *ptb, int i){
-	if( ptb == NULL) //groupid not in the table
-		return;
-	/*free origin address*/
-	struct OriginAddr *tmp = ptb->origin_addrs;
-	while(tmp != NULL){
-		ptb->origin_addrs = tmp->next;
-		free(tmp);
-		tmp = ptb->origin_addrs;
-	}
-	/*free groupid*/
-	if(ptb->next != NULL)
-		ptb->next->prev = ptb->prev;
-	if(ptb->prev != NULL){
-		ptb->prev->next = ptb->next;
-	}else{	//ptb->prev == NULL
-		grouptable[i] = ptb->next;
-	}
 
-	free(ptb);
-	if(grouptable[i] == NULL)
-		group_num --;
+static unsigned int mgt_hash(int_or_ptr_t key)
+{
+	return key.v;
 }
-/*return groups in grouptable*/
-uint32_t get_gtb_num(){
-	return group_num;
+
+static int_or_ptr_t mgt_dup_key(int_or_ptr_t key)
+{
+	return key;
 }
-/*if groupid in grouptable return true, or return false*/
-bool lookup_groupid(uint32_t groupid){
-	return _get_group_entry(groupid) == NULL ? false : true;
+
+static void mgt_free_key(int_or_ptr_t key)
+{
+
 }
-/*if groupid and origin address src_ip in the grouptable return true, or return false*/
-bool lookup_origin_addr(uint32_t groupid, uint32_t origin_addr){
-	struct GroupTable *ptb = _get_group_entry(groupid);
 
-	while(ptb != NULL){
-		if(ptb->groupid == groupid){
-			struct OriginAddr *poa = ptb->origin_addrs;
-			while(poa != NULL){
-				if(poa->address == origin_addr)
-					return true;
-
-				poa = poa->next;
-			}
-			return false;
-		}//end if
-		ptb = ptb->next;
-	}//end while
-
+static bool mgt_eq_val(int_or_ptr_t k1, int_or_ptr_t k2)
+{
 	return false;
 }
-/*return the number of originadds in the groupid, return 0 if groupid not in the table*/
-uint32_t get_origin_len(uint32_t groupid){
-	uint32_t ret = 0;
-	struct GroupTable *ptb = _get_group_entry(groupid);
-	record(RECORD_NAME);
-	while(ptb != NULL){
-		if(ptb->groupid == groupid){
-			return ptb->origin_len;
-		}
-		ptb = ptb->next;
+
+static void mgt_free_val(int_or_ptr_t val)
+{
+
+}
+
+struct map *igmp_init(void)
+{
+	return map(mgt_eq, mgt_hash, mgt_dup_key, mgt_free_key);
+}
+
+struct igmp_addrs *igmp_get_maddrs(struct map *group_table, uint32_t groupid)
+{
+	struct igmp_addrs *l;
+
+	l = map_read(group_table, INT(groupid)).p;
+	if(l == NULL) {
+		l = malloc(sizeof(struct igmp_addrs));
+		l->addrs = NULL;
+		l->n = 0;
+		map_add_key(group_table, INT(groupid), PTR(l), mgt_eq_val, mgt_free_val);
 	}
-
-	return ret;
+	return l;
 }
-/* return all origin addresses in a groupid in buffer, function return numbers of origin adress.
- * nums means buffer's num, sizeof(buffer) = 4 * nums (Bytes)， return members' number
- */
-uint32_t get_group_maddrs(uint32_t groupid, uint32_t *buffer, uint32_t nums){
-	struct GroupTable *ptb = _get_group_entry(groupid);
-	uint32_t ret = 0; //the num of origin_addr write in buffer
-	record(RECORD_NAME);
-	while(ptb != NULL){
-		if(ptb->groupid == groupid){
-			ret = ptb->origin_len;
-			struct OriginAddr *poa = ptb->origin_addrs; //pointer to origin address
-			assert(ret <= nums);
-			int i = 0;
-			while(poa != NULL){
-				buffer[i++] = poa->address;
-				poa = poa->next;
-			}
 
-			return ret;
-		}
-		ptb = ptb->next;
-	}
-
-	return ret;
-}
-/*insert a table entry with{groupid, origin address}*/
-void insert_gtb(uint32_t groupid, uint32_t origin_addr){
-	struct GroupTable *ptb = _get_group_entry(groupid);
-
-	if(ptb == NULL){ //not exist, malloc and insert from head
-		/*group table entry*/
-		struct GroupTable *entry = (struct GroupTable *) malloc(sizeof(struct GroupTable));
-		struct GroupTable *tmp = grouptable[Hash_key(groupid)];
-		entry->groupid = groupid;
-		entry->next = tmp; //head insert
-		entry->prev = NULL;
-		if(tmp != NULL)
-			tmp->prev = entry;
-		entry->origin_len = 1;
-		/*origin address entry*/
-		struct OriginAddr *poa = (struct OriginAddr *)malloc(sizeof(struct OriginAddr));
-		poa->address = origin_addr;
-		poa->next = NULL;
-		entry->origin_addrs = poa;
-		//grouptable
-		grouptable[Hash_key(groupid)] = entry;
-		group_num ++;
-	}else{	//groupid in the table, address insert from head
-		struct OriginAddr *poa = (struct OriginAddr *)malloc(sizeof(struct OriginAddr));
-		poa->address = origin_addr;
-		poa->next = ptb->origin_addrs;
-		ptb->origin_addrs = poa;
-
-		ptb->origin_len++;
-	}
-}
-/*delete a table entry with groupid*/
-void delete_gtb(uint32_t groupid){
-	struct GroupTable *ptb = _get_group_entry(groupid);
-	_delete_gtb(ptb, Hash_key(groupid));
-}
-/*delete an origin address in an table entry*/
-void delete_origin_address(uint32_t groupid, uint32_t origin_addr){
-	struct GroupTable *ptb = _get_group_entry(groupid);
-	_delete_origin_address(ptb, origin_addr);
-	if(ptb->origin_addrs == NULL){ 	//group emtpy, should be deleted
-		_delete_gtb(ptb, Hash_key(groupid));
-	}
-}
-/*delete all the origin address from every group*/
-void clean_origin_address(uint32_t origin_addr){
+static bool addrs_in(struct igmp_addrs *l, uint32_t ip)
+{
 	int i;
-	for(i = 0; i < HASH_TABLE_SIZE; i++){
-		struct GroupTable *ptb = grouptable[i];
-		while(ptb != NULL){
-			_delete_origin_address(ptb, origin_addr);
-			ptb = ptb->next;
-		}
-	}
+	for(i = 0; i < l->n; i++)
+		if(l->addrs[i] == ip)
+			return true;
+	return false;
 }
-/********* Group Table End ***************************************/
+
+static void addrs_add(struct igmp_addrs *l, uint32_t ip)
+{
+	if(addrs_in(l, ip))
+		return;
+
+	l->addrs = realloc(l->addrs, l->n + 1);
+	l->addrs[l->n] = ip;
+	l->n++;
+}
+
+static void addrs_del(struct igmp_addrs *l, uint32_t ip)
+{
+	int i;
+	for(i = 0; i < l->n; i++)
+		if(l->addrs[i] == ip) {
+			int j;
+			l->n--;
+			for(j = i; j < l->n; j++)
+				l->addrs[j] = l->addrs[j+1];
+			return;
+		}
+}
+
+static void enter_group(struct map *gt, uint32_t groupid, uint32_t ip)
+{
+	struct igmp_addrs *l;
+	l = igmp_get_maddrs(gt, groupid);
+	addrs_add(l, ip);
+	map_mod(gt, INT(groupid), PTR(l));
+}
+
+static void exit_group(struct map *gt, uint32_t groupid, uint32_t ip)
+{
+	struct igmp_addrs *l;
+	l = igmp_get_maddrs(gt, groupid);
+	addrs_del(l, ip);
+	map_mod(gt, INT(groupid), PTR(l));
+}
 
 /*checksum calculate, return the host order*/
 uint16_t checksum(const uint8_t *buff, int len){
@@ -338,13 +226,14 @@ uint16_t checksum(const uint8_t *buff, int len){
 	return ~(low + high);
 }
 
-void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
+void process_igmp(struct map *group_table, uint32_t src_ip, const uint8_t *buffer, int len)
 {
 	if( checksum(buffer, len) != 0)
 		return;
 	if(len == IGMP_HEADER_LEN){ 	//igmp v1, v2`
-		struct igmphdr *igmp = (struct igmphdr *)buffer;
+		const struct igmphdr *igmp = (const struct igmphdr *) buffer;
 		uint32_t groupid = igmp->groupid;
+
 		switch( igmp->type ){
 			case QUERY_REPORT:
 				/*controller cannot receive query report packet*/
@@ -352,84 +241,57 @@ void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len)
 			case V1_MEMBERSHIP_REPORT:
 				/*same as V2_MEMBERSHIP_REPORT...*/
 			case V2_MEMBERSHIP_REPORT:
-				if( lookup_origin_addr(groupid, src_ip) == false){	//如果不存在，则加入
-					insert_gtb(groupid, src_ip);
-					invalidate(RECORD_NAME); //修改组表
-				}
+				enter_group(group_table, groupid, src_ip);
 				break;
 			case V2_LEAVE_GROUP:
-				if(lookup_origin_addr(groupid, src_ip) == true){ //如果存在则，删除
-					delete_origin_address(groupid, src_ip);
-					invalidate(RECORD_NAME); //修改组表
-				}
+				exit_group(group_table, groupid, src_ip);
 				break;
 			default:
 				/*error*/
 				break;
 		}
 	}else if(len >= IGMP_V3_REPORT_HEADER_LEN){ //igmp v3
-		struct igmpv3_report *igmpv3_pkt = (struct igmpv3_report *)buffer;
+		const struct igmpv3_report *igmpv3_pkt = (const struct igmpv3_report *) buffer;
 		/*only deal with membership report*/
 		if(igmpv3_pkt->type != V3_MEMBERSHIP_REPORT)
 			return;
 		uint16_t ngrecord = ntohs(igmpv3_pkt->ngrecord);
-		uint8_t *grecord = (uint8_t *)igmpv3_pkt->grec;
+		const uint8_t *grecord = (const uint8_t *) igmpv3_pkt->grec;
 		int i;
 
 		/*deal with each record*/
 		for(i = 0; i < ngrecord; i++){
 			uint8_t grec_type = *grecord++;
 			uint8_t grec_auxdlen = *grecord++; //一般为0，不为0,则要跳过末尾的grec_auxdlen个字节
-			uint16_t grec_nsrc = ntohs(*((uint16_t *)grecord));
+			uint16_t grec_nsrc = ntohs(*((const uint16_t *)grecord));
 			grecord += sizeof(uint16_t);
-			uint32_t grec_mcaddr = ntohl(*((uint32_t *)grecord));
+			uint32_t grec_mcaddr = ntohl(*((const uint32_t *)grecord));
 			grecord += sizeof(uint32_t);
 
 			switch( grec_type ){
 				case V3_MODE_IS_INCLUDE: 	//接收来自源，如果源为空则， 为退出报告，否则加入组
 					if( grec_nsrc == 0){ //INCLUDE{}, 表示退出报告
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == true){
-							delete_origin_address(grec_mcaddr, src_ip);
-							invalidate(RECORD_NAME); //修改组表
-						}
+						exit_group(group_table, grec_mcaddr, src_ip);
 					}else{ //不为0，表示对源进行控制，现在不对源进行控制，只进行插入
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == false)
-							insert_gtb(grec_mcaddr, src_ip);
-						invalidate(RECORD_NAME); //修改组表
+						enter_group(group_table, grec_mcaddr, src_ip);
 					}
 					break;
 				case V3_MODE_IS_EXCLUDE:
 					if( grec_nsrc == 0){ //EXCLUDE{}, 表示组加入报告
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
-							insert_gtb(grec_mcaddr, src_ip);
-							invalidate(RECORD_NAME); //修改组表
-						}
+						enter_group(group_table, grec_mcaddr, src_ip);
 					}else{ //不为0，表示对源进行控制，现在不对源进行控制，只进行插入
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
-							insert_gtb(grec_mcaddr, src_ip);
-							invalidate(RECORD_NAME); //修改组表
-						}
+						enter_group(group_table, grec_mcaddr, src_ip);
 					}
 					break;
 				case V3_CHANGE_TO_INCLUDE: //源地址不为空，则当做插入，否则当做退出操作
 					if( grec_nsrc == 0){
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == true){
-							delete_origin_address(grec_mcaddr, src_ip);
-							invalidate(RECORD_NAME); //修改组表
-
-						}
+						exit_group(group_table, grec_mcaddr, src_ip);
 					}else{
-						if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
-							insert_gtb(grec_mcaddr, src_ip);
-							invalidate(RECORD_NAME); //修改组表
-						}
+						enter_group(group_table, grec_mcaddr, src_ip);
 					}
 					break;
 				case V3_CHANGE_TO_EXCLUDE: //暂时当做插入处理
-					if(lookup_origin_addr(grec_mcaddr, src_ip) == false){
-						insert_gtb(grec_mcaddr, src_ip);
-						invalidate(RECORD_NAME); //修改组表
-					}
+					enter_group(group_table, grec_mcaddr, src_ip);
 					break;
 				case V3_ALLOW_NEW_SOURCE: //不处理
 					break;

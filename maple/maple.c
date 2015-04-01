@@ -12,14 +12,17 @@
 #include "spec_parser.h"
 #include "trace.h"
 #include "trace_tree.h"
+#include "map.h"
 
 #include "maple_api.h"
 
 static struct header *header_spec;
 
+static struct map *env;
+
 /* f */
-struct route *f(struct packet *pk);
-void *init_f(void);
+struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port);
+void *init_f(struct map *env);
 
 /* API for f */
 struct packet {
@@ -80,15 +83,7 @@ void mod_packet(struct packet *pkt, const char *field, value_t value)
 	trace_M(field, value, spec);
 }
 
-void record(const char *name)
-{
-	trace_RE(name, NULL);
-}
 
-void invalidate(const char *name)
-{
-	trace_IE(name);
-}
 
 struct entity **get_hosts(int *pnum)
 {
@@ -179,7 +174,9 @@ void maple_init(void)
 	fprintf(stderr, "loading header spec...\n");
 	header_spec = spec_parser_file("scripts/header.spec");
 	assert(header_spec);
-	init_f();
+	fprintf(stderr, "init env...\n");
+	env = map(mapf_eq_str, mapf_hash_str, mapf_dup_str, mapf_free_str);
+	init_f(env);
 }
 
 void maple_switch_up(struct xswitch *sw)
@@ -202,9 +199,17 @@ static void mod_in_port(struct trace *trace, int in_port)
 	trace->events[i].u.r.value = value_from_8(in_port);
 }
 
-static bool cmpname_p(void *pname, const char *name, const void *arg __attribute__((unused)))
+
+struct namearg
 {
-	if(strcmp(pname, name) == 0)
+	const char *name;
+	const void *arg;
+};
+
+static bool cmpna_p(void *parg, const char *name, const void *arg)
+{
+	struct namearg *na = parg;
+	if(strcmp(na->name, name) == 0 && (na->arg == arg || NULL == arg))
 		return true;
 	return false;
 }
@@ -227,7 +232,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 	pkt.hack_get_payload = false;
 	trace_G(NULL, header_spec, 0);
 
-	r = f(&pkt);
+	r = f(&pkt, env, topo_get_switch(sw->dpid), in_port);
 
 	trace_R("in_port", value_from_8(0));
 	packet_parser_free(pkt.pp);
@@ -344,9 +349,10 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 
 	/* invalidate */
 	for(i = 0; i < trace->num_inv_events; i++) {
-		char *name;
-		name = trace->inv_events[i].name;
-		fprintf(stderr, "invalidate \"%s\":\n", name);
-		maple_invalidate(cmpname_p, name);
+		struct namearg na;
+		na.name = trace->inv_events[i].name;
+		na.arg = trace->inv_events[i].arg;
+		fprintf(stderr, "invalidate \"%s\":\n", na.name);
+		maple_invalidate(cmpna_p, &na);
 	}
 }

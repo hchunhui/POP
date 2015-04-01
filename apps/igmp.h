@@ -86,15 +86,15 @@ struct igmpv3_query{
 	uint32_t src[0];
 };
 
-uint32_t get_gtb_num(); //组表表项数目
-bool lookup_groupid(uint32_t groupid);	//查组地址
-bool lookup_origin_addr(uint32_t groupid, uint32_t origin_addr); //查（组地址，源地址）
-uint32_t get_origin_len(uint32_t groupid); //查一个组有多少个成员地址
-uint32_t get_group_maddrs(uint32_t groupid, uint32_t *buffer, uint32_t nums); //获取一个组的所有成员到buffer里
-void insert_gtb(uint32_t groupid, uint32_t origin_addr); //将（组地址，源地址）插入组表
-void delete_gtb(uint32_t groupid); //删除一个组地址选项
-void delete_origin_address(uint32_t groupid, uint32_t origin_addr); //删除一个（组地址，源地址）对
-void clean_origin_address(uint32_t origin_addr); //清除一个主机
-void process_igmp(uint32_t src_ip, const uint8_t *buffer, int len);
+struct igmp_addrs {
+	int n;
+	uint32_t *addrs;
+};
+
+struct map;
+
+struct map *igmp_init(void);
+struct igmp_addrs *igmp_get_maddrs(struct map *group_table, uint32_t groupid);
+void process_igmp(struct map *group_table, uint32_t src_ip, const uint8_t *buffer, int len);
 
 #endif  /*_IGMP_H_*/
