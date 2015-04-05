@@ -3,7 +3,7 @@
 #include <assert.h>
 #include "xswitch/xswitch.h"
 #include "packet_parser.h"
-
+#include "param.h"
 
 struct expr {
 	enum expr_type type;
@@ -281,6 +281,12 @@ struct expr *header_get_length(struct header *h)
 	return h->length;
 }
 
+int header_get_fixed_length(struct header *h)
+{
+	assert(h->length->type == EXPR_VALUE);
+	return h->length->u.value;
+}
+
 void header_set_sel(struct header *h, const char *name)
 {
 	int i;
@@ -311,6 +317,20 @@ void header_add_next(struct header *h, value_t v, struct header *nh)
 	h->next[i].v = v;
 	h->next[i].h = nh;
 	h->num_next++;
+}
+
+struct header *header_lookup(struct header *start, const char *name)
+{
+	int i;
+	struct header *h;
+	if(strcmp(name, start->name) == 0)
+		return start;
+	for(i = 0; i < start->num_next; i++) {
+		h = header_lookup(start->next[i].h, name);
+		if(h)
+			return h;
+	}
+	return NULL;
 }
 
 const char *header_get_name(struct header *h)
@@ -408,6 +428,23 @@ void packet_parser_push(struct packet_parser *pp, struct header **new_spec,
 	*prev_stack_top = pp->stack_top;
 	pp->stack_top--;
 	*new_spec = STACK_TOP(pp).spec;
+}
+
+void packet_parser_add_header(struct packet_parser *pp, struct header *add_spec, int *phlen)
+{
+	int hlen;
+	assert(pp->stack_top == 0);
+
+	hlen = header_get_fixed_length(add_spec);
+	assert(STACK_TOP(pp).length + hlen < MSGBUF_MAX_LENGTH);
+
+	memmove(STACK_TOP(pp).data + hlen,
+		STACK_TOP(pp).data,
+		STACK_TOP(pp).length);
+	memset(STACK_TOP(pp).data, 0, hlen);
+
+	STACK_TOP(pp).length += hlen;
+	*phlen = hlen;
 }
 
 void packet_parser_mod(struct packet_parser *pp, const char *field, value_t value,

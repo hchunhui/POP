@@ -13,7 +13,6 @@ void mod_packet(struct packet *pkt, const char *field, value_t value);
 void push_header(struct packet *pkt);
 
 void add_header(struct packet *pkt, const char *proto);
-void remove_header(struct packet *pkt);
 
 struct entity;
 struct entity **get_hosts(int *pnum);

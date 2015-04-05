@@ -83,7 +83,13 @@ void mod_packet(struct packet *pkt, const char *field, value_t value)
 	trace_M(field, value, spec);
 }
 
-
+void add_header(struct packet *pkt, const char *proto)
+{
+	int hlen;
+	struct header *h = header_lookup(header_spec, proto);
+	packet_parser_add_header(pkt->pp, h, &hlen);
+	trace_A(hlen);
+}
 
 struct entity **get_hosts(int *pnum)
 {
@@ -222,7 +228,8 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 	edge_t *edges;
 	int num_edges;
 	struct trace *trace;
-	struct action *ac_mod;
+	struct action *ac_edge, *ac_core;
+	bool eq_edge_core;
 
 	/* init */
 	trace_clear();
@@ -240,18 +247,28 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 	trace = trace_get();
 
 	/* learn */
-	/* XXX */
-	ac_mod = action();
+	/* XXX:
+	 * ac_edge: prelude for edge switches
+	 * ac_core: prelude for core switches
+	 * eq_edge_core: true if ac_edge == ac_core
+	 */
+	ac_edge = action();
+	ac_core = action();
+	eq_edge_core = true;
 	for(i = 0; i < trace->num_mod_events; i++) {
 		int offset, length;
 		struct header *cur_spec;
+		int j, hlen;
 
 		switch(trace->mod_events[i].type) {
 		case MEV_P:
 			cur_spec = trace->mod_events[i].u.p.new_spec;
 			expr_generate_action_backward(
 				header_get_length(cur_spec),
-				trace->mod_events[i].u.p.stack_base, ac_mod);
+				trace->mod_events[i].u.p.stack_base, ac_edge);
+			expr_generate_action_backward(
+				header_get_length(cur_spec),
+				trace->mod_events[i].u.p.stack_base, ac_core);
 			break;
 		case MEV_M:
 			cur_spec = trace->mod_events[i].u.m.spec;
@@ -259,8 +276,17 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 					 trace->mod_events[i].u.m.name,
 					 &offset,
 					 &length);
-			action_add_set_field(ac_mod, offset, length,
+			action_add_set_field(ac_edge, offset, length,
 					     trace->mod_events[i].u.m.value);
+			eq_edge_core = false;
+			break;
+		case MEV_A:
+			hlen = trace->mod_events[i].u.a.hlen;
+			for(j = 0; j < hlen / 16; j++)
+				action_add_add_field(ac_edge, 0, 16 * 8, value_from_8(0));
+			if(hlen % 16)
+				action_add_add_field(ac_edge, 0, (hlen%16) * 8, value_from_8(0));
+			eq_edge_core = false;
 			break;
 		}
 	}
@@ -271,6 +297,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		struct xswitch *sw;
 		struct action *ac;
 		int in;
+		enum { MODE_EDGE, MODE_CORE } mode;
 	} sw_actions[num_edges];
 	int n_actions = 0;
 	for(i = 0; i < num_edges; i++) {
@@ -304,9 +331,19 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 					mb = msg_packet_out(0, packet, packet_len, a0);
 					xswitch_send(cur_sw, mb);
 					action_free(a0);
-					sw_actions[entry].ac = action_copy(ac_mod);
+					sw_actions[entry].ac = action_copy(ac_edge);
+					sw_actions[entry].mode = MODE_EDGE;
+				} else {
+					sw_actions[entry].ac = action_copy(ac_core);
+					sw_actions[entry].mode = MODE_CORE;
 				}
 			}
+
+			/* XXX */
+			assert((eq_edge_core) ||
+			       (sw_actions[entry].mode == MODE_EDGE && edges[i].ent2 == NULL) ||
+			       (sw_actions[entry].mode == MODE_CORE && edges[i].ent2 != NULL));
+
 			action_add(sw_actions[entry].ac, AC_OUTPUT, out_port);
 			for(j = 0; j < num_edges; j++) {
 				if(edges[j].ent2 == cur_ent)
@@ -330,7 +367,8 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		action_free(cur_ac);
 	}
 
-	action_free(ac_mod);
+	action_free(ac_edge);
+	action_free(ac_core);
 
 	if((!pkt.hack_get_payload) && num_edges == 0) {
 		struct action *a = action();

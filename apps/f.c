@@ -139,18 +139,25 @@ void init_f(struct map *env)
 
 struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port)
 {
-	/* inspect L2 header */
+	struct route *r = NULL;
+
+	/* inspect network header */
 	pull_header(pkt);
 
 	/* call handler */
 	if (strcmp(read_header_type(pkt), "sdnp") == 0) {
-		return handle_sdnp(pkt, env);
+		r = handle_sdnp(pkt, env);
 	} else if(strcmp(read_header_type(pkt), "ipv4") == 0) {
-		return handle_ipv4(pkt, env);
+		r = handle_ipv4(pkt, env);
 	} else {
 		fprintf(stderr, "unknown protocol: %s.\n", read_header_type(pkt));
-		return route();
+		r = route();
 	}
+
+	/* reset header */
+	push_header(pkt);
+
+	return r;
 }
 
 #else

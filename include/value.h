@@ -2,7 +2,7 @@
 #define _VALUE_H_
 #include <inttypes.h>
 #include <stdbool.h>
-#define VALUE_LEN 8
+#define VALUE_LEN 16
 
 typedef struct {
 	uint8_t octet[6];

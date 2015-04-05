@@ -73,6 +73,14 @@ void trace_M(const char *name, value_t value, struct header *spec)
 	trace.num_mod_events++;
 }
 
+void trace_A(int hlen)
+{
+	int i = trace.num_mod_events;
+	trace.mod_events[i].type = MEV_A;
+	trace.mod_events[i].u.a.hlen = hlen;
+	trace.num_mod_events++;
+}
+
 void trace_clear(void)
 {
 	trace.num_events = 0;

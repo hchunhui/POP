@@ -6,7 +6,7 @@
 struct header;
 
 enum event_type { EV_R, EV_T, EV_RE, EV_G };
-enum mod_event_type { MEV_P, MEV_M };
+enum mod_event_type { MEV_P, MEV_M, MEV_A };
 
 struct event
 {
@@ -46,6 +46,9 @@ struct mod_event
 			value_t value;
 			struct header *spec;
 		} m;
+		struct {
+			int hlen;
+		} a;
 	} u;
 };
 
@@ -69,6 +72,7 @@ void trace_IE(const char *name, const void *arg);
 void trace_G(struct header *old_spec, struct header *new_spec, int stack_base);
 void trace_P(struct header *new_spec, int stack_base);
 void trace_M(const char *name, value_t value, struct header *spec);
+void trace_A(int hlen);
 void trace_clear(void);
 struct trace *trace_get(void);
 

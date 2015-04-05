@@ -62,7 +62,7 @@ packet_in(PyObject *self __unused, PyObject *args)
 {
 	void *sw;
 	const uint8_t *_pkt;
-	uint8_t pkt[2048];
+	uint8_t pkt[MSGBUF_MAX_LENGTH];
 	int port_id, pkt_len;
 
 	PyArg_ParseTuple(args, "kis#", &sw, &port_id, &_pkt, &pkt_len);
