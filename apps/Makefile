@@ -1,6 +1,12 @@
-TOPDIR = ..
-EXTRA_CFLAGS = -g -O2 -Wall
-SRCS = f.c igmp.c spanning_tree.c
-LIB = libapps.a
+SUBDIRS = lib l2_learning l3_multi
 
-include ${TOPDIR}/Makefile.comm
+all:
+	@for d in ${SUBDIRS}; do \
+		make -C $${d}; \
+	done
+
+clean:
+	@for d in ${SUBDIRS}; do \
+		make -C $${d} clean; \
+	done
+

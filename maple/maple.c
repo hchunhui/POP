@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <dlfcn.h>
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
 #include "topo/entity.h"
@@ -16,13 +17,15 @@
 
 #include "maple_api.h"
 
+static void *algo_handle;
+
 static struct header *header_spec;
 
 static struct map *env;
 
 /* f */
-struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port);
-void *init_f(struct map *env);
+static struct route *(*f)(struct packet *pkt, struct map *env, struct entity *me, int in_port);
+static void *(*init_f)(struct map *env);
 
 /* API for f */
 struct packet {
@@ -175,10 +178,20 @@ void maple_invalidate(bool (*p)(void *p_data, const char *name, const void *arg)
 }
 
 /* call back funtions */
-void maple_init(void)
+void maple_init(const char *algo_file, const char *spec_file)
 {
-	fprintf(stderr, "loading header spec...\n");
-	header_spec = spec_parser_file("scripts/header.spec");
+	fprintf(stderr, "loading algorithm(%s)...\n", algo_file);
+	algo_handle = dlopen(algo_file, RTLD_NOW);
+	if(!algo_handle)
+		fprintf(stderr, "error: %s\n", dlerror());
+	assert(algo_handle);
+	f = dlsym(algo_handle, "f");
+	assert(f);
+	init_f = dlsym(algo_handle, "init_f");
+	assert(init_f);
+
+	fprintf(stderr, "loading header spec(%s)...\n", spec_file);
+	header_spec = spec_parser_file(spec_file);
 	assert(header_spec);
 	fprintf(stderr, "init env...\n");
 	env = map(mapf_eq_str, mapf_hash_str, mapf_dup_str, mapf_free_str);

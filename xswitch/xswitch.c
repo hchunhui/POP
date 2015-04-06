@@ -9,9 +9,9 @@
 #include "maple/maple.h"
 #include "topo/topo.h"
 
-void xswitch_init(void)
+void xswitch_init(const char *algo_file, const char *spec_file)
 {
-	maple_init();
+	maple_init(algo_file, spec_file);
 }
 
 void xswitch_send(struct xswitch *sw, struct msgbuf *b)

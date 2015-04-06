@@ -617,7 +617,7 @@ static int parse(struct parse_ctx *pctx)
 #undef CTX
 
 /* Interface */
-struct header *spec_parser_string(char *s, int length)
+struct header *spec_parser_string(const char *s, int length)
 {
 	int i;
 	int ret;
@@ -640,7 +640,7 @@ struct header *spec_parser_string(char *s, int length)
 	return ctx.curr_h;
 }
 
-struct header *spec_parser_file(char *filename)
+struct header *spec_parser_file(const char *filename)
 {
 	FILE *fp;
 	int size;

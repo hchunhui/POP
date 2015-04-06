@@ -1,3 +1,7 @@
+from sys import setdlopenflags, getdlopenflags
+from ctypes import RTLD_GLOBAL
+setdlopenflags(getdlopenflags() | RTLD_GLOBAL)
+
 from pox.core import core
 import pox.openflow.libopenflow_01 as of
 from pox.lib.recoco import Timer
@@ -37,5 +41,6 @@ class pofmaple_handler (object):
         core.PofManager.set_port_pof_enable(event.dpid, phy_port.portId)
     handler(event.connection)
 
-def launch ():
+def launch (algo_file="./l3_multi.so", spec_file="header.spec"):
+  pofmaple_pox.init(algo_file, spec_file)
   core.registerNew(pofmaple_handler)

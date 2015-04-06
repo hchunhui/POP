@@ -13,7 +13,7 @@
 #define __unused __attribute__((unused))
 
 extern const char *msg_get_pof_version(void);
-extern void xswitch_init(void);
+extern void xswitch_init(const char *algo_file, const char *spec_file);
 extern void xswitch_on_timeout(void);
 
 /* XXX */
@@ -125,12 +125,23 @@ timeout(PyObject *self __unused, PyObject *args __unused)
 	return Py_BuildValue("");
 }
 
+static PyObject *
+init(PyObject *self __unused, PyObject *args)
+{
+	const char *algo_file, *spec_file;
+	PyArg_ParseTuple(args, "ss", &algo_file, &spec_file);
+	xswitch_init(algo_file, spec_file);
+	xmit();
+	return Py_BuildValue("");
+}
+
 static PyMethodDef methods[] = {
 	{ "going_up", going_up, METH_VARARGS, "" },
 	{ "going_down", going_down, METH_VARARGS, "" },
 	{ "packet_in", packet_in, METH_VARARGS, "" },
 	{ "port_status", port_status, METH_VARARGS, "" },
 	{ "timeout", timeout, METH_VARARGS, "" },
+	{ "init", init, METH_VARARGS, "" },
 	{ NULL, NULL, 0, NULL }
 };
 
@@ -141,6 +152,4 @@ initpofmaple_pox(void)
 	mb_h = NULL;
 	in_xmit = false;
 	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
-	xswitch_init();
-	xmit();
 }

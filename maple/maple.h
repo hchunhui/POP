@@ -3,7 +3,7 @@
 #include "types.h"
 
 struct xswitch;
-void maple_init(void);
+void maple_init(const char *algo_file, const char *spec_file);
 void maple_switch_up(struct xswitch *sw);
 void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len);
 void maple_switch_down(struct xswitch *sw);

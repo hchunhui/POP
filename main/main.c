@@ -14,7 +14,7 @@
 #include "io/sw.h"
 
 extern const char *msg_get_pof_version(void);
-extern void xswitch_init(void);
+extern void xswitch_init(const char *algo_file, const char *spec_file);
 extern struct xswitch *xswitch_on_accept(void *conn);
 extern void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg);
 extern void xswitch_on_close(struct xswitch *sw);
@@ -53,10 +53,12 @@ timeout_cb_func(void)
 static void
 usage(const char *prgname)
 {
-	fprintf(stderr, "%s [-t] [-v] [-p 6633]"
+	fprintf(stderr, "%s [-t] [-v] [-p 6633] [-f apps/l3_multi.so] [-s scripts/header.spec]"
 			"\t-t      Run as real-time thread\n"
 			"\t-v      Verbose\n"
-			"\t-p PORT Specify the server port\n",
+			"\t-p PORT Specify the server port\n"
+			"\t-f FILE Specify algorithm\n"
+			"\t-s FILE Specify header spec\n",
 			prgname);
 	exit(EXIT_FAILURE);
 }
@@ -64,9 +66,11 @@ usage(const char *prgname)
 int
 main(int argc, char **argv)
 {
+	const char *algo_file = "apps/l3_multi.so";
+	const char *spec_file = "scripts/header.spec";
 	int ch;
 
-	while ((ch = getopt(argc, argv, "p:tv")) != -1) {
+	while ((ch = getopt(argc, argv, "p:tvf:s:")) != -1) {
 		switch (ch) {
 		case 't':
 			realtime = 1;
@@ -77,6 +81,12 @@ main(int argc, char **argv)
 		case 'p':
 			sscanf(optarg, "%d", &server_port);
 			break;
+		case 'f':
+			algo_file = optarg;
+			break;
+		case 's':
+			spec_file = optarg;
+			break;
 		default:
 			usage(argv[0]);
 		}
@@ -86,7 +96,7 @@ main(int argc, char **argv)
 
 	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
 	init_io_module();
-	xswitch_init();
+	xswitch_init(algo_file, spec_file);
 
 #if 0
 	while (1) {
