@@ -53,7 +53,7 @@ timeout_cb_func(void)
 static void
 usage(const char *prgname)
 {
-	fprintf(stderr, "%s [-t] [-v] [-p 6633] [-f apps/l3_multi.so] [-s scripts/header.spec]"
+	fprintf(stderr, "%s [-t] [-v] [-p 6633] [-f apps/l3_multi.so] [-s scripts/header.spec]\n"
 			"\t-t      Run as real-time thread\n"
 			"\t-v      Verbose\n"
 			"\t-p PORT Specify the server port\n"
