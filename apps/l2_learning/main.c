@@ -47,6 +47,9 @@ struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_p
 	table = map_read(env, PTR("table")).p;
 	assert(table);
 
+	if(dst == 0xffffffffffffull)
+		return flood(me, in_port);
+
 	ftable = map_read(table, INT(id)).p;
 	if(ftable == NULL) {
 		ftable = map(mapf_eq_int, mapf_hash_int,
