@@ -7,6 +7,7 @@ struct sw;
 
 /* xport */
 struct xport {
+	// XXX int
 	uint16_t port_id;
 	uint64_t recvpkts;
 	uint64_t recvbytes;

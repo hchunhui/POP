@@ -1,8 +1,8 @@
 #!/bin/bash
 # h1 ---- 1:s1:2 ---- 2:s2:1 ---- h2
-exec mn --controller=remote --switch=pofs --mac --custom topo.py --topo mytopo
+# exec mn --controller=remote --switch=pofs --mac --custom topo.py --topo mytopo
 
-# exec mn --controller=remote --switch=pofs --mac --custom topo2.py --topo mytopo
+exec mn --controller=remote --switch=pofs --mac --custom topo2.py --topo mytopo
 
 # s1:1 ---- 1:s2
 # exec mn --controller=remote --switch=pofs --mac --custom topo3.py --topo mytopo
