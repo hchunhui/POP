@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,10 +12,33 @@
 
 #define MAX_NUM_HOSTS 1000
 #define MAX_NUM_SWITCHES 100
+
+static pthread_rwlock_t topo_lock;
 static struct entity *hosts[MAX_NUM_HOSTS];
 static int num_hosts;
 static struct entity *switches[MAX_NUM_SWITCHES];
 static int num_switches;
+
+void topo_init(void)
+{
+	pthread_rwlock_init(&topo_lock, NULL);
+}
+
+/* XXX */
+void topo_rdlock(void)
+{
+	pthread_rwlock_rdlock(&topo_lock);
+}
+
+void topo_wrlock(void)
+{
+	pthread_rwlock_wrlock(&topo_lock);
+}
+
+void topo_unlock(void)
+{
+	pthread_rwlock_unlock(&topo_lock);
+}
 
 void topo_print(void)
 {
@@ -179,7 +203,9 @@ struct entity **topo_get_switches(int *pnum)
 void topo_switch_up(struct xswitch *sw)
 {
 	struct entity *e = entity_switch(sw);
+	topo_wrlock();
 	topo_add_switch(e);
+	topo_unlock();
 	lldp_packet_send(sw);
 }
 
@@ -211,16 +237,21 @@ static void del_dangling_hosts(void)
 
 void topo_switch_port_status(struct xswitch *sw, int port, enum port_status status)
 {
-	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+	struct entity *esw;
+
+	topo_wrlock();
+	esw = topo_get_switch(xswitch_get_dpid(sw));
 	switch(status) {
 	case PORT_DOWN:
 		fprintf(stderr, "-----port down-----\n");
 		entity_del_link(esw, port);
 		del_dangling_hosts();
 		topo_print();
+		topo_unlock();
 		break;
 	case PORT_UP:
 		fprintf(stderr, "-----port up-----\n");
+		topo_unlock();
 		lldp_packet_send(sw);
 		break;
 	}
@@ -228,10 +259,13 @@ void topo_switch_port_status(struct xswitch *sw, int port, enum port_status stat
 
 void topo_switch_down(struct xswitch *sw)
 {
-	struct entity *esw = topo_get_switch(xswitch_get_dpid(sw));
+	struct entity *esw;
 
+	topo_wrlock();
 	fprintf(stderr, "-----switch down--------\n");
+	esw = topo_get_switch(xswitch_get_dpid(sw));
 	topo_del_switch(esw);
 	del_dangling_hosts();
 	topo_print();
+	topo_unlock();
 }

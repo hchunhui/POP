@@ -164,16 +164,22 @@ void print_entity(struct entity *e)
 }
 
 /* XXX */
+/* XXX: acquire topo_lock first! */
 void maple_invalidate(bool (*p)(void *p_data, const char *name, const void *arg), void *p_data)
 {
 	int num_switches;
-	struct entity **switches = topo_get_switches(&num_switches);
+	struct entity **switches;
 	int i;
+
+	switches = topo_get_switches(&num_switches);
 	fprintf(stderr, "maple_invalidate\n");
 	for(i = 0; i < num_switches; i++) {
 		struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 		struct trace_tree *tt = cur_sw->trace_tree;
+
+		xswitch_table_lock(cur_sw);
 		trace_tree_invalidate(&tt, cur_sw, cur_sw->table0, p, p_data);
+		xswitch_table_unlock(cur_sw);
 	}
 }
 
@@ -252,7 +258,9 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 	pkt.hack_get_payload = false;
 	trace_G(NULL, header_spec, 0);
 
+	topo_rdlock();
 	r = f(&pkt, env, topo_get_switch(sw->dpid), in_port);
+	topo_unlock();
 
 	trace_R("in_port", value_from_8(0));
 	packet_parser_free(pkt.pp);
@@ -371,12 +379,16 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		struct entity *cur_ent = sw_actions[i].ent;
 		struct action *cur_ac = sw_actions[i].ac;
 		mod_in_port(trace, sw_actions[i].in);
+
+		xswitch_table_lock(cur_sw);
 		if(trace_tree_augment(&(cur_sw->trace_tree), trace, cur_ac)) {
 			fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
 			trace_tree_print(cur_sw->trace_tree);
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
 		}
+		xswitch_table_unlock(cur_sw);
+
 		action_free(cur_ac);
 	}
 
@@ -387,12 +399,16 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		struct action *a = action();
 		mod_in_port(trace, in_port);
 		action_add(a, AC_DROP, 0);
+
+		xswitch_table_lock(sw);
 		if(trace_tree_augment(&(sw->trace_tree), trace, a)) {
 			fprintf(stderr, "--- flow table for cur sw ---\n");
 			trace_tree_print(sw->trace_tree);
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(sw, sw->trace_tree);
 		}
+		xswitch_table_unlock(sw);
+
 		action_free(a);
 	}
 
@@ -404,6 +420,8 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		na.name = trace->inv_events[i].name;
 		na.arg = trace->inv_events[i].arg;
 		fprintf(stderr, "invalidate \"%s\":\n", na.name);
+		topo_rdlock();
 		maple_invalidate(cmpna_p, &na);
+		topo_unlock();
 	}
 }

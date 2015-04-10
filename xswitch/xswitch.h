@@ -20,7 +20,8 @@ void xswitch_free(struct xswitch *sw);
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
 dpid_t xswitch_get_dpid(struct xswitch *sw);
 int xswitch_get_num_ports(struct xswitch *sw);
-
+void xswitch_table_lock(struct xswitch *sw);
+void xswitch_table_unlock(struct xswitch *sw);
 
 /* flow table */
 enum match_field_type { MATCH_FIELD_PACKET, MATCH_FIELD_METADATA };

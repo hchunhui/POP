@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <string.h>
 #include "discovery.h"
 // install flow table
@@ -5,6 +6,7 @@
 // parse LLDP packet
 // send LLDP packet
 
+static pthread_mutex_t arp_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct entity *arp_waiting_hosts[20];
 static int next_available_waiting_host;
 
@@ -201,14 +203,17 @@ handle_lldp_packet_in(const uint8_t *packet, int length, struct xswitch *sw, int
 	if (eth_type != LLDP_TYPE)
 		return -2;
 	edge_t link;
+	topo_wrlock();
 	link.ent2 = topo_get_switch(xswitch_get_dpid(sw));
 	link.port2 = port;
 	if (! parse_lldp(packet, &link))
 	{
 		fprintf(stderr, "parse_lldp error\n");
+		topo_unlock();
 		return -3;
 	}
 	entity_add_link(link.ent1, link.port1, link.ent2, link.port2);
+	topo_unlock();
 	return 0;
 }
 
@@ -327,6 +332,7 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 	arp.arp_tpa = value_to_32(value_extract(packet, 38*8, 32));
 
 	// handle arp request
+	topo_rdlock();
 	if (arp.arp_op == ARPOP_REQUEST) {
 		eh1 = topo_get_host_by_paddr(arp.arp_tpa);
 		if (eh1 != NULL) {
@@ -345,16 +351,19 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 			// save src host info.
 			// flood arp request.
 			struct entity *eh_wait;
+			pthread_mutex_lock(&arp_lock);
 			if (next_available_waiting_host >= 20) {
 				fprintf(stderr, "waiting hosts num >= 20.\n");
+				pthread_mutex_unlock(&arp_lock);
+				topo_unlock();
 				return -13;
 			}
 			eh_wait = topo_get_host_by_haddr(arp.arp_sha);
 			arp_waiting_hosts[next_available_waiting_host] = eh_wait;
+			get_next_available_waiting_host();
+			pthread_mutex_unlock(&arp_lock);
 
 			flood(packet, length);
-			get_next_available_waiting_host();
-		
 		}
 	} else if (arp.arp_op == ARPOP_REPLY) {
 		// TODO respond waiting host and move it from waiting hosts.
@@ -362,6 +371,7 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 		struct entity *esw = NULL;
 		struct xswitch *xsw = NULL;
 		int sw_out_port;
+		pthread_mutex_lock(&arp_lock);
 		for (i = 0; i < 20; i++) {
 			if(arp_waiting_hosts[i] != NULL) {
 				hinfo = entity_get_addr(arp_waiting_hosts[i]);
@@ -374,14 +384,18 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 				}
 			}
 		}
+		pthread_mutex_unlock(&arp_lock);
+
 		if (ewait == NULL) {
 			fprintf(stderr, "not find waiting arp host\n");
+			topo_unlock();
 			return -14;
 		}
 		esw = entity_host_get_adj_switch(ewait, &sw_out_port);
 		xsw = entity_get_xswitch(esw);
 		port_packet_out(xsw, sw_out_port, packet, length);
 	}
+	topo_unlock();
 	return 0;
 }
 
@@ -413,6 +427,8 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 		break;
 	}
 
+	/* fast path */
+	topo_rdlock();
 	esw = topo_get_switch(xswitch_get_dpid(xsw));
 	assert(esw != NULL);
 
@@ -420,14 +436,30 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 	esw_adj = entity_get_adjs(esw, &numadjs);
 	for (j = 0; j < numadjs; j++) {
 		if(esw_adj[j].out_port == port &&
-		   entity_get_type(esw_adj[j].adj_entity) == ENTITY_TYPE_SWITCH)
+		   entity_get_type(esw_adj[j].adj_entity) == ENTITY_TYPE_SWITCH) {
+			topo_unlock();
 			return;
+		}
 	}
 
 	/* is multicast addr? */
-	if(hinfo.haddr.octet[0] & 1)
-		return;
+	if((hinfo.haddr.octet[0] & 1) == 0) {
+		host = topo_get_host_by_haddr(hinfo.haddr);
+		if(host) {
+			old_esw = entity_host_get_adj_switch(host, &old_port);
+			old_paddr = entity_get_addr(host).paddr;
+			if (old_esw == esw && old_port == port &&
+			    ((hinfo.paddr && old_paddr == hinfo.paddr) ||
+			     !hinfo.paddr)) {
+				topo_unlock();
+				return;
+			}
+		}
+	}
+	topo_unlock();
 
+	/* slow path */
+	topo_wrlock();
 	host = topo_get_host_by_haddr(hinfo.haddr);
 	if (host == NULL) {
 		host = entity_host(hinfo);
@@ -458,19 +490,20 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 				entity_print(host);
 			}
 		}
-		if (old_esw == esw && old_port == port)
-			return;
-		topo_del_host(host);
-		host = entity_host(hinfo);
-		if (topo_add_host(host) >= 0)
-			entity_add_link(host, 1, esw, port);
-		fprintf(stderr, "host loc changed:\n"
-			"old: (%08x, %d)\nnew: (%08x, %d)\n",
-			entity_get_dpid(old_esw),
-			old_port,
-			entity_get_dpid(esw),
-			port);
+		if (old_esw != esw || old_port != port) {
+			topo_del_host(host);
+			host = entity_host(hinfo);
+			if (topo_add_host(host) >= 0)
+				entity_add_link(host, 1, esw, port);
+			fprintf(stderr, "host loc changed:\n"
+				"old: (%08x, %d)\nnew: (%08x, %d)\n",
+				entity_get_dpid(old_esw),
+				old_port,
+				entity_get_dpid(esw),
+				port);
+		}
 	}
+	topo_unlock();
 }
 
 int
@@ -482,16 +515,16 @@ handle_topo_packet_in(struct xswitch *sw, int port, const uint8_t *packet, int l
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
 	if (eth_type == LLDP_TYPE) {
 		handle_lldp_packet_in(packet, length, sw, port);
+		topo_rdlock();
 		topo_print();
+		topo_unlock();
 		return -3;
 	} else if (eth_type == ETHERTYPE_ARP) {
 		update_hosts(packet, length, sw, port);
 		handle_arp_packet_in(packet, length, sw, port);
-		// topo_print();
 		return -4;
 	} else {
 		update_hosts(packet, length, sw, port);
-		// topo_print();
 		return -2;
 	}
 }

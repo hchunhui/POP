@@ -22,4 +22,10 @@ int topo_add_switch(struct entity *e);
 int topo_del_host(struct entity *e);
 int topo_del_switch(struct entity *e);
 void topo_print(void);
+
+void topo_init(void);
+void topo_rdlock(void);
+void topo_wrlock(void);
+void topo_unlock(void);
+
 #endif

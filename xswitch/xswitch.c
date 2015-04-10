@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,6 +13,7 @@
 void xswitch_init(const char *algo_file, const char *spec_file)
 {
 	maple_init(algo_file, spec_file);
+	topo_init();
 }
 
 void xswitch_send(struct xswitch *sw, struct msgbuf *b)
@@ -30,6 +32,16 @@ int xswitch_get_num_ports(struct xswitch *sw)
 	return sw->n_ports;
 }
 
+void xswitch_table_lock(struct xswitch *sw)
+{
+	pthread_mutex_lock(&sw->table_lock);
+}
+
+void xswitch_table_unlock(struct xswitch *sw)
+{
+	pthread_mutex_unlock(&sw->table_lock);
+}
+
 struct xswitch *xswitch(dpid_t dpid, int ports, void *conn)
 {
 	struct xswitch *sw;
@@ -39,6 +51,7 @@ struct xswitch *xswitch(dpid_t dpid, int ports, void *conn)
 	sw->dpid = dpid;
 	sw->n_ports = sw->n_ready_ports = ports;
 	sw->conn = conn;
+	pthread_mutex_init(&sw->table_lock, NULL);
 
 	if(dpid) {
 		sw->state = XS_RUNNING;
@@ -55,7 +68,8 @@ void xswitch_free(struct xswitch *sw)
 {
 	if (sw->state == XS_RUNNING)
 		xswitch_down(sw);
-        free(sw);
+	pthread_mutex_destroy(&sw->table_lock);
+	free(sw);
 }
 
 struct xswitch *xswitch_on_accept(void *conn)

@@ -19,6 +19,7 @@ struct xswitch
 	int next_table_id;
 	struct flow_table *table0;
 	struct trace_tree *trace_tree;
+	pthread_mutex_t table_lock;
 
 	void *conn;
 };
