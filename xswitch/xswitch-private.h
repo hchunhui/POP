@@ -2,6 +2,21 @@
 #define _XSWITCH_PRIVATE_H_
 #include "xswitch.h"
 
+/* xport */
+struct xport {
+	// XXX int
+	uint16_t port_id;
+	uint64_t recvpkts;
+	uint64_t recvbytes;
+	uint64_t recent_recvpkts;
+	uint64_t recent_recvbytes;
+
+	/* hash table
+	 * hash function: port_id % XPORT_HASH_SIZE
+	 */
+	struct xport *next;
+};
+
 /* xswitch */
 struct trace_tree;
 struct xswitch
@@ -14,6 +29,8 @@ struct xswitch
 	dpid_t dpid;
 	int n_ports;
 	int n_ready_ports;
+
+	struct xport *xports[XPORT_HASH_SIZE];
 	//TODO port number
 
 	int next_table_id;

@@ -37,4 +37,16 @@ struct entity *get_host_adj_switch(struct entity *e, int *sw_port);
 const struct entity_adj *get_entity_adjs(struct entity *e, int *pnum);
 void print_entity(struct entity *e);
 
+uint64_t get_port_recvpkts(struct entity *e, uint16_t port_id);
+uint64_t get_port_recvbytes(struct entity *e, uint16_t port_id);
+/* recent: in the last 5 seconds, the pkts(or bytes) received by the port.*/
+uint64_t get_port_recent_recvpkts(struct entity *e, uint16_t port_id);
+uint64_t get_port_recent_recvbytes(struct entity *e, uint16_t port_id);
+/* Return false means a wrong port_id or something else.*/
+bool get_port_stats(struct entity *e, uint16_t port_id,
+		    uint64_t *recvpkts/*OUT*/,
+		    uint64_t *recvbytes/*OUT*/,
+		    uint64_t *recent_recvpkts/*OUT*/,
+		    uint64_t *recent_recvbytes/*OUT*/);
+
 #endif /* _MAPLE_API_H_ */

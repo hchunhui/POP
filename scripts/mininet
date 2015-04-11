@@ -1,4 +1,18 @@
 #!/bin/bash
 cd `dirname $0`
-exec mn --controller=remote --switch=pofs --mac --custom topo.py --topo mytopo
-# exec mn --controller=remote --switch=pofs --mac --custom topo2.py --topo mytopo
+# h1 ---- 1:s1:2 ---- 2:s2:1 ---- h2
+# exec mn --controller=remote --switch=pofs --mac --custom topo.py --topo mytopo
+
+exec mn --controller=remote --switch=pofs --mac --custom topo2.py --topo mytopo
+
+# s1:1 ---- 1:s2
+# exec mn --controller=remote --switch=pofs --mac --custom topo3.py --topo mytopo
+
+# h1 ---- 1:s1
+# exec mn --controller=remote --switch=pofs --mac --custom topo4.py --topo mytopo
+
+# s1
+# exec mn --controller=remote --switch=pofs --mac --custom topo5.py --topo mytopo
+
+# h1 ---- 1:s1:2 ---- h2
+# exec mn --controller=remote --switch=pofs --mac --custom topo6.py --topo mytopo

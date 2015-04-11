@@ -2,8 +2,11 @@
 #define _XSWITCH_H_
 #include "types.h"
 
+#define XPORT_HASH_SIZE 1000
+
 struct msgbuf;
 
+struct xport;
 struct xswitch;
 struct flow_table;
 struct match;
@@ -20,8 +23,29 @@ void xswitch_free(struct xswitch *sw);
 void xswitch_send(struct xswitch *sw, struct msgbuf *b);
 dpid_t xswitch_get_dpid(struct xswitch *sw);
 int xswitch_get_num_ports(struct xswitch *sw);
+struct xport **xswitch_get_xports(struct xswitch *sw);
 void xswitch_table_lock(struct xswitch *sw);
 void xswitch_table_unlock(struct xswitch *sw);
+
+/* xport */
+struct xport *xport_new(uint16_t port_id);
+struct xport *xport_copy(const struct xport *xp);
+void xport_free(struct xport *xp);
+struct xport *xport_lookup(struct xswitch *sw, uint16_t port_id);
+struct xport *xport_insert(struct xswitch *sw, const struct xport *xp);
+void xport_update(struct xport *xp, uint64_t recvpkts, uint64_t recvbytes);
+void xport_query(struct xport *xp,
+		 uint64_t *recvpkts/*OUT*/,
+		 uint64_t *recvbytes/*OUT*/,
+		 uint64_t *recent_recvpkts/*OUT*/,
+		 uint64_t *recent_recvbytes/*OUT*/);
+bool xport_delete(struct xswitch *sw, struct xport *xp);
+uint16_t xport_get_port_id(const struct xport *xp);
+uint64_t xport_get_recvpkts(const struct xport *xp);
+uint64_t xport_get_recvbytes(const struct xport *xp);
+uint64_t xport_get_recent_recvpkts(const struct xport *xp);
+uint64_t xport_get_recent_recvbytes(const struct xport *xp);
+struct xport *xport_get_next(const struct xport *xp);
 
 /* flow table */
 enum match_field_type { MATCH_FIELD_PACKET, MATCH_FIELD_METADATA };
@@ -64,6 +88,7 @@ enum action_type {
 	AC_SET_FIELD,
 	AC_ADD_FIELD,
 	AC_DEL_FIELD,
+	AC_COUNTER,
 	/* "instructions" */
 	AC_GOTO_TABLE,
 	AC_MOVE_PACKET,
@@ -110,7 +135,9 @@ struct msgbuf *msg_hello(void);
 struct msgbuf *msg_features_request(void);
 struct msgbuf *msg_set_config(int miss_send_len);
 struct msgbuf *msg_get_config_request(void);
-
+struct msgbuf *msg_counter_add(int counter_id);
+struct msgbuf *msg_counter_request(int counter_id);
+struct msgbuf *msg_query_all(uint16_t slotID);
 struct msgbuf *msg_flow_table_add(struct flow_table *ft);
 struct msgbuf *msg_flow_table_del(struct flow_table *ft);
 struct msgbuf *msg_flow_entry_add(struct flow_table *ft, int index,

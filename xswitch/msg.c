@@ -144,6 +144,7 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 	struct pof_action_set_field *asf;
 	struct pof_action_add_field *aaf;
 	struct pof_action_delete_field *adf;
+	struct pof_action_counter *ac;
 
 	switch(ae->type) {
 	case AC_DROP:
@@ -194,6 +195,12 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 		adf->tag_pos = htons(u16(ae->u.del_field.dst_offset));
 		adf->len_type = 0;
 		adf->tag_len.value = htonl(u32(ae->u.del_field.dst_length));
+		break;
+	case AC_COUNTER:
+		ma->type = htons(POFAT_COUNTER);
+		ma->len = htons(4 + sizeof(*ac));
+		ac = (void *)(ma->action_data);
+		ac->counter_id = htonl(u32(ae->u.arg));
 		break;
 	default:
 		return false;
@@ -400,6 +407,50 @@ struct msgbuf *msg_get_config_request(void)
 	return msg;
 }
 
+struct msgbuf *msg_query_all(uint16_t slotID)
+{
+	struct msgbuf *msg;
+	struct pof_queryall_request *qr;
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_queryall_request)
+		     , POFT_QUERYALL_REQUEST,
+		     &msg);
+	qr = GET_BODY(msg);
+	qr->slotID = htons(u16(slotID));
+	return msg;
+}
+
+struct msgbuf *msg_counter_add(int counter_id)
+{
+	struct msgbuf *msg;
+	struct pof_counter *pc;
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_counter),
+		     POFT_COUNTER_MOD,
+		     &msg);
+	pc = GET_BODY(msg);
+	pc->command = POFCC_ADD;
+#ifdef POF_MULTIPLE_SLOTS
+	pc->slotID = htons(0);
+#endif
+	pc->counter_id = htonl(u32(counter_id));
+	return msg;
+}
+
+struct msgbuf *msg_counter_request(int counter_id)
+{
+	struct msgbuf *msg;
+	struct pof_counter *pc;
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_counter),
+		     POFT_COUNTER_REQUEST,
+		     &msg);
+	pc = GET_BODY(msg);
+	pc->command = POFCC_QUERY;
+#ifdef POF_MULTIPLE_SLOTS
+	pc->slotID = htons(0);
+#endif
+	pc->counter_id = htonl(u32(counter_id));
+	return msg;
+}
+
 struct msgbuf *msg_flow_table_add(struct flow_table *ft)
 {
 	int i;
@@ -574,12 +625,24 @@ static void dump_packet(const struct msgbuf *msg)
 	uint8_t *data = msg->data;
 	size_t size = msg->size;
 	size_t i;
-	fprintf(stderr, "dumping...\n");
+
+	fprintf(stderr, "dumping...\nmsg size: %zu\nmsg data:", size);
 	for(i = 0; i < size; i++)
 	{
 		if(i%16 == 0)
-			fprintf(stderr, "\n");
-		fprintf(stderr, "%02x ", data[i]);
+			fprintf(stderr, "\n%04zx(%04zu): ", i, i);
+		if(i%16 == 8)
+			fprintf(stderr, "  ");
+		fprintf(stderr, "%02x  ", data[i]);
+	}
+	fprintf(stderr, "\n----------");
+	for (i = 0; i < size; i++)
+	{
+		if(i%16 == 0)
+			fprintf(stderr, "\n%04zx(%04zu): ", i, i);
+		if(i%16 == 8)
+			fprintf(stderr, "  ");
+		fprintf(stderr, "%03u ", data[i]);
 	}
 	fprintf(stderr, "\n----------\n");
 }
@@ -592,6 +655,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 	struct pof_flow_table_resource *tr;
 	struct pof_port_status *ps;
 	struct pof_packet_in *pi;
+	struct pof_counter *ct;
 	struct msgbuf *rmsg;
 	int i;
 	int port_id;
@@ -610,7 +674,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		break;
 	case POFT_ERROR:
 		e = GET_BODY(msg);
-		fprintf(stderr, "recive error packet:\n"
+		fprintf(stderr, "receive error packet:\n"
 			"dev_id: 0x%x\n"
 			"type: %hu\n"
 			"code: %hu\n"
@@ -620,13 +684,13 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		break;
 	case POFT_GET_CONFIG_REPLY:
 		sc = GET_BODY(msg);
-		fprintf(stderr, "recive switch config reply:\n"
+		fprintf(stderr, "receive switch config reply:\n"
 			"flags: 0x%hx  miss_send_len: %hu\n",
 			ntohs(sc->flags), ntohs(sc->miss_send_len));
 		break;
 	case POFT_RESOURCE_REPORT:
 		tr = GET_BODY(msg);
-		fprintf(stderr, "recive resource report:\n"
+		fprintf(stderr, "receive resource report:\n"
 			"counter_num: %u\n"
 			"meter_num: %u\n"
 			"group_num: %u\n",
@@ -648,7 +712,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 #else
 		port_id = ntohl(ps->desc.port_id);
 #endif
-		fprintf(stderr, "recive port status:\n"
+		fprintf(stderr, "receive port status:\n"
 			" reason: %d\n"
 			" port_id: 0x%x, name: %s\n"
 			" of_enable: %s\n"
@@ -659,6 +723,7 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		/* All ports are not Openflow(POF) enabled by default, enable it. */
 		if (!ps->desc.of_enable) {
 			struct pof_port_status *p;
+			struct xport *xp;
 			make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_port_status),
 				     POFT_PORT_MOD, &rmsg);
 			p = GET_BODY(rmsg);
@@ -667,6 +732,10 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			p->desc.of_enable = POFE_ENABLE;
 			xswitch_send(sw, rmsg);
 			sw->n_ready_ports++;
+
+			xp = xport_new(port_id);
+			xport_insert(sw, xp);
+			xport_free(xp);
 
 			/* Are we ready? */
 			if(sw->n_ready_ports == sw->n_ports)
@@ -677,6 +746,25 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 			else
 				xswitch_port_status(sw, port_id, PORT_UP);
 		}
+		break;
+	case POFT_COUNTER_REPLY:
+		ct = GET_BODY(msg);
+#if 0
+		fprintf(stderr, "receive counter reply from switch %d:\n"
+			"counter_id: %d\n"
+			"value: %"PRIu64"\n"
+			"byte_value: %"PRIu64"\n",
+			xswitch_get_dpid(sw),
+			ntohl(ct->counter_id),
+			ntohll(ct->value),
+			ntohll(ct->byte_value));
+#endif
+		xport_update(xport_lookup(sw, (uint16_t)ntohl(ct->counter_id)),
+			     ntohll(ct->value),
+			     ntohll(ct->byte_value));
+		break;
+	case POFT_QUERYALL_FIN:
+		fprintf(stderr, "receive queryall fin\n");
 		break;
 	default:
 		fprintf(stderr, "POF packet ignored\n");
