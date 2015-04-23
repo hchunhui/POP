@@ -2,8 +2,6 @@
 #define _MAPLE_API_H_
 #include "types.h"
 
-struct route;
-struct packet;
 void pull_header(struct packet *pkt);
 const char *read_header_type(struct packet *pkt);
 value_t read_packet(struct packet *pkt, const char *field);
@@ -14,7 +12,6 @@ void push_header(struct packet *pkt);
 
 void add_header(struct packet *pkt, const char *proto);
 
-struct entity;
 struct entity **get_hosts(int *pnum);
 struct entity **get_switches(int *pnum);
 struct entity *get_switch(dpid_t dpid);

@@ -1,9 +1,8 @@
 #ifndef _ROUTE_H_
 #define _ROUTE_H_
+#include "types.h"
 #include "edge.h"
 
-struct entity;
-struct route;
 struct route *route(void);
 void route_free(struct route *r);
 void route_add_edge(struct route *r, edge_t e);

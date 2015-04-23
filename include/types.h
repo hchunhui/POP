@@ -13,4 +13,9 @@
 typedef uint32_t dpid_t;
 typedef uint16_t port_t;
 
+struct map;
+struct route;
+struct packet;
+struct entity;
+
 #endif /* _TYPES_H_ */

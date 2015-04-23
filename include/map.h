@@ -1,16 +1,16 @@
 #ifndef _MAP_H_
 #define _MAP_H_
 
+#include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include "types.h"
 
 typedef union { unsigned long v; void *p; } int_or_ptr_t;
 typedef unsigned int (*hash_func_t)(int_or_ptr_t key);
 typedef bool (*eq_func_t)(int_or_ptr_t k1, int_or_ptr_t k2);
 typedef int_or_ptr_t (*dup_func_t)(int_or_ptr_t x);
 typedef void (*free_func_t)(int_or_ptr_t x);
-
-struct map;
 
 struct map *map(eq_func_t eq_key, hash_func_t hash_key,
 		dup_func_t dup_key, free_func_t free_key);
