@@ -14,13 +14,16 @@ static struct route *forward(struct entity *esw, int in_port, int out_port)
 
 static struct route *flood(struct entity *esw, int in_port)
 {
-	int i;
+	int i, n;
 	struct route *r = route();
+	const struct entity_adj *adjs = get_entity_adjs(esw, &n);
+
 	route_add_edge(r, edge(NULL, 0, esw, in_port));
-	for(i = 1; i <= 4; i++) {
-		if(i == in_port)
-			continue;
-		route_add_edge(r, edge(esw, i, NULL, 0));
+	for(i = 0; i < n; i++) {
+		int port = adjs[i].out_port;
+		if(port != in_port) {
+			route_add_edge(r, edge(esw, port, NULL, 0));
+		}
 	}
 	return r;
 }
