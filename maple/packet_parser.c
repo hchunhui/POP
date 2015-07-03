@@ -478,16 +478,52 @@ void packet_parser_add_header(struct packet_parser *pp, struct header *add_spec,
 	*phlen = hlen;
 }
 
+/* translate from RFC 1071 */
+static void checksum(uint8_t *data, int off, int hlen)
+{
+	uint8_t *buf = data;
+	uint32_t sum = 0;
+
+	*(uint16_t *)(data + off) = 0;
+
+	while(hlen > 1) {
+		sum += *(uint16_t *)buf;
+		buf += 2;
+		hlen -= 2;
+	}
+
+	if(hlen > 0)
+		sum += *buf;
+
+	while(sum>>16)
+		sum = (sum & 0xffff) + (sum >> 16);
+
+	*(uint16_t *)(data + off) = ~sum;
+}
+
 void packet_parser_mod(struct packet_parser *pp, const char *field, value_t value,
 		       struct header **spec)
 {
 	int offset, length;
+	const char *checksum_field;
+
 	struct header *cur_spec = STACK_TOP(pp).spec;
 	*spec = cur_spec;
 
 	header_get_field(cur_spec, field, &offset, &length);
 	assert((offset + length + 7) / 8 <= STACK_TOP(pp).length);
 	value_unextract(STACK_TOP(pp).data, offset, length, value);
+
+	/* re-calcuate checksum */
+	/* TODO: incremental update checksum */
+	checksum_field = header_get_sum(cur_spec);
+	if(checksum_field) {
+		int hlen = expr_interp(cur_spec->length, pp);
+		header_get_field(cur_spec, checksum_field, &offset, &length);
+		/* FIXME */
+		assert(offset % 16 == 0 && length == 16);
+		checksum(STACK_TOP(pp).data, offset/8, hlen);
+	}
 }
 
 value_t packet_parser_read(struct packet_parser *pp, const char *field)
