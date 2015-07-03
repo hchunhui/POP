@@ -22,6 +22,7 @@ enum token {
 	T_HEADER, // "header"
 	T_FIELDS, // "fields"
 	T_LENGTH, // "length"
+	T_CHECKSUM, // "checksum"
 	T_NEXT,   // "next"
 	T_SELECT, // "select"
 	T_CASE,   // "case"
@@ -163,6 +164,8 @@ static void next_tok(struct parse_ctx *pctx)
 					R(T_FIELDS);
 				else if(strcmp(pctx->buf, "length") == 0)
 					R(T_LENGTH);
+				else if(strcmp(pctx->buf, "checksum") == 0)
+					R(T_CHECKSUM);
 				else if(strcmp(pctx->buf, "next") == 0)
 					R(T_NEXT);
 				else if(strcmp(pctx->buf, "select") == 0)
@@ -283,10 +286,11 @@ Syntax for Packet Header Spec:
   prog ::= headers start
   start ::= START IDENT SCOL
   headers ::= e | header headers
-  header ::= HEADER IDENT (SCOL | BEGIN fields length next END)
+  header ::= HEADER IDENT (SCOL | BEGIN fields length checksum next END)
   fields ::= FIELDS BEGIN items END
   items ::= e | IDENT COL (NUMBER | STAR) SCOL items
   length ::= e | LENGTH COL expr0 SCOL
+  checksum ::= e | CHECKSUM COL IDENT SCOL
   next ::= e | NEXT SELECT LP IDENT RP BEGIN cases END
   cases ::= e | CASE NUMBER COL IDENT SCOL cases
 
@@ -484,6 +488,17 @@ D(next)
 	}
 }
 
+D(checksum)
+{
+	if(T(T_CHECKSUM)) {
+		M(T_COL);
+		M(T_IDENT);
+		header_set_sum(CTX->curr_h, CTX->buf);
+		M(T_SCOL);
+	}
+	return 0;
+}
+
 D(length)
 {
 	if(T(T_LENGTH)) {
@@ -572,6 +587,7 @@ D(headers)
 			M(T_BEGIN);
 			P(fields);
 			P(length);
+			P(checksum);
 			P(next);
 			M(T_END);
 			P(headers);

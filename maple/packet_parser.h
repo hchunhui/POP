@@ -37,9 +37,12 @@ void header_add_field(struct header *h, const char *name, int offset, int length
 void header_get_field(struct header *h, const char *name, int *offset, int *length);
 void header_set_length(struct header *h, struct expr *e);
 struct expr *header_get_length(struct header *h);
+int header_get_fixed_length(struct header *h);
 void header_set_sel(struct header *h, const char *name);
 const char *header_get_sel(struct header *h);
 int header_get_sel_length(struct header *h);
+void header_set_sum(struct header *h, const char *name);
+const char *header_get_sum(struct header *h);
 void header_add_next(struct header *h, value_t v, struct header *nh);
 struct header *header_lookup(struct header *start, const char *name);
 const char *header_get_name(struct header *h);

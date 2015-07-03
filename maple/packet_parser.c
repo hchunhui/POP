@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -228,6 +229,7 @@ struct header {
 	} fields[100];
 	struct expr *length;
 	int sel_idx;
+	int sum_idx;
 	int num_next;
 	struct {
 		value_t v;
@@ -243,6 +245,7 @@ struct header *header(const char *name)
 	h->num_fields = 0;
 	h->length = NULL;
 	h->sel_idx = -1;
+	h->sum_idx = -1;
 	h->num_next = 0;
 	return h;
 }
@@ -283,8 +286,18 @@ struct expr *header_get_length(struct header *h)
 
 int header_get_fixed_length(struct header *h)
 {
-	assert(h->length->type == EXPR_VALUE);
-	return h->length->u.value;
+	if(h->length->type == EXPR_VALUE) {
+		return h->length->u.value;
+	} else {
+		int i;
+		int length = 0;
+		fprintf(stderr, "header_get_fixed_length: length is variable!\n");
+		for(i = 0; i < h->num_fields; i++) {
+			if(h->fields[i].offset + h->fields[i].length > length)
+				length = h->fields[i].offset + h->fields[i].length;
+		}
+		return length;
+	}
 }
 
 void header_set_sel(struct header *h, const char *name)
@@ -308,6 +321,24 @@ int header_get_sel_length(struct header *h)
 {
 	assert(h->sel_idx >= 0);
 	return h->fields[h->sel_idx].length;
+}
+
+void header_set_sum(struct header *h, const char *name)
+{
+	int i;
+	for(i = 0; i < h->num_fields; i++)
+		if(strcmp(name, h->fields[i].name) == 0) {
+			h->sum_idx = i;
+			return;
+		}
+	assert(0);
+}
+
+const char *header_get_sum(struct header *h)
+{
+	if(h->sum_idx == -1)
+		return NULL;
+	return h->fields[h->sum_idx].name;
 }
 
 void header_add_next(struct header *h, value_t v, struct header *nh)

@@ -31,7 +31,7 @@ header sdnp {
 		port_dst : 16;
 		dpid_dst : 32;
 		__seq_num : 16;
-		checksum : 16;
+		cksum : 16;
 	}
 }
 
@@ -52,6 +52,7 @@ header ipv4 {
 		opt : *;
 	}
 	length : ihl << 2;
+	checksum : sum;
 	next select (nw_proto) {
 		case 0x01 : icmp;
 		case 0x02 : igmp;
