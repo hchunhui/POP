@@ -124,6 +124,7 @@ static struct route *handle_ipv4(struct packet *pkt, struct map *env)
 		if(is_multicast_ip(hdst_ip)) {
 			return handle_ipv4_multicast(hsrc_ip, hdst_ip, env);
 		} else {
+			mod_packet(pkt, "ttl", value_from_8(42));
 			return handle_ipv4_unicast(hsrc_ip, hdst_ip, env);
 		}
 	}
