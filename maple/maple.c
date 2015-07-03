@@ -314,6 +314,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		int offset, length;
 		struct header *cur_spec;
 		int j, hlen;
+		const char *checksum_field;
 
 		switch(trace->mod_events[i].type) {
 		case MEV_P:
@@ -333,6 +334,18 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 					 &length);
 			action_add_set_field(ac_edge, offset, length,
 					     trace->mod_events[i].u.m.value);
+			checksum_field = header_get_sum(cur_spec);
+			if(checksum_field) {
+				header_get_field(cur_spec,
+						 checksum_field,
+						 &offset,
+						 &length);
+				/* XXX: hack
+				 * Variable length checksum is not supported by POF-1.x.
+				 */
+				hlen = header_get_fixed_length(cur_spec);
+				action_add_checksum(ac_edge, offset, length, 0, hlen);
+			}
 			eq_edge_core = false;
 			break;
 		case MEV_A:
