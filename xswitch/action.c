@@ -131,6 +131,18 @@ void action_add_move_packet_imm(struct action *a, enum move_direction dir, int v
 	a->num_actions++;
 }
 
+void action_add_checksum(struct action *a, int sum_offset, int sum_length, int cal_offset, int cal_length)
+{
+	int n = a->num_actions;
+	assert(n < ACTION_NUM_ACTIONS);
+	a->a[n].type = AC_CHECKSUM;
+	a->a[n].u.checksum.sum_offset = sum_offset;
+	a->a[n].u.checksum.sum_length = sum_length;
+	a->a[n].u.checksum.cal_offset = cal_offset;
+	a->a[n].u.checksum.cal_length = cal_length;
+	a->num_actions++;
+}
+
 void action_free(struct action *m)
 {
 	free(m);

@@ -96,6 +96,7 @@ enum action_type {
 	AC_CALC_R,
 	AC_CALC_I,
 	AC_WRITE_METADATA,
+	AC_CHECKSUM,
 };
 
 enum move_direction {
@@ -124,6 +125,7 @@ void action_add_move_packet(struct action *a,
 			    enum move_direction dir,
 			    enum match_field_type type, int offset, int length);
 void action_add_move_packet_imm(struct action *a, enum move_direction dir, int value);
+void action_add_checksum(struct action *a, int sum_offset, int sum_length, int cal_offset, int cal_length);
 void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);

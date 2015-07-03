@@ -145,6 +145,7 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 	struct pof_action_add_field *aaf;
 	struct pof_action_delete_field *adf;
 	struct pof_action_counter *ac;
+	struct pof_action_calculate_checksum *cs;
 
 	switch(ae->type) {
 	case AC_DROP:
@@ -201,6 +202,17 @@ static bool fill_action(struct pof_action *ma, struct action_entry *ae)
 		ma->len = htons(4 + sizeof(*ac));
 		ac = (void *)(ma->action_data);
 		ac->counter_id = htonl(u32(ae->u.arg));
+		break;
+	case AC_CHECKSUM:
+		ma->type = htons(POFAT_CALCULATE_CHECKSUM);
+		ma->len = htons(4 + sizeof(*cs));
+		cs = (void *)(ma->action_data);
+		cs->checksum_pos_type = 0;
+		cs->cal_startpos_type = 0;
+		cs->checksum_pos = htons(ae->u.checksum.sum_offset);
+		cs->checksum_len = htons(ae->u.checksum.sum_length);
+		cs->cal_startpos = htons(ae->u.checksum.cal_offset);
+		cs->cal_len      = htons(ae->u.checksum.cal_length);
 		break;
 	default:
 		return false;

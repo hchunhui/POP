@@ -145,6 +145,12 @@ struct action
 				int dst_offset;
 				int dst_length;
 			} del_field;
+			struct {
+				int sum_offset;
+				int sum_length;
+				int cal_offset;
+				int cal_length;
+			} checksum;
 		} u;
 	} a[ACTION_NUM_ACTIONS];
 };
