@@ -151,7 +151,7 @@ static void init_table0(struct xswitch *sw)
 	struct match *ma;
 	struct action *ac;
 	/* init match fields */
-	sw->table0 = flow_table(1, FLOW_TABLE_TYPE_MM, 10);
+	sw->table0 = flow_table(1, FLOW_TABLE_TYPE_MM, 100);
 	flow_table_add_field(sw->table0, "in_port", MATCH_FIELD_METADATA, 16, 8);
 	flow_table_add_field(sw->table0, "dl_dst", MATCH_FIELD_PACKET, 0, 48);
 	flow_table_add_field(sw->table0, "dl_src", MATCH_FIELD_PACKET, 48, 48);
@@ -195,7 +195,7 @@ static void init_counter_table(struct xswitch *sw)
 	uint16_t port_id;
 	int priority = 1;
 	int idx = 0;
-	struct flow_table *ft = flow_table(0, FLOW_TABLE_TYPE_MM, 4);
+	struct flow_table *ft = flow_table(0, FLOW_TABLE_TYPE_MM, 100);
 	flow_table_add_field(ft, "in_port", MATCH_FIELD_METADATA, 16, 8);
 
 	msg = msg_flow_table_add(ft);
