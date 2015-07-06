@@ -6,6 +6,7 @@ header icmp;
 header igmp;
 header tcp;
 header udp;
+header sdnaddr;
 
 header ethernet {
 	fields {
@@ -22,6 +23,7 @@ header ethernet {
 }
 
 header sdnp {
+	/*
 	fields {
 		type : 8;
 		__reason : 8;
@@ -32,6 +34,27 @@ header sdnp {
 		dpid_dst : 32;
 		__seq_num : 16;
 		cksum : 16;
+	} */
+	fields {
+		len : 8;
+		addr : 8;
+		msg : *;
+	}
+	length : len;
+	next select (addr) {
+		case 0: sdnaddr;
+	}
+}
+
+header sdnaddr {
+	fields {
+		type : 8;
+		__reason : 8;
+		dpid_src : 32;
+		port_src : 16;
+		port_dst : 16;
+		dpid_dst : 32;
+		__seq_num : 16;
 	}
 }
 

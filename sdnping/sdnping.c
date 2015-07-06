@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 
-#define PKT_LEN 60
 // HWaddr 78:2B:CB:11:1B:DA
 // TODO type
 //
@@ -22,15 +21,19 @@ uint16_t sequence_num;
 int id;
 
 struct sphdr {
+	uint8_t len;
+	uint8_t addr;
+
 	uint8_t type;
 	uint8_t reason;
-	uint16_t checksum;
 	uint32_t src_dpid;
 	uint16_t src_port;
 	uint16_t dst_port;
 	uint32_t dst_dpid;
 	uint16_t sequence_num;
 };
+
+#define PKT_LEN (255 + sizeof(struct sphdr))
 
 void
 print_packet(const struct pcap_pkthdr *pkthdr, const u_char *packet)
@@ -55,17 +58,28 @@ handle_packet(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *pack
 {
 	// printf ("handle packet %d\n", sequence_num);
 	int *ret = (int *)args;
+	const u_char *msg;
 	int i;
 	struct sphdr sph;
+	if (sizeof(struct sphdr) > pkthdr->len) {
+		return;
+	}
 	i = 14;
+	sph.len = packet[i++];
+	if (sph.len + sizeof(struct sphdr) > pkthdr->len) {
+		return;
+	}
+	sph.addr = packet[i++];
+	msg = &packet[i];
+	i += sph.len;
+
 	sph.type = packet[i++];
 	if (sph.type != 2) {
 		*ret = -1;
 		return;
 	}
+
 	sph.reason = packet[i++];
-	sph.checksum = ntohs(*((uint16_t *)&packet[i]));
-	i += 2;
 	sph.src_dpid = ntohl(*((uint32_t *)&packet[i]));
 	i += 4;
 	sph.src_port = ntohs(*((uint16_t *)&packet[i]));
@@ -81,6 +95,10 @@ handle_packet(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *pack
 			*ret = 1;
 			printf("recv ack %3d from switch: %4d port: %4d\n",
 				sph.sequence_num, sph.src_dpid, sph.src_port);
+			for (i = 0; i < sph.len; i++) {
+				printf("%c", (char)msg[i]);
+			}
+			printf("\n");
 		} else if (sph.reason == 1) {
 			*ret = -2;
 		}
@@ -141,11 +159,18 @@ get_mac_addr(char *name)
 }
 
 int
-construct_request_packet(uint32_t remote_dpid, uint16_t remote_port, uint8_t *pkt)
+construct_request_packet(uint32_t remote_dpid, uint16_t remote_port,
+			 uint8_t *pkt, char *msg, int msglen)
 {
 	int i = 0;
 	uint32_t t32;
 	uint16_t t16;
+
+	if (msglen > PKT_LEN) {
+		msglen = PKT_LEN - sizeof(struct sphdr);
+		printf("Message is too long, trim to %d\n", msglen);
+	}
+
 	memset(pkt, 0, PKT_LEN);
 
 	// set mac header
@@ -156,9 +181,14 @@ construct_request_packet(uint32_t remote_dpid, uint16_t remote_port, uint8_t *pk
 	pkt[i++] = 0x55;
 	pkt[i++] = 0x55;
 
+	pkt[i++] = msglen; // len
+	pkt[i++] = 0; // addr;
+	memcpy(&pkt[i], msg, msglen);
+	i += msglen;
+
 	// set sdn new protocol header
-	pkt[i] = 0x1;
-	i += 4;
+	pkt[i++] = 0x1; // type
+	pkt[i++] = 0; // reason
 	t32 = htonl(local_dpid);
 	t16 = htons(local_port);
 	memcpy(&pkt[i], &t32, 4);
@@ -173,9 +203,10 @@ construct_request_packet(uint32_t remote_dpid, uint16_t remote_port, uint8_t *pk
 	i += 4;
 	t16 = htons(sequence_num);
 	memcpy(&pkt[i], &t16, 2);
+	i += 2;
 
 	// TODO Sequence Number and CheckSum
-	return 0;
+	return i;
 }
 
 int
@@ -183,16 +214,16 @@ main(int argc, char *argv[])
 {
 	// lookup and open dev
 	char errbuf[PCAP_ERRBUF_SIZE], *devstr;
+	char *msg = NULL;
 	pcap_t *device;
 	uint32_t remote_dpid;
 	uint16_t remote_port;
 	uint8_t sendbuf[PKT_LEN];
 	struct bpf_program filter;
-	int t;
+	int t, pktlen;
 
 	if (argc < 3) {
-		printf("Usage: sdnping dst_dpid dst_port\n");
-		printf("type of dst_dpid, dst_port: int\n");
+		printf("Usage: sdnping dst_dpid dst_port [msg]\n");
 		return 1;
 	}
 	t = atoi(argv[1]);
@@ -207,6 +238,9 @@ main(int argc, char *argv[])
 		return 1;
 	}
 	remote_port = (uint16_t) t;
+	if (argc >= 4) {
+		msg = argv[3];
+	}
 	// devstr = "h2-eth1";
 	devstr = pcap_lookupdev(errbuf);
 	if (devstr) {
@@ -240,8 +274,8 @@ main(int argc, char *argv[])
 		int ret;
 		sequence_num ++;
 		printf("send packet %3d\n", sequence_num);
-		construct_request_packet(remote_dpid, remote_port, sendbuf);
-		pcap_inject(device, sendbuf, PKT_LEN);
+		pktlen = construct_request_packet(remote_dpid, remote_port, sendbuf, msg, strlen(msg));
+		pcap_inject(device, sendbuf, pktlen);
 		for(;;) {
 			// XXX set id as a return value
 			// USE dispatch because loop has no time out

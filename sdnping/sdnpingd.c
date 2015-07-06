@@ -11,22 +11,25 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 
-#define PKT_LEN 60
 
 uint8_t macaddr[6];
 uint32_t local_dpid;
 uint16_t local_port;
 
 struct sphdr {
+	uint8_t len;
+	uint8_t addr;
+
 	uint8_t type;
 	uint8_t reason;
-	uint16_t checksum;
 	uint32_t src_dpid;
 	uint16_t src_port;
 	uint16_t dst_port;
 	uint32_t dst_dpid;
 	uint16_t sequence_num;
 };
+
+#define PKT_LEN (255 + sizeof(struct sphdr))
 
 int
 get_sdn_addr()
@@ -77,11 +80,17 @@ get_mac_addr(char *name)
 
 int
 construct_reply_packet(uint32_t remote_dpid, uint16_t remote_port,
-		       uint16_t sequence_num, uint8_t *pkt)
+		       uint16_t sequence_num, uint8_t *pkt,
+		       char *msg, int msglen)
 {
 	int i = 0;
 	uint32_t t32;
 	uint16_t t16;
+
+	if (msglen > PKT_LEN) {
+		msglen = PKT_LEN - sizeof(struct sphdr);
+		printf("Message is too long, trim to %d\n", msglen);
+	}
 
 	memset(pkt, 0, PKT_LEN);
 	memset(pkt, 0xff, 6);
@@ -90,8 +99,14 @@ construct_reply_packet(uint32_t remote_dpid, uint16_t remote_port,
 	i += 6;
 	pkt[i++] = 0x55;
 	pkt[i++] = 0x55;
-	pkt[i] = 0x2;
-	i += 4;
+
+	pkt[i++] = msglen; // len
+	pkt[i++] = 0; // addr select
+	memcpy(&pkt[i], msg, msglen);
+	i += msglen;
+	
+	pkt[i++] = 0x2; // type
+	pkt[i++] = 0; // reason
 	t32 = htonl(local_dpid);
 	t16 = htons(local_port);
 	memcpy(&pkt[i], &t32, 4);
@@ -106,8 +121,9 @@ construct_reply_packet(uint32_t remote_dpid, uint16_t remote_port,
 	i += 4;
 	t16 = htons(sequence_num);
 	memcpy(&pkt[i], &t16, 2);
+	i += 2;
 
-	return 0;
+	return i;
 }
 void
 print_packet(const struct pcap_pkthdr *pkthdr, const u_char *packet)
@@ -126,18 +142,51 @@ print_packet(const struct pcap_pkthdr *pkthdr, const u_char *packet)
 	printf("\n\n");
 }
 
+static void
+switch_msg(char *msg, int len)
+{
+	int i;
+	for (i = 0; i < len; i++) {
+		if (msg[i] <= 'z' && msg[i] >= 'a')
+			msg[i] += 'Z' - 'z';
+		else if (msg[i] <= 'Z' && msg[i] >= 'A')
+			msg[i] += 'z' - 'Z';
+	}
+}
+
 void
 handle_packet(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *packet)
 {
 	pcap_t *device = (pcap_t *)args;
-	int i;
+	int i, pktlen;
+	char msg[PKT_LEN];
 	struct sphdr sph;
 	uint8_t sendbuf[PKT_LEN];
+/*
+	for (i = 0; i < pkthdr->len; i++) {
+		printf("%02x ", packet[i]);
+	}
+	printf("\n");
+*/
+	if (sizeof(struct sphdr) > pkthdr->len) {
+		return;
+	}
 	i = 14;
+	sph.len = packet[i++];
+	if (sph.len + sizeof(struct sphdr) > pkthdr->len) {
+		return;
+	}
+	sph.addr = packet[i++];
+	memcpy(msg, &packet[i], sph.len);
+	i += sph.len;
+
+	switch_msg(msg, sph.len);
 	sph.type = packet[i++];
+	if (sph.type != 1) {
+		return;
+	}
+
 	sph.reason = packet[i++];
-	sph.checksum = ntohs(*((uint16_t *)&packet[i]));
-	i += 2;
 	sph.src_dpid = ntohl(*((uint32_t *)&packet[i]));
 	i += 4;
 	sph.src_port = ntohs(*((uint16_t *)&packet[i]));
@@ -151,8 +200,8 @@ handle_packet(u_char *args, const struct pcap_pkthdr *pkthdr, const u_char *pack
 	if (sph.dst_port == local_port && sph.dst_dpid == local_dpid) {
 		// printf("recv request from switch %d port %d\n",
 		//         sph.src_dpid, sph.src_port);
-		construct_reply_packet(sph.src_dpid, sph.src_port, sph.sequence_num , sendbuf);
-		pcap_inject(device, sendbuf, PKT_LEN);
+		pktlen = construct_reply_packet(sph.src_dpid, sph.src_port, sph.sequence_num , sendbuf, msg, sph.len);
+		pcap_inject(device, sendbuf, pktlen);
 	}
 
 	// print_packet(pkthdr, packet);
@@ -166,8 +215,8 @@ main()
 	struct bpf_program filter;
 	pcap_t *device;
 
-	if (fork() != 0)
-		return 0;
+	//if (fork() != 0)
+	//	return 0;
 	devstr = pcap_lookupdev(err_buf);
 	// devstr = "h1-eth1";
 	printf("devstr: %s\n", devstr);
@@ -190,7 +239,7 @@ main()
 
 	pcap_setdirection(device, PCAP_D_IN);
 	// construct a filter
-	pcap_compile(device, &filter, "ether[12]=0x55 and ether[13]=0x55 and ether[14]=0x1", 1, 0);
+	pcap_compile(device, &filter, "ether[12]=0x55 and ether[13]=0x55", 1, 0);
 	pcap_setfilter(device, &filter);
 
 	pcap_loop(device, -1, handle_packet, (u_char *)device);

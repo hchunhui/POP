@@ -18,6 +18,7 @@ static struct route *handle_sdnp(struct packet *pkt, struct map *env)
 	int src_port, dst_port;
 	struct nodeinfo *visited;
 
+	pull_header(pkt);
 	src = get_switch(value_to_32(read_packet(pkt, "dpid_src")));
 	dst = get_switch(value_to_32(read_packet(pkt, "dpid_dst")));
 	src_port = value_to_16(read_packet(pkt, "port_src"));
@@ -31,6 +32,7 @@ static struct route *handle_sdnp(struct packet *pkt, struct map *env)
 	visited = get_tree(src, src_port, dst, switches, switches_num);
 	r = get_route(dst, dst_port, visited, switches, switches_num);
 	free(visited);
+	push_header(pkt);
 	return r;
 }
 
