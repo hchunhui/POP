@@ -40,7 +40,7 @@ header sdnp {
 		addr : 8;
 		msg : *;
 	}
-	length : len;
+	length : len + 2;
 	next select (addr) {
 		case 0: sdnaddr;
 	}
