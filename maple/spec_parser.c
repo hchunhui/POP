@@ -209,6 +209,10 @@ static void next_tok(struct parse_ctx *pctx)
 						}
 						*p = 0;
 						pctx->val = strtoull(pctx->buf, NULL, 8);
+					} else { /* Yes, it's zero! */
+						pctx->buf[0] = L;
+						pctx->buf[1] = 0;
+						pctx->val = 0;
 					}
 				} else {
 					char *p = pctx->buf;
