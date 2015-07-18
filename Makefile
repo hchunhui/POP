@@ -11,3 +11,5 @@ clean:
 		make -C $${d} clean; \
 	done
 
+dist:
+	scripts/dist

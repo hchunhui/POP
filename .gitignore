@@ -4,3 +4,5 @@
 *.swp
 *~
 .depends
+VERSION
+out

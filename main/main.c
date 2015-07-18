@@ -94,6 +94,7 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+	fprintf(stderr, "POP Version: %s\n", VERSION);
 	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
 	init_io_module();
 	xswitch_init(algo_file, spec_file);

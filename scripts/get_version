@@ -1,0 +1,25 @@
+#!/bin/sh
+
+get_version()
+{
+	if command -v git >/dev/null 2>/dev/null; then
+		if git status >/dev/null 2>/dev/null; then
+			rev=`git rev-list HEAD --count`
+			head=`git rev-parse --verify --short HEAD`
+			if git diff-index --name-only HEAD >/dev/null 2>/dev/null; then
+				dirty='-dirty'
+			else
+				dirty=''
+			fi
+			echo $rev'-'$head$dirty
+			return
+		fi
+	fi
+	if test -f "VERSION"; then
+		cat VERSION
+	else
+		echo '(UNKNOWN)'
+	fi
+}
+
+echo $(get_version)

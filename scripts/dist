@@ -1,0 +1,14 @@
+#!/bin/sh
+
+DIST_DIR=out
+VERSION=`scripts/get_version`
+NAME=pop-$VERSION
+
+mkdir -p $DIST_DIR
+echo $VERSION > VERSION
+
+echo Generating $DIST_DIR/$NAME.tar.gz ...
+rm -f $DIST_DIR/$NAME.tar.gz $DIST_DIR/$NAME.list
+git ls-files -c -o --exclude-standard > $DIST_DIR/$NAME.list
+echo VERSION >> $DIST_DIR/$NAME.list
+tar -c -z -T $DIST_DIR/$NAME.list --transform 's,^,'$NAME'/,' -f $DIST_DIR/$NAME.tar.gz
