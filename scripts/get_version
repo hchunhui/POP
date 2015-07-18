@@ -3,10 +3,14 @@
 get_version()
 {
 	if command -v git >/dev/null 2>/dev/null; then
-		if git status >/dev/null 2>/dev/null; then
+		if git --git-dir=.git status >/dev/null 2>/dev/null; then
+			if test -f "VERSION"; then
+				VERSION=`cat VERSION`
+				echo -n $VERSION"-local"
+			fi
 			rev=`git rev-list HEAD --count`
 			head=`git rev-parse --verify --short HEAD`
-			if git diff-index --name-only HEAD >/dev/null 2>/dev/null; then
+			if git diff-index --name-only HEAD 2>/dev/null | grep -q ""; then
 				dirty='-dirty'
 			else
 				dirty=''
@@ -18,8 +22,9 @@ get_version()
 	if test -f "VERSION"; then
 		cat VERSION
 	else
-		echo '(UNKNOWN)'
+		echo 'UNKNOWN'
 	fi
 }
 
+cd `dirname $0`/..
 echo $(get_version)
