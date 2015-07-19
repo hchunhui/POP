@@ -68,7 +68,6 @@ struct xswitch *xswitch(dpid_t dpid, int ports, void *conn)
 
 	if(dpid) {
 		sw->state = XS_RUNNING;
-		xswitch_up(sw);
 	} else {
 		sw->state = XS_HELLO;
 		msg = msg_hello();
@@ -211,8 +210,8 @@ next:
 		init_counter(sw, port_id);
 		/* match port_id */
 		ma = match();
-		match_add(ma, "in_port", value_from_16l(port_id),
-			  value_from_64(0xffffffffffffffffull));
+		match_add(ma, "in_port", value_from_8(port_id),
+			  value_from_8(0xff));
 		ac = action();
 		action_add(ac, AC_COUNTER, port_id);
 		action_add_goto_table(ac, 1, 0);

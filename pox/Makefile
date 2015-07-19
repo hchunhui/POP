@@ -1,5 +1,5 @@
 TOPDIR = ..
-PROG = pofmaple_pox.so
+PROG = pop_pox.so
 SRCS = main.c
 EXTRA_OBJS = \
 	${TOPDIR}/maple/libmaple.a ${TOPDIR}/topo/libtopo.a \

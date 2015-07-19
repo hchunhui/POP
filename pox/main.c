@@ -89,11 +89,23 @@ going_up(PyObject *self __unused, PyObject *args)
 	uint32_t dpid;
 	int n_ports;
 	struct xswitch *sw;
-	PyObject *obj;
+	PyObject *obj, *list, *liter, *port;
 
-	PyArg_ParseTuple(args, "IiO", &dpid, &n_ports, &obj);
+	PyArg_ParseTuple(args, "IOiO", &dpid, &list, &n_ports, &obj);
 	Py_INCREF(obj);
 	sw = xswitch(dpid, n_ports, obj);
+
+	liter = PyObject_GetIter(list);
+	while((port = PyIter_Next(liter))) {
+		struct xport *xp;
+		xp = xport_new(PyInt_AsLong(port));
+		xport_insert(sw, xp);
+		xport_free(xp);
+		Py_DECREF(port);
+	}
+	Py_DECREF(liter);
+
+	xswitch_up(sw);
 	xmit();
 	return Py_BuildValue("k", sw);
 }
@@ -146,9 +158,9 @@ static PyMethodDef methods[] = {
 };
 
 PyMODINIT_FUNC
-initpofmaple_pox(void)
+initpop_pox(void)
 {
-	Py_InitModule("pofmaple_pox", methods);
+	Py_InitModule("pop_pox", methods);
 	mb_h = NULL;
 	in_xmit = false;
 	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
