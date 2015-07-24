@@ -1,10 +1,10 @@
-#ifndef MAPLE_IO_IO_INT_H
-#define MAPLE_IO_IO_INT_H
+#ifndef _IO_IO_INT_H
+#define _IO_IO_INT_H
 
 #include <pthread.h>
 #include <ev.h>
 
-/* This file belongs to maple I/O module */
+/* This file belongs to POP I/O module */
 
 struct cq_item {
 	int fd;

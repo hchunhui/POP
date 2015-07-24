@@ -1,0 +1,72 @@
+依赖
+----
+
+* GCC/clang       http://gcc.gnu.org  http://clang.llvm.org
+* GNU make/PMake  http://www.gnu.org/s/make
+* libev           http://libev.schmorp.de
+
+Debian/Ubuntu 用户可以输入:
+
+    apt-get install build-essential libev-dev
+
+
+安装步骤
+--------
+
+1) 配置.
+
+要选择正确的POF版本, 编辑 xswitch/Makefile:
+  POF_VERSION   POFSwitch_VERSION_1_1_9 (default) or
+                POFSwitch_VERSION_1_4_0
+(注意:
+  POP使用了原始POF软件交换机未支持的 PACKET_OUT 消息.
+  请使用我们打过补丁的实现:
+
+      bgit clone http://ssg.ustcsz.edu.cn/~hch/git/pofswitch.git
+
+  切换到下面一个分支:
+
+      git checkout backport (1.1.9 加上 PACKET_OUT 支持)
+      git checkout master   (1.1.9 加上 PACKET_OUT 支持，性能优化)
+      git checkout backport-1.4.0 (1.4.0 加上 PACKET_OUT 之前)
+)
+
+如果使用非标准的编译环境, 编辑 Makefile.comm:
+  CC          C编译器
+  CFLAGS      C编译选项
+  LDFLAGS     链接选项
+
+2) 编译.
+
+回到顶层目录, 输入:
+
+    make
+
+这将编译整个系统和"apps"目录中的应用.
+
+如下启动:
+
+    main/controller [-f apps/app.so] [-h header.spec]
+
+
+3) (可选) 编译POX支持.
+
+当与POX配合工作时, 输入:
+
+    make -C pox
+
+然后将 *.so 和 *.py 复制到 path_to_pox/ext.
+
+如下启动:
+
+    ./pox.py pop [--algo_file=apps/app.so] [--spec_file=header.spec]
+
+
+Mininet 整合
+------------
+
+请使用我们打过补丁的Mininet:
+
+    git clone http://ssg.ustcsz.edu.cn/~hch/git/mininet.git
+    cd mininet
+    ./local-install

@@ -2,8 +2,8 @@
  * Author: Tiwei Bie (btw@mail.ustc.edu.cn)
  */
 
-#ifndef MAPLE_IO_THREAD_H
-#define MAPLE_IO_THREAD_H
+#ifndef _IO_THREAD_H
+#define _IO_THREAD_H
 
 #if defined(__linux__) || defined(__linux)
 #include <sched.h>

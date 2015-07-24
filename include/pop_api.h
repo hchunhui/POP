@@ -1,5 +1,5 @@
-#ifndef _MAPLE_API_H_
-#define _MAPLE_API_H_
+#ifndef _POP_API_H_
+#define _POP_API_H_
 #include "types.h"
 
 void pull_header(struct packet *pkt);
@@ -46,4 +46,4 @@ bool get_port_stats(struct entity *e, uint16_t port_id,
 		    uint64_t *recent_recvpkts/*OUT*/,
 		    uint64_t *recent_recvbytes/*OUT*/);
 
-#endif /* _MAPLE_API_H_ */
+#endif /* _POP_API_H_ */

@@ -1,0 +1,50 @@
+关于
+----
+
+POP(Protocol oblivious Programming)是一个SDN的编程环境.
+
+联系方式:
+    hchunhui@mail.ustc.edu.cn
+
+
+安装
+----
+
+请见 "INSTALL" 文件.
+
+
+快速上手
+--------
+
+POP 接受两个参数作为输入: 应用和数据包头规范.
+
+    main/controller -f apps/app.so -h header.spec
+
+应用都放在 "apps" 目录中, 他们事先要编译成 .so 文件.
+
+数据包头规范定义了数据包头的各种域. "scripts/header.spec" 是一个示例.
+
+系统自带两个示例应用:
+
+l3_multi: IPV4 单播和多播, SDNP 单播.
+
+    main/controller -f apps/l3_multi.so -h scripts/header.spec
+
+l2_learning: MAC 学习型交换机.
+
+    main/controller -f apps/l2_learning.so -h scripts/header.spec
+
+
+文档
+----
+
+请见 "doc" 目录.
+
+
+代码贡献者
+----------
+
+Chunhui He      core, xswitch, pox
+Dongyang Wang   topo, xswitch, sample applications
+Tiwei Bie       IO
+Hu Ge           sample applications

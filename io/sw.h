@@ -1,5 +1,5 @@
-#ifndef _MAPLE_IO_SW_H
-#define _MAPLE_IO_SW_H
+#ifndef _IO_SW_H
+#define _IO_SW_H
 
 #include <stdlib.h>
 #include <assert.h>

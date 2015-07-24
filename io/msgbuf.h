@@ -31,8 +31,8 @@
  * derivatives without specific, written prior permission.
  */
 
-#ifndef MAPLE_IO_MSGBUF_H
-#define MAPLE_IO_MSGBUF_H
+#ifndef _IO_MSGBUF_H
+#define _IO_MSGBUF_H
 
 #include <stddef.h>
 

@@ -1,0 +1,72 @@
+PREREQUISITES
+-------------
+
+* GCC/clang       http://gcc.gnu.org  http://clang.llvm.org
+* GNU make/PMake  http://www.gnu.org/s/make
+* libev           http://libev.schmorp.de
+
+For Debian/Ubuntu users, do:
+
+    apt-get install build-essential libev-dev
+
+
+INSTALLATION INSTRUCTIONS
+-------------------------
+
+1) Configure.
+
+Choose the right POF version, edit xswitch/Makefile:
+  POF_VERSION   POFSwitch_VERSION_1_1_9 (default) or
+                POFSwitch_VERSION_1_4_0
+(NOTE:
+  POP uses the PACKET_OUT message heavily, but original POF software
+  switch doesn't support it. Please use our patched POFSwitch:
+
+      git clone http://ssg.ustcsz.edu.cn/~hch/git/pofswitch.git
+
+  Swtich to one of the following branch:
+
+      git checkout backport (1.1.9 with PACKET_OUT support)
+      git checkout master   (optimized 1.1.9 with PACKET_OUT support)
+      git checkout backport-1.4.0 (1.4.0 with PACKET_OUT support)
+)
+
+For non-standard build environment, edit Makefile.comm:
+  CC          C compiler command
+  CFLAGS      C compiler flags
+  LDFLAGS     linker flags
+
+2) Compile.
+
+From the top directory, do:
+
+    make
+
+This builds the system and applications located in the "apps" directory.
+
+To start, do:
+
+    main/controller [-f apps/app.so] [-h header.spec]
+
+
+3) (Optional) Compile POX support.
+
+To work with POX, do:
+
+    make -C pox
+
+Then copy *.so and *.py to path_to_pox/ext.
+
+To start POP, do:
+
+    ./pox.py pop [--algo_file=apps/app.so] [--spec_file=header.spec]
+
+
+INTEGRATION WITH MININET
+------------------------
+
+Please use our patched mininet:
+
+    git clone http://ssg.ustcsz.edu.cn/~hch/git/mininet.git
+    cd mininet
+    ./local-install

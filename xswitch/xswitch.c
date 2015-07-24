@@ -8,7 +8,7 @@
 #include "xswitch.h"
 #include "io/msgbuf.h"
 
-#include "maple/maple.h"
+#include "core/core.h"
 #include "topo/topo.h"
 
 #include "io/sw.h"
@@ -19,7 +19,7 @@ static __thread struct xswitch *xswitches[XSWITCHMAX];
 
 void xswitch_init(const char *algo_file, const char *spec_file)
 {
-	maple_init(algo_file, spec_file);
+	core_init(algo_file, spec_file);
 	topo_init();
 }
 
@@ -232,7 +232,7 @@ void xswitch_up(struct xswitch *sw)
 	init_counter_table(sw);
 	init_table0(sw);
 	sw->next_table_id = 2;
-	maple_switch_up(sw);
+	core_switch_up(sw);
 	topo_switch_up(sw);
 }
 
@@ -249,7 +249,7 @@ void xswitch_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int pac
 	}
 	fprintf(stderr, "\n");
 	if (!topo_packet_in(sw, in_port, packet, packet_len))
-		maple_packet_in(sw, in_port, packet, packet_len);
+		core_packet_in(sw, in_port, packet, packet_len);
 }
 
 void xswitch_port_status(struct xswitch *sw, int port, enum port_status status)
@@ -262,7 +262,7 @@ void xswitch_down(struct xswitch *sw)
 	int i;
 	struct xport **xps;
 	topo_switch_down(sw);
-	maple_switch_down(sw);
+	core_switch_down(sw);
 	flow_table_free(sw->table0);
 	xps = xswitch_get_xports(sw);
 	for (i = 0; i < XPORT_HASH_SIZE; i++) {

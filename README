@@ -1,0 +1,51 @@
+ABOUT
+-----
+
+POP(Protocol oblivious Programming) is a SDN programming environment.
+
+Please send inquiries/comments/reports to:
+    hchunhui@mail.ustc.edu.cn
+
+
+INSTALLATION
+------------
+
+See the file "INSTALL" for installation instructions on Unix like OS.
+
+
+QUICKSTART
+----------
+
+POP accepts two parameters as input: application and header specification.
+
+    main/controller -f apps/app.so -h header.spec
+
+Applications are located in the "apps" directory, they are compiled into .so files.
+
+Header specification defines fields of packet headers. "scripts/header.spec" is a
+sample header specification.
+
+There are two sample applications:
+
+l3_multi: IPV4 unicast & multicast, SDNP unicast.
+
+    main/controller -f apps/l3_multi.so -h scripts/header.spec
+
+l2_learning: MAC learning switch.
+
+    main/controller -f apps/l2_learning.so -h scripts/header.spec
+
+
+DOCUMENTATION
+-------------
+
+See files in the "doc" directory.
+
+
+CONTRIBUTORS
+------------
+
+Chunhui He      core, xswitch, pox
+Dongyang Wang   topo, xswitch, sample applications
+Tiwei Bie       IO
+Hu Ge           sample applications

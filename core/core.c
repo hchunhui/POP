@@ -8,14 +8,14 @@
 #include "topo/entity.h"
 #include "route.h"
 
-#include "maple.h"
+#include "core.h"
 #include "packet_parser.h"
 #include "spec_parser.h"
 #include "trace.h"
 #include "trace_tree.h"
 #include "map.h"
 
-#include "maple_api.h"
+#include "pop_api.h"
 
 static void *algo_handle;
 
@@ -199,14 +199,14 @@ bool get_port_stats(struct entity *e, uint16_t port_id,
 
 /* XXX */
 /* XXX: acquire topo_lock first! */
-void maple_invalidate(bool (*p)(void *p_data, const char *name, const void *arg), void *p_data)
+void core_invalidate(bool (*p)(void *p_data, const char *name, const void *arg), void *p_data)
 {
 	int num_switches;
 	struct entity **switches;
 	int i;
 
 	switches = topo_get_switches(&num_switches);
-	fprintf(stderr, "maple_invalidate\n");
+	fprintf(stderr, "core_invalidate\n");
 	for(i = 0; i < num_switches; i++) {
 		struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 		struct trace_tree *tt = cur_sw->trace_tree;
@@ -218,7 +218,7 @@ void maple_invalidate(bool (*p)(void *p_data, const char *name, const void *arg)
 }
 
 /* call back funtions */
-void maple_init(const char *algo_file, const char *spec_file)
+void core_init(const char *algo_file, const char *spec_file)
 {
 	fprintf(stderr, "loading algorithm(%s)...\n", algo_file);
 	algo_handle = dlopen(algo_file, RTLD_NOW);
@@ -238,13 +238,13 @@ void maple_init(const char *algo_file, const char *spec_file)
 	init_f(env);
 }
 
-void maple_switch_up(struct xswitch *sw)
+void core_switch_up(struct xswitch *sw)
 {
 	/* init trace tree */
 	sw->trace_tree = trace_tree();
 }
 
-void maple_switch_down(struct xswitch *sw)
+void core_switch_down(struct xswitch *sw)
 {
 	trace_tree_free(sw->trace_tree);
 }
@@ -273,7 +273,7 @@ static bool cmpna_p(void *parg, const char *name, const void *arg)
 	return false;
 }
 
-void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len)
+void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len)
 {
 	int i;
 	struct route *r;
@@ -468,7 +468,7 @@ void maple_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packe
 		na.arg = trace->inv_events[i].arg;
 		fprintf(stderr, "invalidate \"%s\":\n", na.name);
 		topo_rdlock();
-		maple_invalidate(cmpna_p, &na);
+		core_invalidate(cmpna_p, &na);
 		topo_unlock();
 	}
 }

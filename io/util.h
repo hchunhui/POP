@@ -2,8 +2,8 @@
  * Author: Tiwei Bie (btw@mail.ustc.edu.cn)
  */
 
-#ifndef MAPLE_IO_UTIL_H
-#define MAPLE_IO_UTIL_H
+#ifndef _IO_UTIL_H
+#define _IO_UTIL_H
 
 #include <fcntl.h>
 

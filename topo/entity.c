@@ -5,7 +5,7 @@
 #include "entity.h"
 #include "xswitch/xswitch.h"
 
-#include "maple/maple.h"
+#include "core/core.h"
 
 struct entity
 {
@@ -129,7 +129,7 @@ void entity_set_paddr(struct entity *e, uint32_t paddr)
 {
 	assert(e->type == ENTITY_TYPE_HOST);
 	e->u.addr.paddr = paddr;
-	maple_invalidate(host_p, e);
+	core_invalidate(host_p, e);
 }
 
 struct entity *entity_host_get_adj_switch(struct entity *e, int *sw_port)
@@ -168,12 +168,12 @@ void entity_add_link(struct entity *e1, int port1, struct entity *e2, int port2)
 	e1->num_adjs++;
 	e2->num_adjs++;
 #ifdef STRICT_INVALIDATE
-	maple_invalidate(entity_adjs_p, e1->adjs);
-	maple_invalidate(entity_adjs_p, e2->adjs);
+	core_invalidate(entity_adjs_p, e1->adjs);
+	core_invalidate(entity_adjs_p, e2->adjs);
 #else
 	if(e1->type != ENTITY_TYPE_HOST && e2->type != ENTITY_TYPE_HOST) {
-		maple_invalidate(entity_adjs_p, e1->adjs);
-		maple_invalidate(entity_adjs_p, e2->adjs);
+		core_invalidate(entity_adjs_p, e1->adjs);
+		core_invalidate(entity_adjs_p, e2->adjs);
 	}
 #endif
 }
@@ -196,7 +196,7 @@ void entity_del_link(struct entity *e1, int port1)
 					j++;
 				}
 			}
-			maple_invalidate(entity_adjs_p, e2->adjs);
+			core_invalidate(entity_adjs_p, e2->adjs);
 			e1->num_adjs--;
 			e1->adjs[i] = e1->adjs[e1->num_adjs];
 		} else {
@@ -204,9 +204,9 @@ void entity_del_link(struct entity *e1, int port1)
 		}
 	}
 #ifdef STRICT_INVALIDATE
-	maple_invalidate(entity_adjs_p, e1->adjs);
+	core_invalidate(entity_adjs_p, e1->adjs);
 #else
 	if(flag == false)
-		maple_invalidate(entity_adjs_p, e1->adjs);
+		core_invalidate(entity_adjs_p, e1->adjs);
 #endif
 }

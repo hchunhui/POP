@@ -1,7 +1,7 @@
-#ifndef MAPLE_IO_IO_H
-#define MAPLE_IO_IO_H
+#ifndef _IO_IO_H
+#define _IO_IO_H
 
-/* This file belongs to maple I/O module */
+/* This file belongs to POP I/O module */
 
 #define NR_WORKERS 2
 

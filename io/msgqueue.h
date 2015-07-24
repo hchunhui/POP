@@ -1,7 +1,7 @@
-#ifndef MAPLE_IO_MSGQUEUE_H
-#define MAPLE_IO_MSGQUEUE_H
+#ifndef _IO_MSGQUEUE_H
+#define _IO_MSGQUEUE_H
 
-/* This file belongs to maple I/O module */
+/* This file belongs to POP I/O module */
 
 #include <pthread.h>
 #include "io.h"

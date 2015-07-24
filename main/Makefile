@@ -2,9 +2,9 @@ TOPDIR = ..
 PROG = controller
 SRCS = main.c
 EXTRA_OBJS = \
-	${TOPDIR}/maple/libmaple.a ${TOPDIR}/topo/libtopo.a \
+	${TOPDIR}/core/libcore.a ${TOPDIR}/topo/libtopo.a \
 	${TOPDIR}/xswitch/libxswitch.a \
-	${TOPDIR}/io/libmaple-io.a
+	${TOPDIR}/io/libio.a
 VERSION != ${TOPDIR}/scripts/get_version
 
 EXTRA_CFLAGS = -D'VERSION="${VERSION}"' -O2 -Wall -g -I/usr/local/include -I/home/btw/local/include

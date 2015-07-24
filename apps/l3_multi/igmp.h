@@ -1,7 +1,7 @@
 #ifndef _IGMP_H_
 #define _IGMP_H_
 
-#include "maple_api.h"
+#include "pop_api.h"
 #include "types.h"
 #include "value.h"
 #include <assert.h>

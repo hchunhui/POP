@@ -2,7 +2,7 @@ TOPDIR = ..
 PROG = pop_pox.so
 SRCS = main.c
 EXTRA_OBJS = \
-	${TOPDIR}/maple/libmaple.a ${TOPDIR}/topo/libtopo.a \
+	${TOPDIR}/core/libcore.a ${TOPDIR}/topo/libtopo.a \
 	${TOPDIR}/xswitch/libxswitch.a \
 	${TOPDIR}/io/msgbuf.o
 

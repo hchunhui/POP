@@ -8,7 +8,7 @@
 #include "entity.h"
 #include "discovery.h"
 
-#include "maple/maple.h"
+#include "core/core.h"
 
 #define MAX_NUM_HOSTS 1000
 #define MAX_NUM_SWITCHES 100
@@ -104,7 +104,7 @@ int topo_add_host(struct entity *e)
 	if (num_hosts >= MAX_NUM_HOSTS)
 		return -1;
 	hosts[num_hosts++] = e;
-	maple_invalidate(host_p, NULL);
+	core_invalidate(host_p, NULL);
 	return (num_hosts-1);
 }
 
@@ -118,7 +118,7 @@ int topo_add_switch(struct entity *e)
 	if(num_switches >= MAX_NUM_SWITCHES)
 		return -1;
 	switches[num_switches++] = e;
-	maple_invalidate(switch_p, NULL);
+	core_invalidate(switch_p, NULL);
 	return (num_switches - 1);
 }
 
@@ -127,7 +127,7 @@ int topo_del_host(struct entity *e)
 	int i;
 	for (i=0; i < num_hosts; i++)
 		if (hosts[i] == e) {
-			maple_invalidate(host_p, e);
+			core_invalidate(host_p, e);
 			num_hosts --;
 			entity_free(e);
 			if (i != num_hosts)
@@ -142,7 +142,7 @@ int topo_del_switch(struct entity *e)
 	int i;
 	for (i=0; i < num_switches; i++)
 		if (switches[i] == e) {
-			maple_invalidate(switch_p, e);
+			core_invalidate(switch_p, e);
 			num_switches --;
 			entity_free(e);
 			if (i != num_switches)
@@ -225,7 +225,7 @@ static void del_dangling_hosts(void)
 		int num_adjs;
 		entity_get_adjs(hosts[j], &num_adjs);
 		if(num_adjs == 0) {
-			maple_invalidate(host_p, hosts[j]);
+			core_invalidate(host_p, hosts[j]);
 			num_hosts--;
 			entity_free(hosts[j]);
 			hosts[j] = hosts[num_hosts];

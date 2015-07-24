@@ -1,5 +1,5 @@
-#ifndef MAPLE_PARAM_H
-#define MAPLE_PARAM_H
+#ifndef _PARAM_H
+#define _PARAM_H
 
 extern int verbose;
 extern int realtime;
