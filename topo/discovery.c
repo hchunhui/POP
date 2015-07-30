@@ -503,6 +503,7 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 				port);
 		}
 	}
+	topo_print();
 	topo_unlock();
 }
 

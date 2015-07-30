@@ -2,6 +2,7 @@ CC = cc
 LD = cc
 AR = ar
 CFLAGS = -Werror=cast-qual -fPIC -I${TOPDIR} -I${TOPDIR}/include -pthread ${EXTRA_CFLAGS}
+#CFLAGS += -DENABLE_WEB
 LDFLAGS = ${EXTRA_LDFLAGS}
 OBJS = ${SRCS:.c=.o}
 

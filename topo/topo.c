@@ -10,6 +10,10 @@
 
 #include "core/core.h"
 
+#ifdef ENABLE_WEB
+#include "web/ws.h"
+#endif
+
 #define MAX_NUM_HOSTS 1000
 #define MAX_NUM_SWITCHES 100
 
@@ -40,6 +44,82 @@ void topo_unlock(void)
 	pthread_rwlock_unlock(&topo_lock);
 }
 
+#ifdef ENABLE_WEB
+static int find_id(struct entity *e)
+{
+        int i;
+        if(entity_get_type(e) == ENTITY_TYPE_HOST) {
+                for(i = 0; i < num_hosts; i++)
+                        if(hosts[i] == e)
+                                return num_switches + i;
+        } else {
+                for(i = 0; i < num_switches; i++)
+                        if(switches[i] == e)
+                                return i;
+        }
+        assert(0);
+}
+
+void topo_print_json(void)
+{
+        int i;
+	char buf[40960];
+	int pos;
+        char ebuf[32];
+	printf("topo_print_json\n");
+	pos = 0;
+        pos += sprintf(buf + pos, "{");
+        pos += sprintf(buf + pos, "\"nodes\":");
+        pos += sprintf(buf + pos, "[");
+        for(i = 0; i < num_switches; i++) {
+                sprintf(ebuf, "%08x", entity_get_dpid(switches[i]));
+                pos += sprintf(buf + pos, "{ \"name\":\"%s\", \"type\":%d }%s",
+			       ebuf,
+			       entity_get_type(switches[i]),
+			       ((i == num_switches - 1) && num_hosts == 0) ? "" : ",");
+        }
+        for(i = 0; i < num_hosts; i++) {
+                struct host_info hi = entity_get_addr(hosts[i]);
+                sprintf(ebuf, "%02x:%02x:%02x:%02x:%02x:%02x",
+                        hi.haddr.octet[0], hi.haddr.octet[1], hi.haddr.octet[2],
+                        hi.haddr.octet[3], hi.haddr.octet[4], hi.haddr.octet[5]);
+                pos += sprintf(buf + pos, "{ \"name\":\"%s\", \"type\":%d }%s",
+			       ebuf,
+			       entity_get_type(hosts[i]),
+			       i == num_hosts - 1 ? "" : ",");
+        }
+        pos += sprintf(buf + pos, "],");
+
+        pos += sprintf(buf + pos, "\"links\":");
+        pos += sprintf(buf + pos, "[");
+        for(i = 0; i < num_switches; i++) {
+                struct entity *e = switches[i];
+                int j;
+                int num_adjs;
+                const struct entity_adj *adjs = entity_get_adjs(e, &num_adjs);
+                for(j = 0; j < num_adjs; j++)
+                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d }%s",
+				       i, find_id(adjs[j].adj_entity),
+				       (j == num_adjs - 1 &&
+					i == num_switches - 1 && num_hosts == 0) ?
+				       "" : ",");
+        }
+        for(i = 0; i < num_hosts; i++) {
+                struct entity *e = hosts[i];
+                int j;
+                int num_adjs;
+                const struct entity_adj *adjs = entity_get_adjs(e, &num_adjs);
+                for(j = 0; j < num_adjs; j++)
+                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d }%s",
+				       num_switches + i, find_id(adjs[j].adj_entity),
+				       (j == num_adjs - 1 && i == num_hosts - 1) ? "" : ",");
+        }
+        pos += sprintf(buf + pos, "]");
+        pos += sprintf(buf + pos, "}");
+	ws_printf("%s", buf);
+}
+#endif
+
 void topo_print(void)
 {
 	int i;
@@ -53,6 +133,9 @@ void topo_print(void)
 	}
 	fprintf(stderr, "num_switches: %d, num_hosts: %d\n",
 		num_switches, num_hosts);
+#ifdef ENABLE_WEB
+	topo_print_json();
+#endif
 }
 
 static bool host_p(void *phost, const char *name, const void *arg)

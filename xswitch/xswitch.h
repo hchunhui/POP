@@ -130,6 +130,7 @@ void action_free(struct action *a);
 int action_num_actions(struct action *a);
 void action_union(struct action *a1, struct action *a2);
 void action_dump(struct action *a, char *buf, int n);
+void action_summary(struct action *a, char *buf, int n);
 
 
 /* msg */

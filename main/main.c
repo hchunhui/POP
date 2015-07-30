@@ -13,6 +13,10 @@
 #include "io/io.h"
 #include "io/sw.h"
 
+#ifdef ENABLE_WEB
+#include "web/ws.h"
+#endif
+
 extern const char *msg_get_pof_version(void);
 extern void xswitch_init(const char *algo_file, const char *spec_file);
 extern struct xswitch *xswitch_on_accept(void *conn);
@@ -94,6 +98,9 @@ main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
+#ifdef ENABLE_WEB
+	ws_init();
+#endif
 	fprintf(stderr, "POP Version: %s\n", VERSION);
 	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
 	init_io_module();

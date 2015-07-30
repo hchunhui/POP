@@ -213,6 +213,9 @@ void core_invalidate(bool (*p)(void *p_data, const char *name, const void *arg),
 
 		xswitch_table_lock(cur_sw);
 		trace_tree_invalidate(&tt, cur_sw, cur_sw->table0, p, p_data);
+#ifdef ENABLE_WEB
+		trace_tree_print_json(cur_sw->trace_tree, cur_sw->dpid);
+#endif
 		xswitch_table_unlock(cur_sw);
 	}
 }
@@ -431,6 +434,9 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 		if(trace_tree_augment(&(cur_sw->trace_tree), trace, cur_ac)) {
 			fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
 			trace_tree_print(cur_sw->trace_tree);
+#ifdef ENABLE_WEB
+			trace_tree_print_json(cur_sw->trace_tree, cur_sw->dpid);
+#endif
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
 		}
@@ -451,6 +457,9 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 		if(trace_tree_augment(&(sw->trace_tree), trace, a)) {
 			fprintf(stderr, "--- flow table for cur sw ---\n");
 			trace_tree_print(sw->trace_tree);
+#ifdef ENABLE_WEB
+			trace_tree_print_json(sw->trace_tree, sw->dpid);
+#endif
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(sw, sw->trace_tree);
 		}

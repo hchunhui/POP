@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<!--
+http://www.ibm.com/developerworks/cn/web/1112_huangxa_websocket/
+http://bl.ocks.org/NPashaP/7683252#index.html
+http://bost.ocks.org/mike/join/
+http://www.cnblogs.com/flyingzl/articles/2469351.html
+-->
+<meta charset="utf-8">
+<style>
+body{
+        width:1300px;
+        margin:10px auto;
+}
+
+ellipse{
+    fill:white;
+    stroke:steelblue;
+    stroke-width:2px;
+}
+
+line{
+  stroke:grey;
+  stroke-width:3px;
+}
+
+.incRect{
+        stroke:grey;
+        shape-rendering:crispEdges;
+}
+
+#treesvg g text:hover, #treesvg g circle:hover{
+        cursor:pointer;
+}
+
+#navdiv{
+    background:#bbb;
+}
+
+#treesvg, #toposvg{
+        border:1px solid grey;
+}
+
+#labelpos{
+        color:white;
+}
+
+#navdiv button, #navdiv textarea{
+        vertical-align:middle;
+}
+
+#g_labels text{
+        text-anchor:middle;
+}
+
+#g_elabels text{
+        text-anchor:middle;
+        fill:red;
+        font-weight:bold;
+        font-size:10pt;
+}
+
+circle.entity {
+    stroke: #fff;
+    stroke-width: 1.5px;
+}
+
+line.link {
+    stroke-width: 2px;
+    stroke: #999;
+    stroke-opacity: 0.6;
+}
+
+text.incircle {
+    font-size:10px;
+    color:#000;
+}
+
+text.incircle:hover {
+    cursor:default;
+}
+
+marker#arrow {
+    stroke: #999;
+    fill: #999;
+}
+</style>
+
+<body>
+
+<div id="navdiv">
+    <button onclick='switch_tree(0)'>Redraw</button>
+    <text id="curswitch">0/0</text>
+    <button onclick='switch_tree(-1)'>prev</button>
+    <button onclick='switch_tree(1)'>next</button>
+    <input type="text" id="Connection" value="127.0.0.1:8000" />
+    <button id='ToggleConnection' type="button" onclick='ToggleConnectionClicked();'>connect</button>
+    <input type="text" id="DataToSend" size="88" />
+    <button id='SendData' type="button" onclick='SendDataClicked();'>Send</button>
+</div>
+
+<svg id="treesvg" width="1300" height="450"></svg>
+<br />
+<svg id="toposvg" width="1300" height="400"></svg>
+<br />
+<div id='LogContainer' class='container'></div>
+<br />
+
+
+<script src="d3.v3.min.js"></script>
+
+<script>
+    function tree(){
+        var vRad=12, tree={w:120, h:50};
+        tree.vis=
+            {v:0,
+             el:"...",
+             l:'Switch',
+             p:{x:650, y:30},
+             c:[]};
+        tree.getVertices =  function(){
+            var v =[];
+            function getVertices(t,f){
+                v.push({v:t.v, l:t.l, p:t.p, f:f});
+                t.c.forEach(function(d){ return getVertices(d,{v:t.v, p:t.p}); });
+            }
+            getVertices(tree.vis,{});
+            return v.sort(function(a,b){ return a.v - b.v;});
+        }
+
+        tree.getEdges =  function(){
+            var e =[];
+            function getEdges(_){
+                _.c.forEach(function(d){ e.push({v1:_.v, l1:_.l, p1:_.p, v2:d.v, l2:d.l, p2:d.p, el:d.el});});
+                _.c.forEach(getEdges);
+            }
+            getEdges(tree.vis);
+            return e.sort(function(a,b){ return a.v2 - b.v2;});
+        }
+
+        redraw = function(){
+            var edges = d3.select("#g_lines").selectAll('line').data(tree.getEdges());
+
+            edges.exit().remove();
+            edges.attr('x1',function(d){ return d.p1.x;}).attr('y1',function(d){ return d.p1.y;})
+                .attr('x2',function(d){ return d.p2.x;}).attr('y2',function(d){ return d.p2.y;});
+
+            edges.enter().append('line')
+                .attr('x1',function(d){ return d.p1.x;}).attr('y1',function(d){ return d.p1.y;})
+                .attr('x2',function(d){ return d.p2.x;}).attr('y2',function(d){ return d.p2.y;});
+
+            var circles = d3.select("#g_circles").selectAll('ellipse').data(tree.getVertices(), function(d) {return d.v});
+
+            circles.exit().remove();
+
+            circles.attr('cx',function(d){ return d.p.x;}).attr('cy',function(d){ return d.p.y;});
+
+            circles.enter().append('ellipse').attr('cx',function(d){ return d.f.p.x;}).attr('cy',function(d){return d.f.p.y;}).attr('rx',50).attr('ry',10);
+
+            var labels = d3.select("#g_labels").selectAll('text').data(tree.getVertices(), function(d) {return d.v});
+
+            labels.exit().remove();
+            labels.text(function(d){return d.l;})
+                .attr('x',function(d){ return d.p.x;}).attr('y',function(d){ return d.p.y+5;});
+
+            labels.enter().append('text').attr('x',function(d){ return d.f.p.x;}).attr('y',function(d){ return d.f.p.y+5;})
+                .text(function(d){return d.l;});
+
+            var elabels = d3.select("#g_elabels").selectAll('text').data(tree.getEdges());
+
+            elabels.exit().remove();
+            elabels
+                .attr('x',function(d){ return (d.p1.x+d.p2.x)/2+(d.p1.x < d.p2.x? 8: -8);}).attr('y',function(d){ return (d.p1.y+d.p2.y)/2;})
+                .text(function(d){return d.el;});
+
+            elabels.enter().append('text')
+                .attr('x',function(d){ return (d.p1.x+d.p2.x)/2+(d.p1.x < d.p2.x? 8: -8);}).attr('y',function(d){ return (d.p1.y+d.p2.y)/2;})
+                .text(function(d){return d.el;});
+
+        }
+
+        getLeafCount = function(_){
+            if(_.c.length == 0) return 1;
+            else return _.c.map(getLeafCount).reduce(function(a,b){ return a+b;});
+        }
+
+        reposition = function(v){
+            var lC = getLeafCount(v), left=v.p.x - tree.w*(lC-1)/2;
+            v.c.forEach(function(d){
+                var w =tree.w*getLeafCount(d);
+                left+=w;
+                d.p = {x:left-(w+tree.w)/2, y:v.p.y+tree.h};
+                reposition(d);
+            });
+        }
+
+        initialize = function(){
+            d3.select("#treesvg").append('g').attr('id','g_lines').selectAll('line').data(tree.getEdges()).enter().append('line')
+                .attr('x1',function(d){ return d.p1.x;}).attr('y1',function(d){ return d.p1.y;})
+                .attr('x2',function(d){ return d.p2.x;}).attr('y2',function(d){ return d.p2.y;});
+
+            d3.select("#treesvg").append('g').attr('id','g_circles').selectAll('ellipse').data(tree.getVertices()).enter()
+                .append('ellipse').attr('cx',function(d){ return d.p.x;}).attr('cy',function(d){ return d.p.y;}).attr('rx',50).attr('ry',10);
+
+            d3.select("#treesvg").append('g').attr('id','g_labels').selectAll('text').data(tree.getVertices()).enter().append('text')
+                .attr('x',function(d){ return d.p.x;}).attr('y',function(d){ return d.p.y+5;}).text(function(d){return d.l;});
+
+            d3.select("#treesvg").append('g').attr('id','g_elabels').selectAll('text').data(tree.getEdges()).enter().append('text')
+                .attr('x',function(d){ return (d.p1.x+d.p2.x)/2+(d.p1.x < d.p2.x? 8: -8);}).attr('y',function(d){ return (d.p1.y+d.p2.y)/2;})
+                .text(function(d){return '';});
+        }
+        initialize();
+
+        return tree;
+    }
+
+    function topo(){
+        var topo={};
+        var width = 1300,
+            height = 400;
+        var color = d3.scale.category20();
+        topo.force = d3.layout.force().charge(-1000).linkDistance(100).size([width, height]);
+        topo.draw = function(nodes, links) {
+            var svg = d3.select("#toposvg");
+
+            topo.force
+                .nodes(nodes)
+                .links(links);
+
+            svg.selectAll("line.link").remove();
+            svg.selectAll("g.node").remove();
+
+            var link = svg.selectAll("line.link")
+                .data(links, function(d) {return d.source * 4096 + d.target;});
+            var node = svg.selectAll("g.node")
+                .data(nodes, function(d) {return d.name;});
+
+            link.enter().append("line")
+                .attr("class", "link")
+                .attr("marker-end", "url(#arrow)");
+
+            node.enter().append("g")
+                .attr("class", "node")
+                .attr("r", 15)
+                .call(topo.force.drag);
+
+            node.append("title")
+                .text(function(d) { return d.name; });
+
+            var circle = node.append("circle")
+                .attr("class", "entity")
+                .attr("r", function(d) { return 15; })
+                .style("fill", function(d) { return color(color(d.type)); });
+
+            var text = node.append("text")
+                .attr("class", "incircle")
+                .text(function(d) {return d.name;})
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.31em")
+                .attr("x", function(d) {return d.x;})
+                .attr("y", function(d) {return d.y;});
+
+            topo.force.on("tick", function() {
+                link.attr("x1", function(d) { return d.source.x; })
+                    .attr("y1", function(d) { return d.source.y; })
+                    .attr("x2", function(d) { return d.target.x; })
+                    .attr("y2", function(d) { return d.target.y; });
+
+                circle.attr("cx", function(d) { return d.x; })
+                    .attr("cy", function(d) { return d.y; });
+                text.attr("x", function(d) { return d.x; })
+                    .attr("y", function(d) { return d.y; });
+            });
+            topo.force.start();
+            for (var i = 0; i < 200; ++i) topo.force.tick();
+            topo.force.stop();
+
+        }
+        return topo;
+    }
+</script>
+
+
+<style type="text/css">
+     .container
+     {
+         font-family: "Courier New";
+         width: 680px;
+         height: 300px;
+         overflow: auto;
+         border: 1px solid black;
+     }
+</style>
+
+<script src="jquery-min.js" type="text/javascript"></script>
+<script type="text/javascript">
+      var tree;
+      var trees = [];
+      var cur_idx = 0;
+      var ws;
+      var topo;
+      var SocketCreated = false;
+      var isUserloggedout = false;
+
+      function switch_tree(d) {
+          var idx = cur_idx + d;
+          if(idx < 0)
+              idx = trees.length - 1;
+          if(idx >= trees.length)
+              idx = 0;
+          cur_idx = idx;
+          document.getElementById("curswitch").innerHTML = (cur_idx + 1) + "/" + trees.length;
+          tree.vis.c = [trees[cur_idx].tree];
+          reposition(tree.vis);
+          redraw();
+          setTimeout(redraw, 100);
+      }
+
+      function ToggleConnectionClicked() {
+            if (SocketCreated && (ws.readyState == 0 || ws.readyState == 1)) {
+                SocketCreated = false;
+                isUserloggedout = true;
+                ws.close();
+            } else {
+                try {
+                    if ("WebSocket" in window) {
+                            ws = new WebSocket("ws://" + document.getElementById("Connection").value);
+                    }
+                    else if("MozWebSocket" in window) {
+                            ws = new MozWebSocket("ws://" + document.getElementById("Connection").value);
+                    }
+
+                    SocketCreated = true;
+                    isUserloggedout = false;
+                } catch (ex) {
+                    Log(ex, "ERROR");
+                    return;
+                }
+                document.getElementById("ToggleConnection").innerHTML = "close";
+                ws.onopen = WSonOpen;
+                ws.onmessage = WSonMessage;
+                ws.onclose = WSonClose;
+                ws.onerror = WSonError;
+            }
+        };
+
+
+        function WSonOpen() {
+            Log("UP", "OK");
+        };
+
+        function WSonMessage(event) {
+            obj = JSON.parse(event.data);
+            if ('tree' in obj) {
+                var i;
+                var flag = true;
+                for (i = 0; i < trees.length; i++) {
+                    if(trees[i].dpid == obj.dpid) {
+                        trees[i] = obj;
+                        flag = false;
+                        break;
+                    }
+                }
+                if(flag) {
+                    trees.push(obj);
+                }
+                switch_tree(0);
+                Log(event.data);
+            } else {
+                Log(event.data);
+                topo.draw(obj.nodes, obj.links);
+            }
+        };
+
+        function WSonClose() {
+            if (isUserloggedout)
+                Log("DOWN");
+            document.getElementById("ToggleConnection").innerHTML = "connect";
+        };
+
+        function WSonError() {
+            Log("ERROR", "ERROR");
+        };
+
+        function SendDataClicked() {
+            if (document.getElementById("DataToSend").value.trim() != "") {
+                ws.send(document.getElementById("DataToSend").value);
+                document.getElementById("DataToSend").value = "";
+            }
+        };
+
+
+        function Log(Text, MessageType) {
+            if (MessageType == "OK") Text = "<span style='color: green;'>" + Text + "</span>";
+            if (MessageType == "ERROR") Text = "<span style='color: red;'>" + Text + "</span>";
+            document.getElementById("LogContainer").innerHTML = document.getElementById("LogContainer").innerHTML + Text + "<br />";
+            var LogContainer = document.getElementById("LogContainer");
+            LogContainer.scrollTop = LogContainer.scrollHeight;
+        };
+
+
+        $(document).ready(function () {
+            $("#SendDataContainer").hide();
+        });
+
+        tree = tree();
+        reposition(tree.vis);
+        redraw();
+        topo = topo();
+        topo.draw([], []);
+</script>
+
+</body>

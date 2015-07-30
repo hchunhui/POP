@@ -202,3 +202,26 @@ void action_dump(struct action *a, char *buf, int n)
 			offset += snprintf(buf + offset, n - offset, "unknown ");
 		}
 }
+
+void action_summary(struct action *a, char *buf, int n)
+{
+	int i;
+	int p, c;
+	for(i = 0; i < a-> num_actions; i++)
+		if(a->a[i].type == AC_DROP) {
+			snprintf(buf, n, "Drop");
+			return;
+		}
+	for(i = 0, c = 0; i < a-> num_actions; i++)
+		if(a->a[i].type == AC_OUTPUT) {
+			p = a->a[i].u.arg;
+			c++;
+		}
+	if(c == 1) {
+		snprintf(buf, n, "To Port %d", p);
+	} else if(c > 1) {
+		snprintf(buf, n, "Multicast");
+	} else {
+		snprintf(buf, n, "...");
+	}
+}

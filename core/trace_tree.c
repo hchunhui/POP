@@ -8,6 +8,10 @@
 #include "packet_parser.h"
 #include "xswitch/xswitch-private.h"
 
+#ifdef ENABLE_WEB
+#include "web/ws.h"
+#endif
+
 /* data type */
 enum trace_tree_type { TT_E, TT_L, TT_V, TT_T, TT_D, TT_G };
 struct trace_tree
@@ -240,6 +244,118 @@ void trace_tree_print(struct trace_tree *tree)
 		break;
 	}
 }
+
+#ifdef ENABLE_WEB
+/* json printer */
+static int json_printer(char *buf, int pos,
+			struct trace_tree *tree, char *el, struct header *h)
+{
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
+	struct trace_tree_L *tl;
+	int offset, length;
+	char ebuf[64];
+	int j, k;
+
+	switch(tree->type) {
+	case TT_E:
+		sprintf(ebuf, "To Controller");
+		break;
+	case TT_V:
+		tv = (struct trace_tree_V *) tree;
+		sprintf(ebuf, "V %s", tv->name);
+		break;
+	case TT_T:
+		tt = (struct trace_tree_T *) tree;
+		sprintf(ebuf, "T %s", tt->name);
+		break;
+	case TT_D:
+		td = (struct trace_tree_D *) tree;
+		return json_printer(buf, pos, td->t, el, h);
+	case TT_G:
+		tg = (struct trace_tree_G *) tree;
+		sprintf(ebuf, "G %s", header_get_name(tg->new_spec));
+		break;
+	case TT_L:
+		tl = (struct trace_tree_L *) tree;
+		action_summary(tl->ac, ebuf, 64);
+		break;
+	}
+
+	pos += sprintf(buf+pos,
+		       "{\"v\":%lu, \"el\":\"%s\", \"l\":\"%s\", \"p\":{\"x\":650, \"y\":30}, \"c\":[",
+		       (long) tree, el, ebuf);
+
+	switch(tree->type) {
+	case TT_E:
+		break;
+	case TT_V:
+		tv = (struct trace_tree_V *) tree;
+		if(strcmp(tv->name, "in_port"))
+			header_get_field(h, tv->name, &offset, &length);
+		else
+			length = 8;
+		length = (length + 7) / 8;
+		for(j = 0; j < tv->num_branches; j++) {
+			for(k = 0; k < length; k++) {
+				sprintf(ebuf + 2*k,
+					"%02x",
+					tv->branches[j].value.v[k]);
+			}
+			pos = json_printer(buf, pos, tv->branches[j].tree, ebuf, h);
+			if(j < tv->num_branches - 1)
+				pos += sprintf(buf+pos, ",");
+		}
+		break;
+	case TT_T:
+		tt = (struct trace_tree_T *) tree;
+		if(strcmp(tt->name, "in_port"))
+			header_get_field(h, tt->name, &offset, &length);
+		else
+			length = 8;
+		length = (length + 7) / 8;
+		sprintf(ebuf, " = ");
+		for(k = 0; k < length; k++) {
+			sprintf(ebuf + 3 + 2*k,
+				"%02x",
+				tt->value.v[k]);
+		}
+		pos = json_printer(buf, pos, tt->t, ebuf, h);
+		pos += sprintf(buf+pos, ",");
+		ebuf[0] = '!';
+		pos = json_printer(buf, pos, tt->f, ebuf, h);
+		break;
+	case TT_D:
+		td = (struct trace_tree_D *) tree;
+		pos = json_printer(buf, pos, td->t, "", h);
+		break;
+	case TT_G:
+		tg = (struct trace_tree_G *) tree;
+		pos = json_printer(buf, pos, tg->t, "", tg->new_spec);
+		break;
+	case TT_L:
+		break;
+	}
+
+	pos += sprintf(buf+pos, "]}");
+	return pos;
+}
+
+void trace_tree_print_json(struct trace_tree *tree, dpid_t dpid)
+{
+	char buf[40960];
+	char ebuf[64];
+	int pos = 0;
+
+	sprintf(ebuf, "%08x", dpid);
+	pos = sprintf(buf+pos, "{\"tree\": ");
+	pos = json_printer(buf, pos, tree, ebuf, NULL);
+	pos = sprintf(buf+pos, ",\"dpid\":\"%s\"}", ebuf);
+	ws_printf("%s", buf);
+}
+#endif
 
 /* helper */
 static void init_entry(struct xswitch *sw, struct flow_table *ft)

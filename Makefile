@@ -1,5 +1,5 @@
 
-SUBDIRS = io xswitch core topo apps cbench main
+SUBDIRS = io xswitch core topo web apps cbench main
 
 all:
 	@for d in ${SUBDIRS}; do \
