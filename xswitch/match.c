@@ -48,3 +48,31 @@ void match_dump(struct match *m, char *buf, int n)
 				   m->m[i].value.v[2], m->m[i].value.v[3],
 				   m->m[i].value.v[4], m->m[i].value.v[5]);
 }
+
+#ifdef ENABLE_WEB
+#include "core/packet_parser.h"
+int match_dump_json(struct match *m, struct header *h, char *buf)
+{
+	int i, k;
+	int offset, length;
+	int pos = 0;
+
+	for(i = 0; i < m->fields_num; i++) {
+		if(strcmp(m->m[i].name, "in_port"))
+			header_get_field(h, m->m[i].name, &offset, &length);
+		else
+			length = 8;
+		length = (length + 7) / 8;
+		pos += sprintf(buf+pos, "\"%s\":\"", m->m[i].name);
+		for(k = 0; k < length; k++) {
+			pos += sprintf(buf+pos,
+				       "%02x",
+				       m->m[i].value.v[k]);
+		}
+		pos += sprintf(buf+pos,
+			       "\"%s",
+			       i == m->fields_num - 1 ? "" : ",");
+	}
+	return pos;
+}
+#endif

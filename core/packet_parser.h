@@ -49,6 +49,10 @@ const char *header_get_name(struct header *h);
 struct flow_table *header_make_flow_table(struct header *h, int tid);
 void header_free(struct header *h);
 
+#ifdef ENABLE_WEB
+int header_print_json(struct header *h, char *buf);
+#endif
+
 struct packet_parser;
 struct packet_parser *packet_parser(struct header *spec, uint8_t *data, int length);
 void packet_parser_free(struct packet_parser *pp);

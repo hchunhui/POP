@@ -67,6 +67,10 @@ void match_add(struct match *m, const char *name, value_t value, value_t mask);
 void match_free(struct match *m);
 void match_dump(struct match *m, char *buf, int n);
 
+#ifdef ENABLE_WEB
+struct header;
+int match_dump_json(struct match *m, struct header *h, char *buf);
+#endif
 
 /* action */
 enum action_oper_type {

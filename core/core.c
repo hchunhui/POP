@@ -215,6 +215,7 @@ void core_invalidate(bool (*p)(void *p_data, const char *name, const void *arg),
 		trace_tree_invalidate(&tt, cur_sw, cur_sw->table0, p, p_data);
 #ifdef ENABLE_WEB
 		trace_tree_print_json(cur_sw->trace_tree, cur_sw->dpid);
+		trace_tree_print_ft_json(cur_sw->trace_tree, cur_sw->dpid);
 #endif
 		xswitch_table_unlock(cur_sw);
 	}
@@ -439,6 +440,9 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 #endif
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
+#ifdef ENABLE_WEB
+			trace_tree_print_ft_json(cur_sw->trace_tree, cur_sw->dpid);
+#endif
 		}
 		xswitch_table_unlock(cur_sw);
 
@@ -462,6 +466,9 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 #endif
 			fprintf(stderr, "\n");
 			trace_tree_emit_rule(sw, sw->trace_tree);
+#ifdef ENABLE_WEB
+			trace_tree_print_ft_json(sw->trace_tree, sw->dpid);
+#endif
 		}
 		xswitch_table_unlock(sw);
 

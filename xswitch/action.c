@@ -180,7 +180,6 @@ void action_dump(struct action *a, char *buf, int n)
 {
 	int i;
 	int offset = 0;
-	offset += snprintf(buf + offset, n - offset, "ACTION: ");
 	for(i = 0; i < a->num_actions; i++)
 		switch(a->a[i].type) {
 		case AC_DROP:
@@ -194,12 +193,11 @@ void action_dump(struct action *a, char *buf, int n)
 					   a->a[i].u.arg);
 			break;
 		case AC_GOTO_TABLE:
-			offset += snprintf(buf + offset, n - offset, "GOTO_TABLE %d off %d ",
-					   a->a[i].u.goto_table.tid,
-					   a->a[i].u.goto_table.offset);
+			offset += snprintf(buf + offset, n - offset, "GOTO_TABLE %d",
+					   a->a[i].u.goto_table.tid);
 			break;
 		default:
-			offset += snprintf(buf + offset, n - offset, "unknown ");
+			;
 		}
 }
 

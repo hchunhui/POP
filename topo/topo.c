@@ -98,11 +98,8 @@ void topo_print_json(void)
                 int num_adjs;
                 const struct entity_adj *adjs = entity_get_adjs(e, &num_adjs);
                 for(j = 0; j < num_adjs; j++)
-                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d }%s",
-				       i, find_id(adjs[j].adj_entity),
-				       (j == num_adjs - 1 &&
-					i == num_switches - 1 && num_hosts == 0) ?
-				       "" : ",");
+                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d },",
+				       i, find_id(adjs[j].adj_entity));
         }
         for(i = 0; i < num_hosts; i++) {
                 struct entity *e = hosts[i];
@@ -110,10 +107,11 @@ void topo_print_json(void)
                 int num_adjs;
                 const struct entity_adj *adjs = entity_get_adjs(e, &num_adjs);
                 for(j = 0; j < num_adjs; j++)
-                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d }%s",
-				       num_switches + i, find_id(adjs[j].adj_entity),
-				       (j == num_adjs - 1 && i == num_hosts - 1) ? "" : ",");
+                        pos += sprintf(buf + pos, "{ \"source\":%d, \"target\":%d },",
+				       num_switches + i, find_id(adjs[j].adj_entity));
         }
+	if(buf[pos-1] == ',')
+		pos--;
         pos += sprintf(buf + pos, "]");
         pos += sprintf(buf + pos, "}");
 	ws_printf("%s", buf);

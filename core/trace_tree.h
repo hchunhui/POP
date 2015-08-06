@@ -13,6 +13,7 @@ void trace_tree_free(struct trace_tree *t);
 void trace_tree_print(struct trace_tree *tree);
 #ifdef ENABLE_WEB
 void trace_tree_print_json(struct trace_tree *tree, dpid_t dpid);
+void trace_tree_print_ft_json(struct trace_tree *tree, dpid_t dpid);
 #endif
 bool trace_tree_augment(struct trace_tree **tree, struct trace *trace, struct action *a);
 bool trace_tree_invalidate(struct trace_tree **tree, struct xswitch *sw, struct flow_table *ft,

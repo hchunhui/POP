@@ -387,6 +387,25 @@ void header_free(struct header *h)
 	free(h);
 }
 
+#ifdef ENABLE_WEB
+int header_print_json(struct header *h, char *buf)
+{
+	int i;
+	int pos = 0;
+	for(i = 0; i < h->num_fields; i++) {
+		if(h->fields[i].name[0] == '_' &&
+		   h->fields[i].name[1] == '_')
+			continue;
+		if(h->fields[i].length == 0)
+			continue;
+		pos += sprintf(buf+pos, "\"%s\"%c",
+			       h->fields[i].name,
+			       i == h->num_fields - 1 ? ' ' : ',');
+	}
+	return pos;
+}
+#endif
+
 struct packet_parser
 {
 	struct {

@@ -246,6 +246,162 @@ void trace_tree_print(struct trace_tree *tree)
 }
 
 #ifdef ENABLE_WEB
+static int json_printer_fe(char *buf, int pos,
+			   int prio,
+			   struct header *h,
+			   struct match *ma,
+			   struct action *ac)
+{
+	char buf2[128];
+	pos += sprintf(buf+pos, "{\"priority\":\"%d\",", prio);
+	pos += match_dump_json(ma, h, buf+pos);
+	action_dump(ac, buf2, 128);
+	if(buf[pos-1] == ',')
+		pos--;
+	pos += sprintf(buf+pos, ",\"actions\":\"%s\"},", buf2);
+	return pos;
+}
+
+static int json_printer_ft(char *buf, int pos,
+			   struct trace_tree *tree, struct match *ma, int *priority,
+			   struct action *ac_pi, struct header *h)
+{
+	int i;
+	struct trace_tree_L *tl;
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
+
+	struct match *maa;
+	struct action *a;
+	char buf2[128];
+
+	struct expr *move_expr;
+	switch(tree->type) {
+	case TT_L:
+		tl = (struct trace_tree_L *)tree;
+		pos = json_printer_fe(buf, pos, *priority, h, ma, tl->ac);
+		(*priority)++;
+		return pos;
+	case TT_V:
+		tv = (struct trace_tree_V *)tree;
+		for(i = 0; i < tv->num_branches; i++) {
+			maa = match_copy(ma);
+			match_add(maa,
+				  tv->name,
+				  tv->branches[i].value,
+				  value_from_64(0xffffffffffffffffull));
+			pos = json_printer_ft(buf, pos, tv->branches[i].tree, maa, priority, ac_pi, h);
+			match_free(maa);
+		}
+		return pos;
+	case TT_T:
+		tt = (struct trace_tree_T *)tree;
+		pos = json_printer_ft(buf, pos, tt->f, ma, priority, ac_pi, h);
+		maa = match_copy(ma);
+		match_add(maa,
+			  tt->name,
+			  tt->value,
+			  value_from_64(0xffffffffffffffffull));
+		pos = json_printer_fe(buf, pos, *priority, h, maa, ac_pi);
+		(*priority)++;
+		pos = json_printer_ft(buf, pos, tt->t, maa, priority, ac_pi, h);
+		match_free(maa);
+		return pos;
+	case TT_G:
+		tg = (struct trace_tree_G *)tree;
+		// insert GOTO_TABLE into orig table
+		a = action();
+		if(tg->old_spec)
+			move_expr = header_get_length(tg->old_spec);
+		else
+			move_expr = expr_value(0);
+		expr_generate_action(move_expr, tg->old_spec, tg->ft, tg->stack_base, a);
+
+		action_dump(a, buf2, 128);
+		pos = json_printer_fe(buf, pos, *priority, h, ma, a);
+		action_free(a);
+		(*priority)++;
+		return pos;
+	case TT_D:
+		td = (struct trace_tree_D *)tree;
+		return json_printer_ft(buf, pos, td->t, ma, priority, ac_pi, h);
+	case TT_E:
+		return pos;
+	}
+	assert(0);
+}
+
+static int json_printer_ft1(char *buf, int pos, struct trace_tree *tree)
+{
+	int i;
+	int priority;
+	struct trace_tree_V *tv;
+	struct trace_tree_T *tt;
+	struct trace_tree_D *td;
+	struct trace_tree_G *tg;
+	struct match *ma;
+	struct action *ac_pi;
+
+	switch(tree->type) {
+	case TT_L:
+	case TT_E:
+		return pos;
+	case TT_D:
+		td = (struct trace_tree_D *)tree;
+		return json_printer_ft1(buf, pos, td->t);
+	case TT_V:
+		tv = (struct trace_tree_V *)tree;
+		for(i = 0; i < tv->num_branches; i++) {
+			pos = json_printer_ft1(buf, pos, tv->branches[i].tree);
+		}
+		return pos;
+	case TT_T:
+		tt = (struct trace_tree_T *)tree;
+		pos = json_printer_ft1(buf, pos, tt->f);
+		pos = json_printer_ft1(buf, pos, tt->t);
+		return pos;
+	case TT_G:
+		tg = (struct trace_tree_G *)tree;
+		priority = 0;
+		ac_pi = action();
+		action_add(ac_pi, AC_PACKET_IN, 0);
+		ma = match();
+		pos += sprintf(buf+pos, "{\"tid\":\"%d\",", flow_table_get_tid(tg->ft));
+		pos += sprintf(buf+pos, "\"columns\":[\"priority\",\"in_port\",");
+		pos += header_print_json(tg->new_spec, buf+pos);
+		if(buf[pos-1] == ',')
+			pos--;
+		pos += sprintf(buf+pos, ",\"actions\"],");
+		pos += sprintf(buf+pos, "\"data\":[");
+		pos = json_printer_ft(buf, pos, tg->t, ma, &priority, ac_pi, tg->new_spec);
+		if(buf[pos-1] == ',')
+			pos--;
+		pos += sprintf(buf+pos, "]},");
+		action_free(ac_pi);
+		match_free(ma);
+		pos = json_printer_ft1(buf, pos, tg->t);
+		return pos;
+	}
+	assert(0);
+}
+
+void trace_tree_print_ft_json(struct trace_tree *tree, dpid_t dpid)
+{
+	char buf[40960];
+	char ebuf[64];
+	int pos = 0;
+
+	sprintf(ebuf, "%08x", dpid);
+	pos += sprintf(buf+pos, "{\"tables\":[");
+	pos = json_printer_ft1(buf, pos, tree);
+	if(buf[pos-1] == ',')
+		pos--;
+	pos += sprintf(buf+pos, "],\"dpid\":\"%s\"}", ebuf);
+	ws_printf("%s", buf);
+}
+
 /* json printer */
 static int json_printer(char *buf, int pos,
 			struct trace_tree *tree, char *el, struct header *h)
@@ -350,9 +506,9 @@ void trace_tree_print_json(struct trace_tree *tree, dpid_t dpid)
 	int pos = 0;
 
 	sprintf(ebuf, "%08x", dpid);
-	pos = sprintf(buf+pos, "{\"tree\": ");
+	pos += sprintf(buf+pos, "{\"tree\": ");
 	pos = json_printer(buf, pos, tree, ebuf, NULL);
-	pos = sprintf(buf+pos, ",\"dpid\":\"%s\"}", ebuf);
+	pos += sprintf(buf+pos, ",\"dpid\":\"%s\"}", ebuf);
 	ws_printf("%s", buf);
 }
 #endif
