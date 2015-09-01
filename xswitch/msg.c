@@ -9,7 +9,15 @@
 
 const char *msg_get_pof_version(void)
 {
-	return POFSwitch_VERSION_STR;
+	return
+		POFSwitch_VERSION_STR
+#ifdef COMPAT_JELLY_PACKET_IN
+		"-JELLY_PACKET_IN"
+#endif
+#ifdef COMPAT_JELLY_PACKET_OUT
+		"-JELLY_PACKET_OUT"
+#endif
+	;
 }
 
 /* helper functions */
@@ -608,6 +616,7 @@ struct msgbuf *msg_flow_entry_mod(struct flow_table *ft, int index,
 	return msg;
 }
 
+#ifndef COMPAT_JELLY_PACKET_OUT
 struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, struct action *a)
 {
 	struct msgbuf *msg;
@@ -627,10 +636,32 @@ struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, stru
 #endif
 	mpo->in_port = htons(u16(in_port));
 	mpo->actions_len = htons(num_actions * sizeof(struct pof_action));
-	fill_actions(mpo->actions, num_actions, a);
+	memcpy(mpo->actions, buf, num_actions * sizeof(struct pof_action));
 	memcpy((mpo->actions) + num_actions, pkt, pkt_len);
 	return msg;
 }
+#else
+struct msgbuf *msg_packet_out(int in_port, const uint8_t *pkt, int pkt_len, struct action *a)
+{
+	struct msgbuf *msg;
+	struct pof_packet_out *mpo;
+	int num_actions = action_num_actions(a); //upper bound
+	struct pof_action buf[num_actions];
+	num_actions = fill_actions(buf, num_actions, a); //real size
+
+	make_pof_msg(sizeof(struct pof_header) + sizeof(struct pof_packet_out),
+		     POFT_PACKET_OUT,
+		     &msg);
+	mpo = GET_BODY(msg);
+	mpo->bufferId = htonl(0xffffffff);
+	mpo->inPort = htonl(in_port);
+	mpo->actionNum = num_actions;
+	mpo->packetLen = htonl(pkt_len);
+	memcpy(mpo->actionList, buf, num_actions * sizeof(struct pof_action));
+	memcpy(mpo->data, pkt, pkt_len);
+	return msg;
+}
+#endif
 
 static void dump_packet(const struct msgbuf *msg)
 {

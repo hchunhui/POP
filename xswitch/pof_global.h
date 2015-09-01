@@ -654,7 +654,9 @@ typedef struct pof_packet_in {
 	uint8_t pad[4];     /* 8 bytes aligned. */
 #endif // POF_MULTIPLE_SLOTS
 #endif // caiqishen 00219933 要求packetIn带有port信息。
+#ifndef COMPAT_JELLY_PACKET_IN
 	uint16_t slotID;
+#endif
 	uint16_t port_id;
 
 	char    data[POF_PACKET_IN_MAX_LENGTH];
@@ -1365,6 +1367,7 @@ typedef struct pof_counter{
 #endif // POF_SD2N
 }pof_counter;   //sizeof=24
 
+#ifndef COMPAT_JELLY_PACKET_OUT
 /* Send packet (controller -> datapath). */
 typedef struct pof_packet_out {
     uint32_t buffer_id;           /* ID assigned by datapath (-1 if none). */
@@ -1379,6 +1382,20 @@ typedef struct pof_packet_out {
                                      from the length field in the header.
                                      (Only meaningful if buffer_id == -1.) */
 } pof_packet_out;
+#else
+/*Describe the packet struct comes from controller*/
+/* add by little jelly*/
+//holly shit
+typedef struct pof_packet_out{
+    uint32_t bufferId;
+    uint32_t inPort;
+    uint8_t actionNum;
+    uint8_t padding[3];
+    uint32_t packetLen;
+    pof_action actionList[POF_MAX_ACTION_NUMBER_PER_INSTRUCTION];
+    char data[POF_PACKET_IN_MAX_LENGTH];
+}pof_packet_out;
+#endif
 
 /* Values for 'type' in pof_error_message. These values are immutable: they
  * will not change in future versions of the protocol (although new values may
