@@ -306,10 +306,12 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 	struct pof_instruction_goto_table *gt;
 	struct pof_instruction_mov_packet_offset *mpo;
 	struct pof_instruction_write_metadata *wm;
-	assert(a->num_actions <= num);
+	bool prev_is_action;
 
 	idx = 0;
+	prev_is_action = false;
 	for(i = 0; i < a->num_actions; i++) {
+		assert(idx < num);
 		switch(a->a[i].type) {
 		case AC_CALC_R:
 			emit_calc_r(&(mi[idx]), a->a[i].u.op_r.op_type,
@@ -320,6 +322,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 				    a->a[i].u.op_r.src_offset,
 				    a->a[i].u.op_r.src_length);
 			idx++;
+			prev_is_action = false;
 			break;
 		case AC_CALC_I:
 			emit_calc_i(&(mi[idx]), a->a[i].u.op_i.op_type,
@@ -328,6 +331,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 				    a->a[i].u.op_i.dst_length,
 				    a->a[i].u.op_i.src_value);
 			idx++;
+			prev_is_action = false;
 			break;
 		case AC_WRITE_METADATA:
 			mi[idx].type = htons(POFIT_WRITE_METADATA);
@@ -338,6 +342,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 			assert(VALUE_LEN <= POF_MAX_FIELD_LENGTH_IN_BYTE);
 			memcpy(wm->value, a->a[i].u.write_metadata.val.v, VALUE_LEN);
 			idx++;
+			prev_is_action = false;
 			break;
 		case AC_MOVE_PACKET:
 			mi[idx].type = htons(POFIT_MOVE_PACKET_OFFSET);
@@ -355,6 +360,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 			mpo->movement.field.len =
 				htons(u16(a->a[i].u.move_packet.length));
 			idx++;
+			prev_is_action = false;
 			break;
 		case AC_MOVE_PACKET_IMM:
 			mi[idx].type = htons(POFIT_MOVE_PACKET_OFFSET);
@@ -367,6 +373,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 			mpo->value_type = 0;
 			mpo->movement.value = htonl(u32(a->a[i].u.move_packet_imm.value));
 			idx++;
+			prev_is_action = false;
 			break;
 		case AC_GOTO_TABLE:
 			mi[idx].type = htons(POFIT_GOTO_TABLE);
@@ -376,19 +383,28 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 			gt->match_field_num = 0; //?
 			gt->packet_offset = htons(u16(a->a[i].u.goto_table.offset));
 			idx++;
+			prev_is_action = false;
 			break;
 		default:
-			mi[idx].type = htons(POFIT_APPLY_ACTIONS);
-			mi[idx].len = htons(8 + sizeof(*ia));
-			ia = (void *)(mi[idx].instruction_data);
-			ia->action_num = 1;
-			b = fill_action(ia->action, &a->a[i]);
-			assert(b);
-			idx++;
+			if(prev_is_action &&
+			   ia->action_num < POF_MAX_ACTION_NUMBER_PER_INSTRUCTION) {
+				b = fill_action(&ia->action[ia->action_num],
+						&a->a[i]);
+				assert(b);
+				ia->action_num++;
+			} else {
+				mi[idx].type = htons(POFIT_APPLY_ACTIONS);
+				mi[idx].len = htons(8 + sizeof(*ia));
+				ia = (void *)(mi[idx].instruction_data);
+				ia->action_num = 1;
+				b = fill_action(ia->action, &a->a[i]);
+				assert(b);
+				idx++;
+			}
+			prev_is_action = true;
 			break;
 		}
 	}
-	assert(idx == a->num_actions);
 	return idx;
 }
 

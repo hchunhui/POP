@@ -88,7 +88,7 @@ struct match
 
 
 /* action */
-#define ACTION_NUM_ACTIONS 6
+#define ACTION_NUM_ACTIONS 18
 struct action
 {
 	int num_actions;
