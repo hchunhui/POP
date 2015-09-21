@@ -6,19 +6,6 @@
 // parse LLDP packet
 // send LLDP packet
 
-static pthread_mutex_t arp_lock = PTHREAD_MUTEX_INITIALIZER;
-static struct entity *arp_waiting_hosts[20];
-static int next_available_waiting_host;
-
-static inline void get_next_available_waiting_host()
-{
-	int i;
-	for (i = 0; i < 20; i++)
-		if (arp_waiting_hosts[i] == NULL)
-			break;
-	next_available_waiting_host = i;
-}
-
 static void port_packet_out(struct xswitch *xsw, int port, const uint8_t *pkt, int len)
 {
 	struct action *ac;
@@ -347,50 +334,21 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 			port_packet_out(xsw, port, arp_reply_pkt, len);
 			free(arp_reply_pkt);
 		} else {
-			//// not found, waiting for reply.
-			// save src host info.
-			// flood arp request.
-			struct entity *eh_wait;
-			pthread_mutex_lock(&arp_lock);
-			if (next_available_waiting_host >= 20) {
-				fprintf(stderr, "waiting hosts num >= 20.\n");
-				pthread_mutex_unlock(&arp_lock);
-				topo_unlock();
-				return -13;
-			}
-			eh_wait = topo_get_host_by_haddr(arp.arp_sha);
-			arp_waiting_hosts[next_available_waiting_host] = eh_wait;
-			get_next_available_waiting_host();
-			pthread_mutex_unlock(&arp_lock);
-
+			//// not found, flood arp request.
 			flood(packet, length);
 		}
 	} else if (arp.arp_op == ARPOP_REPLY) {
-		// TODO respond waiting host and move it from waiting hosts.
-		struct entity *ewait = NULL;
+		struct entity *ewait = topo_get_host_by_haddr(arp.arp_tha);
 		struct entity *esw = NULL;
 		struct xswitch *xsw = NULL;
 		int sw_out_port;
-		pthread_mutex_lock(&arp_lock);
-		for (i = 0; i < 20; i++) {
-			if(arp_waiting_hosts[i] != NULL) {
-				hinfo = entity_get_addr(arp_waiting_hosts[i]);
-				if (haddr_equal(hinfo.haddr, arp.arp_tha)){
-					ewait = arp_waiting_hosts[i];
-					arp_waiting_hosts[i] = NULL;
-					if (i < next_available_waiting_host)
-						next_available_waiting_host = i;
-					break;
-				}
-			}
-		}
-		pthread_mutex_unlock(&arp_lock);
 
 		if (ewait == NULL) {
 			fprintf(stderr, "not find waiting arp host\n");
 			topo_unlock();
 			return -14;
 		}
+
 		esw = entity_host_get_adj_switch(ewait, &sw_out_port);
 		xsw = entity_get_xswitch(esw);
 		port_packet_out(xsw, sw_out_port, packet, length);
