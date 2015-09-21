@@ -30,11 +30,18 @@ Choose the right POF version, edit xswitch/Makefile:
       git checkout master   (optimized 1.1.9 with PACKET_OUT support)
       git checkout backport-1.4.0 (1.4.0 with PACKET_OUT support)
 )
+(NOTE:
+  To work with POFSwitch jelly, set:
+
+      POF_VERSION = POFSwitch_VERSION_1_1_9
+      EXTRA_CFLAGS += -DCOMPAT_JELLY_PACKET_OUT -DCOMPAT_JELLY_PACKET_IN
+)
 
 For non-standard build environment, edit Makefile.comm:
   CC          C compiler command
   CFLAGS      C compiler flags
   LDFLAGS     linker flags
+
 
 2) Compile.
 

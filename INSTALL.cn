@@ -22,13 +22,20 @@ Debian/Ubuntu 用户可以输入:
   POP使用了原始POF软件交换机未支持的 PACKET_OUT 消息.
   请使用我们打过补丁的实现:
 
-      bgit clone http://ssg.ustcsz.edu.cn/~hch/git/pofswitch.git
+      git clone http://ssg.ustcsz.edu.cn/~hch/git/pofswitch.git
 
   切换到下面一个分支:
 
       git checkout backport (1.1.9 加上 PACKET_OUT 支持)
       git checkout master   (1.1.9 加上 PACKET_OUT 支持，性能优化)
-      git checkout backport-1.4.0 (1.4.0 加上 PACKET_OUT 之前)
+      git checkout backport-1.4.0 (1.4.0 加上 PACKET_OUT 支持)
+)
+(
+注意：
+  与 POFSwitch jelly 配合使用时，设置如下:
+
+      POF_VERSION = POFSwitch_VERSION_1_1_9
+      EXTRA_CFLAGS += -DCOMPAT_JELLY_PACKET_OUT -DCOMPAT_JELLY_PACKET_IN
 )
 
 如果使用非标准的编译环境, 编辑 Makefile.comm:
