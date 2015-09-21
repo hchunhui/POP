@@ -44,6 +44,11 @@ struct xport **xswitch_get_xports(struct xswitch *sw)
 	return sw->xports;
 }
 
+struct flow_table *xswitch_get_table0(struct xswitch *sw)
+{
+	return sw->table0;
+}
+
 void xswitch_table_lock(struct xswitch *sw)
 {
 	pthread_mutex_lock(&sw->table_lock);

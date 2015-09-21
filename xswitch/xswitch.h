@@ -24,6 +24,7 @@ void xswitch_send(struct xswitch *sw, struct msgbuf *b);
 dpid_t xswitch_get_dpid(struct xswitch *sw);
 int xswitch_get_num_ports(struct xswitch *sw);
 struct xport **xswitch_get_xports(struct xswitch *sw);
+struct flow_table *xswitch_get_table0(struct xswitch *sw);
 void xswitch_table_lock(struct xswitch *sw);
 void xswitch_table_unlock(struct xswitch *sw);
 

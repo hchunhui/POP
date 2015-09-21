@@ -283,10 +283,36 @@ struct entity **topo_get_switches(int *pnum)
 
 void topo_switch_up(struct xswitch *sw)
 {
-	struct entity *e = entity_switch(sw);
+	struct flow_table *table0;
+	struct match *ma;
+	struct action *ac;
+	struct msgbuf *msg;
+
+	table0 = xswitch_get_table0(sw);
+
+	ma = match();
+	match_add(ma, "dl_type", value_from_16(ETHERTYPE_ARP), value_from_16(0xffff));
+	ac = action();
+	action_add(ac, AC_PACKET_IN, 0);
+	msg = msg_flow_entry_add(table0, flow_table_get_entry_index(table0), 100, ma, ac);
+	match_free(ma);
+	action_free(ac);
+	xswitch_send(sw, msg);
+
+	ma = match();
+	match_add(ma, "dl_dst", value_from_48(LLDP_DST), value_from_48(0xffffffffffffull));
+	match_add(ma, "dl_type", value_from_16(LLDP_TYPE), value_from_16(0xffff));
+	ac = action();
+	action_add(ac, AC_PACKET_IN, 0);
+	msg = msg_flow_entry_add(table0, flow_table_get_entry_index(table0), 100, ma, ac);
+	match_free(ma);
+	action_free(ac);
+	xswitch_send(sw, msg);
+
 	topo_wrlock();
-	topo_add_switch(e);
+	topo_add_switch(entity_switch(sw));
 	topo_unlock();
+
 	lldp_packet_send(sw);
 }
 

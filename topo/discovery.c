@@ -369,21 +369,12 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 	const struct entity_adj *esw_adj;
 	int j, numadjs;
 
-	hinfo.haddr = value_to_haddr(value_extract(packet, 48, 48));
+	assert(len >= 32);
 	eth_type = value_to_16(value_extract(packet, 96, 16));
-	switch (eth_type) {
-	case ETHERTYPE_ARP:
-		assert(len >= 14 + 28);
-		hinfo.paddr = value_to_32(value_extract(packet, 28*8, 32));
-		break;
-	case ETHERTYPE_IP:
-		assert(len >= 14 + 20);
-		hinfo.paddr = value_to_32(value_extract(packet, 26*8, 32));
-		break;
-	default:
-		hinfo.paddr = 0;
-		break;
-	}
+	assert(eth_type == ETHERTYPE_ARP);
+
+	hinfo.haddr = value_to_haddr(value_extract(packet, 22*8, 48));
+	hinfo.paddr = value_to_32(value_extract(packet, 28*8, 32));
 
 	/* fast path */
 	topo_rdlock();
@@ -483,7 +474,6 @@ handle_topo_packet_in(struct xswitch *sw, int port, const uint8_t *packet, int l
 		handle_arp_packet_in(packet, length, sw, port);
 		return -4;
 	} else {
-		update_hosts(packet, length, sw, port);
 		return -2;
 	}
 }
