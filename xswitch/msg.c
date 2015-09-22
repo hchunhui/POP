@@ -310,6 +310,7 @@ static int fill_instructions(struct pof_instruction *mi, int num, struct action 
 
 	idx = 0;
 	prev_is_action = false;
+	ia = NULL; /* make compiler happy */
 	for(i = 0; i < a->num_actions; i++) {
 		assert(idx < num);
 		switch(a->a[i].type) {
