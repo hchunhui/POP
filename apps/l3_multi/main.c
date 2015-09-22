@@ -1,6 +1,6 @@
 #include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "types.h"
 #include "pop_api.h"
 #include "route.h"
@@ -25,7 +25,7 @@ static struct route *handle_sdnp(struct packet *pkt, struct map *env)
 	dst_port = value_to_16(read_packet(pkt, "port_dst"));
 
 	if(src == NULL || dst == NULL) {
-		fprintf(stderr, "sdnp: bad address.\n");
+		xerror("sdnp: bad address.\n");
 		return route();
 	}
 
@@ -49,7 +49,7 @@ static struct route *handle_ipv4_unicast(uint32_t hsrc_ip, uint32_t hdst_ip, str
 	hsrc = get_host_by_paddr(hsrc_ip);
 	hdst = get_host_by_paddr(hdst_ip);
 	if(hsrc == NULL || hdst == NULL) {
-		fprintf(stderr, "ipv4_unicast: bad address.\n");
+		xerror("ipv4_unicast: bad address.\n");
 		return route();
 	}
 	src = get_host_adj_switch(hsrc, &src_port);
@@ -77,17 +77,17 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip, s
 
 	hsrc = get_host_by_paddr(hsrc_ip);
 	if(hsrc == NULL) {
-		fprintf(stderr, "ipv4_multicast: bad src address.\n");
+		xerror("ipv4_multicast: bad src address.\n");
 		return route();
 	}
 	src = get_host_adj_switch(hsrc, &src_port);
 
 	visited = get_tree(src, src_port, NULL, switches, switches_num);
-	fprintf(stderr, "group_id: %08x, group_n: %d\n", hdst_ip, l->n);
+	xinfo("group_id: %08x, group_n: %d\n", hdst_ip, l->n);
 	for(i = 0; i < l->n; i++) {
 		hdst = get_host_by_paddr(l->addrs[i]);
 		if(hdst == NULL) {
-			fprintf(stderr, "ipv4_multicast: bad dst address.\n");
+			xerror("ipv4_multicast: bad dst address.\n");
 			continue;
 		}
 
@@ -134,7 +134,7 @@ static struct route *handle_ipv4(struct packet *pkt, struct map *env)
 
 void init_f(struct map *env)
 {
-	fprintf(stderr, "f init\n");
+	xinfo("f init\n");
 	map_add_key(env, PTR("group_table"), PTR(igmp_init()),
 		    mapf_eq_map, mapf_free_map);
 }
@@ -152,7 +152,7 @@ struct route *f(struct packet *pkt, struct map *env)
 	} else if(strcmp(read_header_type(pkt), "ipv4") == 0) {
 		r = handle_ipv4(pkt, env);
 	} else {
-		fprintf(stderr, "unknown protocol: %s.\n", read_header_type(pkt));
+		xinfo("unknown protocol: %s.\n", read_header_type(pkt));
 		r = route();
 	}
 

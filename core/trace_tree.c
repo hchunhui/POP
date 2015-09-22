@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "types.h"
 #include "trace.h"
 #include "trace_tree.h"
@@ -206,41 +207,45 @@ void trace_tree_print(struct trace_tree *tree)
 	struct trace_tree_D *td;
 	struct trace_tree_G *tg;
 	int j;
+
+	if(xlog_get_verbose() > XLOG_DEBUG)
+		return;
+
 	switch(tree->type) {
 	case TT_E:
-		fprintf(stderr, "(E)");
+		xdebug("(E)");
 		break;
 	case TT_V:
 		tv = (struct trace_tree_V *) tree;
-		fprintf(stderr, "(V %s", tv->name);
+		xdebug("(V %s", tv->name);
 		for(j = 0; j < tv->num_branches; j++) {
-			fprintf(stderr, " ");
+			xdebug(" ");
 			trace_tree_print(tv->branches[j].tree);
 		}
-		fprintf(stderr, ")");
+		xdebug(")");
 		break;
 	case TT_T:
 		tt = (struct trace_tree_T *) tree;
-		fprintf(stderr, "(T %s ", tt->name);
+		xdebug("(T %s ", tt->name);
 		trace_tree_print(tt->t);
-		fprintf(stderr, " ");
+		xdebug(" ");
 		trace_tree_print(tt->f);
-		fprintf(stderr, ")");
+		xdebug(")");
 		break;
 	case TT_D:
 		td = (struct trace_tree_D *) tree;
-		fprintf(stderr, "(D %s ", td->name);
+		xdebug("(D %s ", td->name);
 		trace_tree_print(td->t);
-		fprintf(stderr, ")");
+		xdebug(")");
 		break;
 	case TT_G:
 		tg = (struct trace_tree_G *) tree;
-		fprintf(stderr, "(G %s ", header_get_name(tg->new_spec));
+		xdebug("(G %s ", header_get_name(tg->new_spec));
 		trace_tree_print(tg->t);
-		fprintf(stderr, ")");
+		xdebug(")");
 		break;
 	case TT_L:
-		fprintf(stderr, "(L)");
+		xdebug("(L)");
 		break;
 	}
 }
@@ -787,8 +792,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 		tl = (struct trace_tree_L *)tree;
 		match_dump(ma, buf, 128);
 		action_dump(tl->ac, buf2, 128);
-		fprintf(stderr, "tid %d: %2d, %s, %s\n",
-			flow_table_get_tid(ft), priority, buf, buf2);
+		xdebug("tid %d: %2d, %s, %s\n",
+		       flow_table_get_tid(ft), priority, buf, buf2);
 		if(tl->index == -1) {
 			tl->index = flow_table_get_entry_index(ft);
 			msg = msg_flow_entry_add(ft, tl->index, priority, ma, tl->ac);
@@ -818,8 +823,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 			  tt->value,
 			  value_from_64(0xffffffffffffffffull));
 		action_dump(ac_pi, buf, 128);
-		fprintf(stderr, "tid %d: %2d, BARRIER, %s\n",
-			flow_table_get_tid(ft), priority, buf);
+		xdebug("tid %d: %2d, BARRIER, %s\n",
+		       flow_table_get_tid(ft), priority, buf);
 		if(tt->barrier_index == -1) {
 			tt->barrier_index = flow_table_get_entry_index(ft);
 			msg = msg_flow_entry_add(ft, tt->barrier_index, priority, maa, ac_pi);
@@ -850,8 +855,8 @@ static int emit_rule(struct xswitch *sw, struct flow_table *ft,
 
 		match_dump(ma, buf, 128);
 		action_dump(a, buf2, 128);
-		fprintf(stderr, "tid %d: %2d, %s, %s\n",
-			flow_table_get_tid(ft), priority, buf, buf2);
+		xdebug("tid %d: %2d, %s, %s\n",
+		       flow_table_get_tid(ft), priority, buf, buf2);
 
 		if(tg->index == -1) {
 			tg->index = flow_table_get_entry_index(ft);

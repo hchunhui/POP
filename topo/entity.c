@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "entity.h"
 #include "xswitch/xswitch.h"
 
@@ -41,23 +42,23 @@ void entity_print(struct entity *e)
 {
 	int i;
 	if (e->type == ENTITY_TYPE_HOST) {
-		fprintf(stderr, "HOST:\nEth Addr: ");
+		xinfo("HOST:\nEth Addr: ");
 		for (i=0; i<6; i++)
-			fprintf(stderr, "%02x ",e->u.addr.haddr.octet[i]);
-		fprintf(stderr, "\nIPv4: %08x\n", e->u.addr.paddr);
-		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
+			xinfo("%02x ",e->u.addr.haddr.octet[i]);
+		xinfo("\nIPv4: %08x\n", e->u.addr.paddr);
+		xinfo("num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
-				e->adjs[i].out_port, e->adjs[i].adj_in_port,
-				entity_get_dpid(e->adjs[i].adj_entity));
+			xinfo("  %3d: %d, %d, %d\n", i,
+			      e->adjs[i].out_port, e->adjs[i].adj_in_port,
+			      entity_get_dpid(e->adjs[i].adj_entity));
 		}
 	} else if (e->type == ENTITY_TYPE_SWITCH) {
-		fprintf(stderr, "SWITCH:\nDpid: %d\n", entity_get_dpid(e));
-		fprintf(stderr, "num_adjs: %d\n", e->num_adjs);
+		xinfo("SWITCH:\nDpid: %d\n", entity_get_dpid(e));
+		xinfo("num_adjs: %d\n", e->num_adjs);
 		for (i=0; i<e->num_adjs; i++) {
-			fprintf(stderr, "  %3d: %d, %d, %d\n", i,
-				e->adjs[i].out_port, e->adjs[i].adj_in_port,
-				(e->adjs[i].adj_entity)->type);
+			xinfo("  %3d: %d, %d, %d\n", i,
+			      e->adjs[i].out_port, e->adjs[i].adj_in_port,
+			      (e->adjs[i].adj_entity)->type);
 		}
 	}
 }

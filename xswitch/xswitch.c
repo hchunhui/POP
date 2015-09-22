@@ -1,9 +1,9 @@
 #include <pthread.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
+#include "xlog/xlog.h"
 #include "xswitch-private.h"
 #include "xswitch.h"
 #include "io/msgbuf.h"
@@ -111,18 +111,18 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 	struct msgbuf *rmsg;
 	switch(sw->state) {
 	case XS_HELLO:
-		fprintf(stderr, "expect hello\n");
+		xdebug("expect hello\n");
 		if(msg_process_hello(msg)) {
-			fprintf(stderr, "sending features request\n");
+			xdebug("sending features request\n");
 			rmsg = msg_features_request();
 			xswitch_send(sw, rmsg);
 			sw->state = XS_FEATURES_REPLY;
 		}
 		break;
 	case XS_FEATURES_REPLY:
-		fprintf(stderr, "expect features reply\n");
+		xdebug("expect features reply\n");
 		if(msg_process_features_reply(msg, &sw->dpid, &sw->n_ports)) {
-			fprintf(stderr, "sending set/get config\n");
+			xdebug("sending set/get config\n");
 			rmsg = msg_set_config(128);
 			xswitch_send(sw, rmsg);
 			rmsg = msg_get_config_request();
@@ -139,7 +139,7 @@ void xswitch_on_recv(struct xswitch *sw, struct msgbuf *msg)
 		msg_process(sw, msg);
 		break;
 	default:
-		fprintf(stderr, "error switch state.\n");
+		xerror("error switch state.\n");
 		abort();
 	}
 	msgbuf_delete(msg);
@@ -185,7 +185,7 @@ static void init_counter(struct xswitch *sw, int counter_id)
 {
 	struct msgbuf *msg;
 	msg = msg_counter_add(counter_id);
-	fprintf(stderr, "add counter %d\n", counter_id);
+	xdebug("add counter %d\n", counter_id);
 	xswitch_send(sw, msg);
 }
 
@@ -223,7 +223,7 @@ next:
 		msg = msg_flow_entry_add(ft, idx++, priority++, ma, ac);
 		match_free(ma);
 		action_free(ac);
-		fprintf(stderr, "add counter %u on port %u\n", port_id, port_id);
+		xdebug("add counter %u on port %u\n", port_id, port_id);
 		xswitch_send(sw, msg);
 		if ((xp = xport_get_next(xp)) != NULL)
 			goto next;
@@ -244,15 +244,15 @@ void xswitch_up(struct xswitch *sw)
 void xswitch_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet_len)
 {
 	int i;
-	fprintf(stderr, "packet in, dpid: 0x%x, in_port: %u, total_len: %u\n",
-		sw->dpid, in_port, packet_len);
+	xdebug("packet in, dpid: 0x%x, in_port: %u, total_len: %u\n",
+	       sw->dpid, in_port, packet_len);
 	for(i = 0; i < packet_len; i++)
 	{
 		if(i%16 == 0)
-			fprintf(stderr, "%06x ", i);
-		fprintf(stderr, "%02x%c", packet[i], i%16==15 ? '\n' : ' ');
+			xdebug("%06x ", i);
+		xdebug("%02x%c", packet[i], i%16==15 ? '\n' : ' ');
 	}
-	fprintf(stderr, "\n");
+	xdebug("\n");
 	if (!topo_packet_in(sw, in_port, packet, packet_len))
 		core_packet_in(sw, in_port, packet, packet_len);
 }
@@ -309,7 +309,7 @@ next2:
 		return;
 	sendonce = 1;
 	*/
-	fprintf(stderr, "\n\n\nsend counter request\n");
+	xdebug("\n\n\nsend counter request\n");
 	counter_id = 1;
 	for (i = 0; i < xswitchnum; i++) {
 		sw = xswitches[i];

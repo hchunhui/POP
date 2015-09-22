@@ -1,5 +1,6 @@
 #include <pthread.h>
 #include <string.h>
+#include "xlog/xlog.h"
 #include "discovery.h"
 // install flow table
 // construct LLDP packet
@@ -149,7 +150,7 @@ parse_lldp(const uint8_t *packet, edge_t *link/*OUT*/)
 	while(type != 0){
 		offset += 8*lldp_tlv_next(packet, &tlv, offset);
 		type = lldp_tlv_get_type(&tlv);
-		fprintf(stderr, "type: %d\n", type);
+		xdebug("type: %d\n", type);
 		if (type == CHASSIS_ID_TLV){
 			if (i != 0)
 			{
@@ -183,7 +184,7 @@ handle_lldp_packet_in(const uint8_t *packet, int length, struct xswitch *sw, int
 {
 	if (length < 14 + 14)
 	{
-		fprintf(stderr, "length < 28\n");
+		xerror("length < 28\n");
 		return -1;
 	}
 	uint16_t eth_type = value_to_16(value_extract(packet, 96, 16));
@@ -195,7 +196,7 @@ handle_lldp_packet_in(const uint8_t *packet, int length, struct xswitch *sw, int
 	link.port2 = port;
 	if (! parse_lldp(packet, &link))
 	{
-		fprintf(stderr, "parse_lldp error\n");
+		xerror("parse_lldp error\n");
 		topo_unlock();
 		return -3;
 	}
@@ -344,7 +345,7 @@ static int handle_arp_packet_in(const uint8_t *packet, int length, struct xswitc
 		int sw_out_port;
 
 		if (ewait == NULL) {
-			fprintf(stderr, "not find waiting arp host\n");
+			xinfo("not find waiting arp host\n");
 			topo_unlock();
 			return -14;
 		}
@@ -414,28 +415,28 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 		host = entity_host(hinfo);
 		if (topo_add_host(host) >= 0)
 			entity_add_link(host, 1, esw, port);
-		fprintf(stderr, "found new host:\n");
+		xinfo("found new host:\n");
 		entity_print(host);
 	} else {
 		old_esw = entity_host_get_adj_switch(host, &old_port);
 		old_paddr = entity_get_addr(host).paddr;
 		if (hinfo.paddr && old_paddr != hinfo.paddr) {
 			if(old_paddr) {
-				fprintf(stderr, "IP alias detected!\n");
-				fprintf(stderr, "mac: "
-					"%02x:%02x:%02x:%02x:%02x:%02x\n",
-					hinfo.haddr.octet[0],
-					hinfo.haddr.octet[1],
-					hinfo.haddr.octet[2],
-					hinfo.haddr.octet[3],
-					hinfo.haddr.octet[4],
-					hinfo.haddr.octet[5]);
-				fprintf(stderr, "old ip: %08x\n", old_paddr);
-				fprintf(stderr, "new ip: %08x\n", hinfo.paddr);
+				xinfo("IP alias detected!\n");
+				xinfo("mac: "
+				      "%02x:%02x:%02x:%02x:%02x:%02x\n",
+				      hinfo.haddr.octet[0],
+				      hinfo.haddr.octet[1],
+				      hinfo.haddr.octet[2],
+				      hinfo.haddr.octet[3],
+				      hinfo.haddr.octet[4],
+				      hinfo.haddr.octet[5]);
+				xinfo("old ip: %08x\n", old_paddr);
+				xinfo("new ip: %08x\n", hinfo.paddr);
 				assert(0);
 			} else {
 				entity_set_paddr(host, hinfo.paddr);
-				fprintf(stderr, "host paddr changed:\n");
+				xinfo("host paddr changed:\n");
 				entity_print(host);
 			}
 		}
@@ -444,12 +445,12 @@ static void update_hosts(const uint8_t *packet, int len, struct xswitch *xsw, in
 			host = entity_host(hinfo);
 			if (topo_add_host(host) >= 0)
 				entity_add_link(host, 1, esw, port);
-			fprintf(stderr, "host loc changed:\n"
-				"old: (%08x, %d)\nnew: (%08x, %d)\n",
-				entity_get_dpid(old_esw),
-				old_port,
-				entity_get_dpid(esw),
-				port);
+			xinfo("host loc changed:\n"
+			      "old: (%08x, %d)\nnew: (%08x, %d)\n",
+			      entity_get_dpid(old_esw),
+			      old_port,
+			      entity_get_dpid(esw),
+			      port);
 		}
 	}
 	topo_print();

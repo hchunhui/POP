@@ -1,10 +1,10 @@
-#include <stdio.h>
+#include "xlog/xlog.h"
 #include "pop_api.h"
 #include "learning.h"
 
 void init_f(struct map *env)
 {
-	fprintf(stderr, "f init\n");
+	xinfo("f init\n");
 	learning_init(env, "table");
 }
 

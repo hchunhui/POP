@@ -2,9 +2,9 @@
  * Make our system as a POX application...
  */
 
-#include <stdio.h>
 #include <Python.h>
 
+#include "xlog/xlog.h"
 #include "param.h"
 #include "io/msgbuf.h"
 
@@ -163,5 +163,5 @@ initpop_pox(void)
 	Py_InitModule("pop_pox", methods);
 	mb_h = NULL;
 	in_xmit = false;
-	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
+	xinfo("POF Version: %s\n", msg_get_pof_version());
 }

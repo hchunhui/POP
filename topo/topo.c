@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "xlog/xlog.h"
 #include "types.h"
 #include "xswitch/xswitch.h"
 #include "topo.h"
@@ -66,7 +67,7 @@ void topo_print_json(void)
 	char buf[40960];
 	int pos;
         char ebuf[32];
-	printf("topo_print_json\n");
+
 	pos = 0;
         pos += sprintf(buf + pos, "{");
         pos += sprintf(buf + pos, "\"nodes\":");
@@ -121,16 +122,16 @@ void topo_print_json(void)
 void topo_print(void)
 {
 	int i;
-	fprintf(stderr, "\nSwitches--------------\n");
+	xinfo("\nSwitches--------------\n");
 	for (i=0; i<num_switches; i++) {
 		entity_print(switches[i]);
 	}
-	fprintf(stderr, "\nHosts--------------\n");
+	xinfo("\nHosts--------------\n");
 	for (i=0; i<num_hosts; i++) {
 		entity_print(hosts[i]);
 	}
-	fprintf(stderr, "num_switches: %d, num_hosts: %d\n",
-		num_switches, num_hosts);
+	xinfo("num_switches: %d, num_hosts: %d\n",
+	      num_switches, num_hosts);
 #ifdef ENABLE_WEB
 	topo_print_json();
 #endif
@@ -319,7 +320,7 @@ void topo_switch_up(struct xswitch *sw)
 bool topo_packet_in(struct xswitch *sw, int in_port, const uint8_t *packet, int packet_len)
 {
 	int rt = handle_topo_packet_in(sw, in_port, packet, packet_len);
-	fprintf(stderr, "return value %d\n", rt);
+	xdebug("return value %d\n", rt);
 	if (rt==-2)
 		return false;
 	return true;
@@ -350,14 +351,14 @@ void topo_switch_port_status(struct xswitch *sw, int port, enum port_status stat
 	esw = topo_get_switch(xswitch_get_dpid(sw));
 	switch(status) {
 	case PORT_DOWN:
-		fprintf(stderr, "-----port down-----\n");
+		xinfo("-----port down-----\n");
 		entity_del_link(esw, port);
 		del_dangling_hosts();
 		topo_print();
 		topo_unlock();
 		break;
 	case PORT_UP:
-		fprintf(stderr, "-----port up-----\n");
+		xinfo("-----port up-----\n");
 		topo_unlock();
 		lldp_packet_send(sw);
 		break;
@@ -369,7 +370,7 @@ void topo_switch_down(struct xswitch *sw)
 	struct entity *esw;
 
 	topo_wrlock();
-	fprintf(stderr, "-----switch down--------\n");
+	xinfo("-----switch down--------\n");
 	esw = topo_get_switch(xswitch_get_dpid(sw));
 	topo_del_switch(esw);
 	del_dangling_hosts();

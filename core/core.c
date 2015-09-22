@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <dlfcn.h>
+#include "xlog/xlog.h"
 #include "xswitch/xswitch-private.h"
 #include "topo/topo.h"
 #include "topo/entity.h"
@@ -54,7 +55,7 @@ void pull_header(struct packet *pkt)
 	packet_parser_pull(pkt->pp, &old_spec, &sel_value, &new_spec, &next_stack_top);
 	trace_R(header_get_sel(old_spec), sel_value);
 	trace_G(old_spec, new_spec, next_stack_top);
-	printf("current header: %s\n", header_get_name(new_spec));
+	xdebug("current header: %s\n", header_get_name(new_spec));
 }
 
 const char *read_header_type(struct packet *pkt)
@@ -246,7 +247,7 @@ void core_invalidate(bool (*p)(void *p_data, const char *name, const void *arg),
 	int i;
 
 	switches = topo_get_switches(&num_switches);
-	fprintf(stderr, "core_invalidate\n");
+	xdebug("core_invalidate\n");
 	for(i = 0; i < num_switches; i++) {
 		struct xswitch *cur_sw = entity_get_xswitch(switches[i]);
 		struct trace_tree *tt = cur_sw->trace_tree;
@@ -264,20 +265,20 @@ void core_invalidate(bool (*p)(void *p_data, const char *name, const void *arg),
 /* call back funtions */
 void core_init(const char *algo_file, const char *spec_file)
 {
-	fprintf(stderr, "loading algorithm(%s)...\n", algo_file);
+	xinfo("loading algorithm(%s)...\n", algo_file);
 	algo_handle = dlopen(algo_file, RTLD_NOW);
 	if(!algo_handle)
-		fprintf(stderr, "error: %s\n", dlerror());
+		xerror("error: %s\n", dlerror());
 	assert(algo_handle);
 	f = dlsym(algo_handle, "f");
 	assert(f);
 	init_f = dlsym(algo_handle, "init_f");
 	assert(init_f);
 
-	fprintf(stderr, "loading header spec(%s)...\n", spec_file);
+	xinfo("loading header spec(%s)...\n", spec_file);
 	header_spec = spec_parser_file(spec_file);
 	assert(header_spec);
-	fprintf(stderr, "init env...\n");
+	xinfo("init env...\n");
 	env = map(mapf_eq_str, mapf_hash_str, mapf_dup_str, mapf_free_str);
 	init_f(env);
 }
@@ -363,11 +364,11 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 	for(i = 0; i < num_edges; i++) {
 		struct entity *cur_ent = edges[i].ent1;
 		int out_port = edges[i].port1;
-		fprintf(stderr, "handle edge (0x%x, %d, 0x%x, %d):\n",
-			entity_get_dpid(edges[i].ent1),
-			edges[i].port1,
-			entity_get_dpid(edges[i].ent2),
-			edges[i].port2);
+		xdebug("handle edge (0x%x, %d, 0x%x, %d):\n",
+		       entity_get_dpid(edges[i].ent1),
+		       edges[i].port1,
+		       entity_get_dpid(edges[i].ent2),
+		       edges[i].port2);
 		if(cur_ent) {
 			struct xswitch *cur_sw = entity_get_xswitch(cur_ent);
 			int j, entry;
@@ -423,12 +424,12 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 
 		xswitch_table_lock(cur_sw);
 		if(trace_tree_augment(&(cur_sw->trace_tree), trace, cur_ac)) {
-			fprintf(stderr, "--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
+			xdebug("--- flow table for 0x%x ---\n", entity_get_dpid(cur_ent));
 			trace_tree_print(cur_sw->trace_tree);
 #ifdef ENABLE_WEB
 			trace_tree_print_json(cur_sw->trace_tree, cur_sw->dpid);
 #endif
-			fprintf(stderr, "\n");
+			xdebug("\n");
 			trace_tree_emit_rule(cur_sw, cur_sw->trace_tree);
 #ifdef ENABLE_WEB
 			trace_tree_print_ft_json(cur_sw->trace_tree, cur_sw->dpid);
@@ -449,12 +450,12 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 
 		xswitch_table_lock(sw);
 		if(trace_tree_augment(&(sw->trace_tree), trace, a)) {
-			fprintf(stderr, "--- flow table for cur sw ---\n");
+			xdebug("--- flow table for cur sw ---\n");
 			trace_tree_print(sw->trace_tree);
 #ifdef ENABLE_WEB
 			trace_tree_print_json(sw->trace_tree, sw->dpid);
 #endif
-			fprintf(stderr, "\n");
+			xdebug("\n");
 			trace_tree_emit_rule(sw, sw->trace_tree);
 #ifdef ENABLE_WEB
 			trace_tree_print_ft_json(sw->trace_tree, sw->dpid);
@@ -472,7 +473,7 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 		struct namearg na;
 		na.name = trace->inv_events[i].name;
 		na.arg = trace->inv_events[i].arg;
-		fprintf(stderr, "invalidate \"%s\":\n", na.name);
+		xdebug("invalidate \"%s\":\n", na.name);
 		topo_rdlock();
 		core_invalidate(cmpna_p, &na);
 		topo_unlock();

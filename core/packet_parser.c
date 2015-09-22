@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "xswitch/xswitch.h"
 #include "packet_parser.h"
 #include "param.h"
@@ -291,7 +292,7 @@ int header_get_fixed_length(struct header *h)
 	} else {
 		int i;
 		int length = 0;
-		fprintf(stderr, "header_get_fixed_length: length is variable!\n");
+		xinfo("header_get_fixed_length: length is variable!\n");
 		for(i = 0; i < h->num_fields; i++) {
 			if(h->fields[i].offset + h->fields[i].length > length)
 				length = h->fields[i].offset + h->fields[i].length;

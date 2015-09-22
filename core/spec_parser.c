@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "packet_parser.h"
 #include "spec_parser.h"
 
@@ -247,10 +248,10 @@ static void next_tok(struct parse_ctx *pctx)
 #define F(g) do {							\
 		 int ret;						\
 		 if((ret = (g))) {					\
-			fprintf(stderr, "Fail at (%d, %d) in %s.\n",	\
+			 xerror("Fail at (%d, %d) in %s.\n",		\
 				pctx->tok_row,				\
 				pctx->tok_col, #g);			\
-			return ret;					\
+			 return ret;					\
 		 }							\
 	} while(0)
 #define T(t) (parse_tok(pctx, t) == 0)
@@ -446,7 +447,7 @@ D(cases)
 		M(T_IDENT);
 		e = symtab_find(CTX, CTX->buf);
 		if(!e) {
-			fprintf(stderr, "Header %s not found.\n", CTX->buf);
+			xerror("Header %s not found.\n", CTX->buf);
 			return 2;
 		}
 		slen = header_get_sel_length(CTX->curr_h);
@@ -464,7 +465,7 @@ D(cases)
 		else if(slen == 64)
 			header_add_next(CTX->curr_h, value_from_64(val), e->h);
 		else {
-			fprintf(stderr, "Unable to handle length: %d\n", slen);
+			xerror("Unable to handle length: %d\n", slen);
 			return 2;
 		}
 		M(T_SCOL);
@@ -513,7 +514,7 @@ D(length)
 		return 0;
 	} else {
 		if(CTX->curr_offset%8) {
-			fprintf(stderr, "Bad header length: %d bits.\n", CTX->curr_offset);
+			xerror("Bad header length: %d bits.\n", CTX->curr_offset);
 			return 2;
 		}
 		header_set_length(CTX->curr_h, expr_value(CTX->curr_offset/8));
@@ -584,7 +585,7 @@ D(headers)
 					CTX->curr_h = e->h;
 					CTX->curr_offset = 0;
 				} else {
-					fprintf(stderr, "Conflict header %s.\n", name);
+					xerror("Conflict header %s.\n", name);
 					return 2;
 				}
 			}
@@ -653,8 +654,8 @@ struct header *spec_parser_string(const char *s, int length)
 		return NULL;
 	for(i = 0; i < ctx.tabsize; i++)
 		if(ctx.symtab[i].ref == 0) {
-			fprintf(stderr, "Warning: Defined but not used Header %s.\n",
-				header_get_name(ctx.symtab[i].h));
+			xinfo("Warning: Defined but not used Header %s.\n",
+			      header_get_name(ctx.symtab[i].h));
 			header_free(ctx.symtab[i].h);
 		}
 	return ctx.curr_h;
@@ -668,7 +669,7 @@ struct header *spec_parser_file(const char *filename)
 	struct header *h;
 	fp = fopen(filename, "r");
 	if(!fp) {
-		fprintf(stderr, "Unable to open file: %s.\n", filename);
+		xerror("Unable to open file: %s.\n", filename);
 		return NULL;
 	}
 	fseek(fp, 0, SEEK_END);

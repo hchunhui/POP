@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <netinet/in.h>
+#include "xlog/xlog.h"
 
 #include "param.h"
 
@@ -31,14 +32,14 @@ void
 accept_cb_func(struct sw *sw)
 {
 	sw->xsw = xswitch_on_accept(sw);
-	printf("Connected.\n");
+	xinfo("Connected.\n");
 }
 
 void
 close_cb_func(struct sw *sw)
 {
 	xswitch_on_close(sw->xsw);
-	printf("Closed.\n");
+	xinfo("Closed.\n");
 }
 
 void
@@ -74,13 +75,14 @@ main(int argc, char **argv)
 	const char *spec_file = "scripts/header.spec";
 	int ch;
 
-	while ((ch = getopt(argc, argv, "p:tvf:s:")) != -1) {
+	while ((ch = getopt(argc, argv, "p:tvf:s:h")) != -1) {
 		switch (ch) {
 		case 't':
 			realtime = 1;
 			break;
 		case 'v':
 			verbose = 1;
+			xlog_set_verbose(XLOG_DEBUG);
 			break;
 		case 'p':
 			sscanf(optarg, "%d", &server_port);
@@ -101,8 +103,8 @@ main(int argc, char **argv)
 #ifdef ENABLE_WEB
 	ws_init();
 #endif
-	fprintf(stderr, "POP Version: %s\n", VERSION);
-	fprintf(stderr, "POF Version: %s\n", msg_get_pof_version());
+	xinfo("POP Version: %s\n", VERSION);
+	xinfo("POF Version: %s\n", msg_get_pof_version());
 	init_io_module();
 	xswitch_init(algo_file, spec_file);
 

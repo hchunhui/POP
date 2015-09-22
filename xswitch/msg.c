@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <netinet/in.h>
 #include <assert.h>
+#include "xlog/xlog.h"
 #include "xswitch-private.h"
 #include "pof_global.h"
 #include "io/msgbuf.h"
@@ -511,7 +512,7 @@ struct msgbuf *msg_flow_table_add(struct flow_table *ft)
 	}
 	mft->key_len = htons(u16(key_len));
 	mft->slotID = htons(0);
-	fprintf(stderr, "----key_len: %d, fields_num: %d\n", key_len, ft->fields_num);
+	xdebug("----key_len: %d, fields_num: %d\n", key_len, ft->fields_num);
 	return msg;
 }
 
@@ -686,25 +687,25 @@ static void dump_packet(const struct msgbuf *msg)
 	size_t size = msg->size;
 	size_t i;
 
-	fprintf(stderr, "dumping...\nmsg size: %zu\nmsg data:", size);
+	xinfo("dumping...\nmsg size: %zu\nmsg data:", size);
 	for(i = 0; i < size; i++)
 	{
 		if(i%16 == 0)
-			fprintf(stderr, "\n%04zx(%04zu): ", i, i);
+			xinfo("\n%04zx(%04zu): ", i, i);
 		if(i%16 == 8)
-			fprintf(stderr, "  ");
-		fprintf(stderr, "%02x  ", data[i]);
+			xinfo("  ");
+		xinfo("%02x  ", data[i]);
 	}
-	fprintf(stderr, "\n----------");
+	xinfo("\n----------");
 	for (i = 0; i < size; i++)
 	{
 		if(i%16 == 0)
-			fprintf(stderr, "\n%04zx(%04zu): ", i, i);
+			xinfo("\n%04zx(%04zu): ", i, i);
 		if(i%16 == 8)
-			fprintf(stderr, "  ");
-		fprintf(stderr, "%03u ", data[i]);
+			xinfo("  ");
+		xinfo("%03u ", data[i]);
 	}
-	fprintf(stderr, "\n----------\n");
+	xinfo("\n----------\n");
 }
 
 void msg_process(struct xswitch *sw, const struct msgbuf *msg)
@@ -730,39 +731,39 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 		xswitch_packet_in(sw, ntohs(pi->port_id), (uint8_t *)pi->data, ntohs(pi->total_len));
 		break;
 	case POFT_FLOW_REMOVED:
-		fprintf(stderr, "flow removed\n");
+		xdebug("flow removed\n");
 		break;
 	case POFT_ERROR:
 		e = GET_BODY(msg);
-		fprintf(stderr, "receive error packet:\n"
-			"dev_id: 0x%x\n"
-			"type: %hu\n"
-			"code: %hu\n"
-			"string: %s\n",
-			ntohl(e->device_id), ntohs(e->type),
-			ntohs(e->code), e->err_str);
+		xerror("receive error packet:\n"
+		       "dev_id: 0x%x\n"
+		       "type: %hu\n"
+		       "code: %hu\n"
+		       "string: %s\n",
+		       ntohl(e->device_id), ntohs(e->type),
+		       ntohs(e->code), e->err_str);
 		break;
 	case POFT_GET_CONFIG_REPLY:
 		sc = GET_BODY(msg);
-		fprintf(stderr, "receive switch config reply:\n"
-			"flags: 0x%hx  miss_send_len: %hu\n",
-			ntohs(sc->flags), ntohs(sc->miss_send_len));
+		xdebug("receive switch config reply:\n"
+		       "flags: 0x%hx  miss_send_len: %hu\n",
+		       ntohs(sc->flags), ntohs(sc->miss_send_len));
 		break;
 	case POFT_RESOURCE_REPORT:
 		tr = GET_BODY(msg);
-		fprintf(stderr, "receive resource report:\n"
-			"counter_num: %u\n"
-			"meter_num: %u\n"
-			"group_num: %u\n",
-			ntohl(tr->counter_num),
-			ntohl(tr->meter_num),
-			ntohl(tr->group_num));
+		xdebug("receive resource report:\n"
+		       "counter_num: %u\n"
+		       "meter_num: %u\n"
+		       "group_num: %u\n",
+		       ntohl(tr->counter_num),
+		       ntohl(tr->meter_num),
+		       ntohl(tr->group_num));
 		for(i = 0; i < POF_MAX_TABLE_TYPE; i++) {
-			fprintf(stderr, "table %d, type %d\n", i, tr->tbl_rsc_desc[i].type);
-			fprintf(stderr, " tbl_num: %d, key_len: %d, total_size: %u\n",
-				tr->tbl_rsc_desc[i].tbl_num,
-				ntohs(tr->tbl_rsc_desc[i].key_len),
-				ntohl(tr->tbl_rsc_desc[i].total_size));
+			xdebug("table %d, type %d\n", i, tr->tbl_rsc_desc[i].type);
+			xdebug(" tbl_num: %d, key_len: %d, total_size: %u\n",
+			       tr->tbl_rsc_desc[i].tbl_num,
+			       ntohs(tr->tbl_rsc_desc[i].key_len),
+			       ntohl(tr->tbl_rsc_desc[i].total_size));
 		}
 		break;
 	case POFT_PORT_STATUS:
@@ -772,14 +773,14 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 #else
 		port_id = ntohl(ps->desc.port_id);
 #endif
-		fprintf(stderr, "receive port status:\n"
-			" reason: %d\n"
-			" port_id: 0x%x, name: %s\n"
-			" of_enable: %s\n"
-			" state: 0x%x\n",
-			ps->reason, port_id, ps->desc.name,
-			ps->desc.of_enable?"TRUE":"FALSE",
-			ntohl(ps->desc.state));
+		xdebug("receive port status:\n"
+		       " reason: %d\n"
+		       " port_id: 0x%x, name: %s\n"
+		       " of_enable: %s\n"
+		       " state: 0x%x\n",
+		       ps->reason, port_id, ps->desc.name,
+		       ps->desc.of_enable?"TRUE":"FALSE",
+		       ntohl(ps->desc.state));
 		/* All ports are not Openflow(POF) enabled by default, enable it. */
 		if (!ps->desc.of_enable) {
 			struct pof_port_status *p;
@@ -810,24 +811,24 @@ void msg_process(struct xswitch *sw, const struct msgbuf *msg)
 	case POFT_COUNTER_REPLY:
 		ct = GET_BODY(msg);
 #if 0
-		fprintf(stderr, "receive counter reply from switch %d:\n"
-			"counter_id: %d\n"
-			"value: %"PRIu64"\n"
-			"byte_value: %"PRIu64"\n",
-			xswitch_get_dpid(sw),
-			ntohl(ct->counter_id),
-			ntohll(ct->value),
-			ntohll(ct->byte_value));
+		xdebug("receive counter reply from switch %d:\n"
+		       "counter_id: %d\n"
+		       "value: %"PRIu64"\n"
+		       "byte_value: %"PRIu64"\n",
+		       xswitch_get_dpid(sw),
+		       ntohl(ct->counter_id),
+		       ntohll(ct->value),
+		       ntohll(ct->byte_value));
 #endif
 		xport_update(xport_lookup(sw, (uint16_t)ntohl(ct->counter_id)),
 			     ntohll(ct->value),
 			     ntohll(ct->byte_value));
 		break;
 	case POFT_QUERYALL_FIN:
-		fprintf(stderr, "receive queryall fin\n");
+		xdebug("receive queryall fin\n");
 		break;
 	default:
-		fprintf(stderr, "POF packet ignored\n");
+		xerror("POF packet ignored\n");
 		dump_packet(msg);
 	}
 }
@@ -836,7 +837,7 @@ bool msg_process_hello(const struct msgbuf *msg)
 {
 	if(GET_HEAD(msg)->type == POFT_HELLO) {
 		if(GET_HEAD(msg)->version != POF_VERSION) {
-			fprintf(stderr, "POF version mismatch!\n");
+			xerror("POF version mismatch!\n");
 			abort();
 		}
 		return true;
@@ -850,13 +851,12 @@ bool msg_process_features_reply(const struct msgbuf *msg, dpid_t *dpid, int *n_p
 		struct pof_switch_features *sf = GET_BODY(msg);
 		*dpid = ntohl(sf->dev_id);
 		*n_ports = ntohs(sf->port_num);
-		fprintf(stderr,
-			"fetures reply ...\n"
-			"dpid 0x%x\n""ports %d\n",
-			*dpid, *n_ports);
+		xdebug("fetures reply ...\n"
+		       "dpid 0x%x\n""ports %d\n",
+		       *dpid, *n_ports);
 		return true;
 	} else {
-		fprintf(stderr, "ignore packet...\n");
+		xerror("ignore packet...\n");
 		return false;
 	}
 }
