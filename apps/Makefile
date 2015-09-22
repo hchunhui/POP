@@ -1,4 +1,4 @@
-SUBDIRS = lib l2_learning l3_multi
+SUBDIRS = lib l2_learning l3_multi compress
 
 all:
 	@for d in ${SUBDIRS}; do \
