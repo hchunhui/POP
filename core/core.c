@@ -24,14 +24,26 @@ static struct header *header_spec;
 static struct map *env;
 
 /* f */
-static struct route *(*f)(struct packet *pkt, struct map *env, struct entity *me, int in_port);
+static struct route *(*f)(struct packet *pkt, struct map *env);
 static void *(*init_f)(struct map *env);
 
 /* API for f */
 struct packet {
 	struct packet_parser *pp;
+	struct xswitch *in_sw;
+	int in_port;
 	bool hack_get_payload;
 };
+
+int read_packet_inport(struct packet *pkt)
+{
+	return pkt->in_port;
+}
+
+struct entity *read_packet_inswitch(struct packet *pkt)
+{
+	return topo_get_switch(pkt->in_sw->dpid);
+}
 
 void pull_header(struct packet *pkt)
 {
@@ -92,6 +104,18 @@ void add_header(struct packet *pkt, const char *proto)
 	struct header *h = header_lookup(header_spec, proto);
 	packet_parser_add_header(pkt->pp, h, &hlen);
 	trace_A(hlen);
+}
+
+void add_field(struct packet *pkt, int offb, int lenb, value_t value)
+{
+	packet_parser_add_field(pkt->pp, offb, lenb, value);
+	trace_AF(offb, lenb, value);
+}
+
+void del_field(struct packet *pkt, int offb, int lenb)
+{
+	packet_parser_del_field(pkt->pp, offb, lenb);
+	trace_DF(offb, lenb);
 }
 
 struct entity **get_hosts(int *pnum)
@@ -156,6 +180,22 @@ struct entity *get_host_adj_switch(struct entity *e, int *sw_port)
 	assert(num == 1);
 	*sw_port = adjs[0].adj_in_port;
 	return adjs[0].adj_entity;
+}
+
+struct entity *get_entity(struct entity *e, int port)
+{
+	int i, n;
+	const struct entity_adj *adjs = entity_get_adjs(e, &n);
+
+	for(i = 0; i < n; i++)
+		if(adjs[i].out_port == port) {
+			if(entity_get_type(adjs[i].adj_entity) == ENTITY_TYPE_HOST)
+				trace_RE("topo_host", adjs[i].adj_entity);
+			else
+				trace_RE("topo_switch", adjs[i].adj_entity);
+			return adjs[i].adj_entity;
+		}
+	abort();
 }
 
 void print_entity(struct entity *e)
@@ -293,75 +333,23 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 
 	/* run */
 	pkt.pp = packet_parser(header_spec, packet, packet_len);
+	pkt.in_sw = sw;
+	pkt.in_port = in_port;
 	pkt.hack_get_payload = false;
 	trace_G(NULL, header_spec, 0);
 
 	topo_rdlock();
-	r = f(&pkt, env, topo_get_switch(sw->dpid), in_port);
+	r = f(&pkt, env);
 	topo_unlock();
 
 	trace_R("in_port", value_from_8(0));
-	packet_parser_free(pkt.pp);
 
 	trace = trace_get();
 
 	/* learn */
-	/* XXX:
-	 * ac_edge: prelude for edge switches
-	 * ac_core: prelude for core switches
-	 * eq_edge_core: true if ac_edge == ac_core
-	 */
 	ac_edge = action();
 	ac_core = action();
-	eq_edge_core = true;
-	for(i = 0; i < trace->num_mod_events; i++) {
-		int offset, length;
-		struct header *cur_spec;
-		int j, hlen;
-		const char *checksum_field;
-
-		switch(trace->mod_events[i].type) {
-		case MEV_P:
-			cur_spec = trace->mod_events[i].u.p.new_spec;
-			expr_generate_action_backward(
-				header_get_length(cur_spec),
-				trace->mod_events[i].u.p.stack_base, ac_edge);
-			expr_generate_action_backward(
-				header_get_length(cur_spec),
-				trace->mod_events[i].u.p.stack_base, ac_core);
-			break;
-		case MEV_M:
-			cur_spec = trace->mod_events[i].u.m.spec;
-			header_get_field(cur_spec,
-					 trace->mod_events[i].u.m.name,
-					 &offset,
-					 &length);
-			action_add_set_field(ac_edge, offset, length,
-					     trace->mod_events[i].u.m.value);
-			checksum_field = header_get_sum(cur_spec);
-			if(checksum_field) {
-				header_get_field(cur_spec,
-						 checksum_field,
-						 &offset,
-						 &length);
-				/* XXX: hack
-				 * Variable length checksum is not supported by POF-1.x.
-				 */
-				hlen = header_get_fixed_length(cur_spec);
-				action_add_checksum(ac_edge, offset, length, 0, hlen);
-			}
-			eq_edge_core = false;
-			break;
-		case MEV_A:
-			hlen = trace->mod_events[i].u.a.hlen;
-			for(j = 0; j < hlen / 16; j++)
-				action_add_add_field(ac_edge, 0, 16 * 8, value_from_8(0));
-			if(hlen % 16)
-				action_add_add_field(ac_edge, 0, (hlen%16) * 8, value_from_8(0));
-			eq_edge_core = false;
-			break;
-		}
-	}
+	eq_edge_core = trace_generate_action(trace, ac_core, ac_edge);
 
 	edges = route_get_edges(r, &num_edges);
 	struct {
@@ -399,8 +387,10 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 				if(edges[i].ent2 == NULL) {
 					struct msgbuf *mb;
 					struct action *a0 = action();
+					int plen;
+					const uint8_t *p = packet_parser_get_raw(pkt.pp, &plen);
 					action_add(a0, AC_OUTPUT, out_port);
-					mb = msg_packet_out(0, packet, packet_len, a0);
+					mb = msg_packet_out(0, p, plen, a0);
 					xswitch_send(cur_sw, mb);
 					action_free(a0);
 					sw_actions[entry].ac = action_copy(ac_edge);
@@ -487,4 +477,6 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 		core_invalidate(cmpna_p, &na);
 		topo_unlock();
 	}
+
+	packet_parser_free(pkt.pp);
 }

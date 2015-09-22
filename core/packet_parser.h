@@ -65,9 +65,15 @@ void packet_parser_push(struct packet_parser *pp, struct header **new_spec,
 value_t packet_parser_read(struct packet_parser *pp, const char *field);
 uint32_t packet_parser_read_to_32(struct packet_parser *pp, const char *field);
 const char *packet_parser_read_type(struct packet_parser *pp);
+const uint8_t *packet_parser_get_raw(struct packet_parser *pp, int *length);
 const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length);
+struct header *packet_parser_get_spec(struct packet_parser *pp);
 void packet_parser_mod(struct packet_parser *pp, const char *field, value_t value,
 		       struct header **spec);
 void packet_parser_add_header(struct packet_parser *pp, struct header *add_spec, int *phlen);
 
+void packet_parser_add_field(struct packet_parser *pp,
+			     int offb, int lenb, value_t value);
+void packet_parser_del_field(struct packet_parser *pp,
+			     int offb, int lenb);
 #endif /* _PACKET_PARSER_H_ */

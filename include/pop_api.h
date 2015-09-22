@@ -2,6 +2,8 @@
 #define _POP_API_H_
 #include "types.h"
 
+int read_packet_inport(struct packet *pkt);
+struct entity *read_packet_inswitch(struct packet *pkt);
 void pull_header(struct packet *pkt);
 const char *read_header_type(struct packet *pkt);
 value_t read_packet(struct packet *pkt, const char *field);
@@ -11,6 +13,9 @@ void mod_packet(struct packet *pkt, const char *field, value_t value);
 void push_header(struct packet *pkt);
 
 void add_header(struct packet *pkt, const char *proto);
+
+void add_field(struct packet *pkt, int offb, int lenb, value_t value);
+void del_field(struct packet *pkt, int offb, int lenb);
 
 struct entity **get_hosts(int *pnum);
 struct entity **get_switches(int *pnum);
@@ -28,6 +33,7 @@ struct entity_adj
 };
 #endif
 
+struct entity *get_entity(struct entity *e, int port);
 enum entity_type get_entity_type(struct entity *e);
 dpid_t get_switch_dpid(struct entity *e);
 struct entity *get_host_adj_switch(struct entity *e, int *sw_port);

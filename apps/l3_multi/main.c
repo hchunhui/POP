@@ -139,7 +139,7 @@ void init_f(struct map *env)
 		    mapf_eq_map, mapf_free_map);
 }
 
-struct route *f(struct packet *pkt, struct map *env, struct entity *me, int in_port)
+struct route *f(struct packet *pkt, struct map *env)
 {
 	struct route *r = NULL;
 

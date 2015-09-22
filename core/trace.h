@@ -4,9 +4,10 @@
 #include "types.h"
 
 struct header;
+struct action;
 
 enum event_type { EV_R, EV_T, EV_RE, EV_G };
-enum mod_event_type { MEV_P, MEV_M, MEV_A };
+enum mod_event_type { MEV_P, MEV_M, MEV_A, MEV_AF, MEV_DF };
 
 struct event
 {
@@ -49,6 +50,15 @@ struct mod_event
 		struct {
 			int hlen;
 		} a;
+		struct {
+			int offb;
+			int lenb;
+			value_t value;
+		} af;
+		struct {
+			int offb;
+			int lenb;
+		} df;
 	} u;
 };
 
@@ -73,7 +83,11 @@ void trace_G(struct header *old_spec, struct header *new_spec, int stack_base);
 void trace_P(struct header *new_spec, int stack_base);
 void trace_M(const char *name, value_t value, struct header *spec);
 void trace_A(int hlen);
+void trace_DF(int offb, int lenb);
+void trace_AF(int offb, int lenb, value_t value);
 void trace_clear(void);
 struct trace *trace_get(void);
+
+bool trace_generate_action(struct trace *trace, struct action *ac_core, struct action *ac_edge);
 
 #endif /* _TRACE_H_ */

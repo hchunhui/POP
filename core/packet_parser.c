@@ -497,6 +497,33 @@ void packet_parser_add_header(struct packet_parser *pp, struct header *add_spec,
 	*phlen = hlen;
 }
 
+void packet_parser_add_field(struct packet_parser *pp,
+			     int off, int len, value_t value)
+{
+	int offb = off / 8;
+	int lenb = len / 8;
+	assert(STACK_TOP(pp).length + lenb < MSGBUF_MAX_LENGTH);
+
+	memmove(STACK_TOP(pp).data + offb + lenb,
+		STACK_TOP(pp).data + offb,
+		STACK_TOP(pp).length - offb);
+	memcpy(STACK_TOP(pp).data + offb, value.v, lenb);
+
+	STACK_TOP(pp).length += lenb;
+}
+
+void packet_parser_del_field(struct packet_parser *pp,
+			     int off, int len)
+{
+	int offb = off / 8;
+	int lenb = len / 8;
+	memmove(STACK_TOP(pp).data + offb,
+		STACK_TOP(pp).data + offb + lenb,
+		STACK_TOP(pp).length - offb - lenb);
+
+	STACK_TOP(pp).length -= lenb;
+}
+
 /* translate from RFC 1071 */
 static void checksum(uint8_t *data, int off, int hlen)
 {
@@ -579,6 +606,14 @@ const char *packet_parser_read_type(struct packet_parser *pp)
 	return STACK_TOP(pp).spec->name;
 }
 
+const uint8_t *packet_parser_get_raw(struct packet_parser *pp, int *length)
+{
+	const uint8_t *head = STACK_TOP(pp).data;
+	if(length)
+		*length = STACK_TOP(pp).length;
+	return head;
+}
+
 const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length)
 {
 	int header_length = expr_interp(STACK_TOP(pp).spec->length, pp);
@@ -586,4 +621,9 @@ const uint8_t *packet_parser_get_payload(struct packet_parser *pp, int *length)
 	if(length)
 		*length = STACK_TOP(pp).length - header_length;
 	return head;
+}
+
+struct header *packet_parser_get_spec(struct packet_parser *pp)
+{
+	return STACK_TOP(pp).spec;
 }

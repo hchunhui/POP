@@ -81,6 +81,25 @@ void trace_A(int hlen)
 	trace.num_mod_events++;
 }
 
+void trace_DF(int offb, int lenb)
+{
+	int i = trace.num_mod_events;
+	trace.mod_events[i].type = MEV_DF;
+	trace.mod_events[i].u.df.offb = offb;
+	trace.mod_events[i].u.df.lenb = lenb;
+	trace.num_mod_events++;
+}
+
+void trace_AF(int offb, int lenb, value_t value)
+{
+	int i = trace.num_mod_events;
+	trace.mod_events[i].type = MEV_AF;
+	trace.mod_events[i].u.af.offb = offb;
+	trace.mod_events[i].u.af.lenb = lenb;
+	trace.mod_events[i].u.af.value = value;
+	trace.num_mod_events++;
+}
+
 void trace_clear(void)
 {
 	trace.num_events = 0;
@@ -91,4 +110,91 @@ void trace_clear(void)
 struct trace *trace_get(void)
 {
 	return &trace;
+}
+
+
+#include "xswitch/xswitch.h"
+#include "core/packet_parser.h"
+
+bool trace_generate_action(struct trace *trace, struct action *ac_core, struct action *ac_edge)
+{
+	/* XXX:
+	 * ac_edge: prelude for edge switches
+	 * ac_core: prelude for core switches
+	 * eq_edge_core: true if ac_edge == ac_core
+	 */
+	int i;
+	bool eq_edge_core;
+
+	eq_edge_core = true;
+	for(i = 0; i < trace->num_mod_events; i++) {
+		int offset, length;
+		struct header *cur_spec;
+		int j, hlen;
+		const char *checksum_field;
+
+		switch(trace->mod_events[i].type) {
+		case MEV_P:
+			cur_spec = trace->mod_events[i].u.p.new_spec;
+			if(ac_edge)
+				expr_generate_action_backward(
+					header_get_length(cur_spec),
+					trace->mod_events[i].u.p.stack_base, ac_edge);
+			if(ac_core)
+				expr_generate_action_backward(
+					header_get_length(cur_spec),
+					trace->mod_events[i].u.p.stack_base, ac_core);
+			break;
+		case MEV_M:
+			if(ac_edge) {
+				cur_spec = trace->mod_events[i].u.m.spec;
+				header_get_field(cur_spec,
+						 trace->mod_events[i].u.m.name,
+						 &offset,
+						 &length);
+				action_add_set_field(ac_edge, offset, length,
+						     trace->mod_events[i].u.m.value);
+				checksum_field = header_get_sum(cur_spec);
+				if(checksum_field) {
+					header_get_field(cur_spec,
+							 checksum_field,
+							 &offset,
+							 &length);
+					/* XXX: hack
+					 * Variable length checksum is not supported by POF-1.x.
+					 */
+					hlen = header_get_fixed_length(cur_spec);
+					action_add_checksum(ac_edge, offset, length, 0, hlen);
+				}
+			}
+			eq_edge_core = false;
+			break;
+		case MEV_A:
+			if(ac_edge) {
+				hlen = trace->mod_events[i].u.a.hlen;
+				for(j = 0; j < hlen / 16; j++)
+					action_add_add_field(ac_edge, 0, 16 * 8, value_from_8(0));
+				if(hlen % 16)
+					action_add_add_field(ac_edge, 0, (hlen%16) * 8, value_from_8(0));
+			}
+			eq_edge_core = false;
+			break;
+		case MEV_AF:
+			if(ac_edge)
+				action_add_add_field(ac_edge,
+						     trace->mod_events[i].u.af.offb,
+						     trace->mod_events[i].u.af.lenb,
+						     trace->mod_events[i].u.af.value);
+			eq_edge_core = false;
+			break;
+		case MEV_DF:
+			if(ac_edge)
+				action_add_del_field(ac_edge,
+						     trace->mod_events[i].u.df.offb,
+						     trace->mod_events[i].u.df.lenb);
+			eq_edge_core = false;
+			break;
+		}
+	}
+	return eq_edge_core;
 }
