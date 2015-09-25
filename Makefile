@@ -13,3 +13,6 @@ clean:
 
 dist:
 	scripts/dist
+
+apps_dist:
+	scripts/apps_dist

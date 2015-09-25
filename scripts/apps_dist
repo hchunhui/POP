@@ -1,0 +1,17 @@
+#!/bin/sh
+
+cd `dirname $0`/..
+
+DIST_DIR=out
+VERSION=`scripts/get_version`
+NAME=pop-apps-$VERSION
+
+mkdir -p $DIST_DIR
+echo $VERSION-dist > VERSION
+
+echo Generating $DIST_DIR/$NAME.tar.gz ...
+rm -f $DIST_DIR/$NAME.tar.gz $DIST_DIR/$NAME.list
+git ls-files -c -o --exclude-standard Makefile.comm apps include xlog/*.h > $DIST_DIR/$NAME.list
+echo VERSION >> $DIST_DIR/$NAME.list
+tar -c -z -T $DIST_DIR/$NAME.list --transform 's,^,'$NAME'/,' -f $DIST_DIR/$NAME.tar.gz
+rm -f VERSION
