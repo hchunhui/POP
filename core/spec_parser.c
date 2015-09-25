@@ -68,8 +68,10 @@ struct parse_ctx {
 /* Get next char from input buffer */
 static void next_ch(struct parse_ctx *pctx)
 {
-	if(pctx->curr >= pctx->data + pctx->length)
+	if(pctx->curr >= pctx->data + pctx->length) {
 		pctx->ch = 0;
+		return;
+	}
 	pctx->ch = *(pctx->curr++);
 	if(pctx->ch == '\n') {
 		pctx->row++;
@@ -105,11 +107,12 @@ static void next_tok(struct parse_ctx *pctx)
 				do {
 					l = L;
 					N;
+					if(L == 0) R(T_BAD);
 				} while(l != '*' || L != '/');
 				N;
 				continue;
 			} else if(L == '/') {
-				do N; while(L != '\n');
+				do N; while(L != '\n' && L != 0);
 				N;
 				continue;
 			} else R(T_BAD);
