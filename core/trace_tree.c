@@ -541,6 +541,7 @@ static void fini_entry(struct xswitch *sw, struct flow_table *ft)
 	struct msgbuf *msg;
 	msg = msg_flow_entry_del(ft, 0);
 	xswitch_send(sw, msg);
+	flow_table_put_entry_index(ft, 0);
 }
 
 /* algorithm */
