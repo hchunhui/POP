@@ -103,6 +103,16 @@ enum action {
 	DROP,
 };
 
+/*
+ * SNAT: (from private network to public network)
+ *  new_sport = snat_table[(sip, sport, dip, dport)];
+ *  if(new_sport == 0) {    // establish new connection
+ *      new_sport = next_port++;
+ *      snat_table[(sip, sport, dip, dport)] = new_sport;
+ *      dnat_table[(dip, dport, MY_PUBLIC_IP, new_sport)] = (sip, sport);
+ *  }
+ *  modify_to(MY_PUBLIC_IP, new_sport, dip, dport);
+ */
 static enum action snat(struct packet *pkt,
 			struct map *snat_table, struct map *dnat_table,
 			struct map *env)
@@ -143,6 +153,11 @@ static enum action snat(struct packet *pkt,
 	return DROP;
 }
 
+/*
+ * DNAT: (from public network to private network)
+ *  (orig_ip, orig_port) = dnat_table[(sip, sport, dip, dport)];
+ *  modify_to(sip, sport, orig_ip, orig_port);
+ */
 static enum action dnat(struct packet *pkt, struct map *dnat_table)
 {
 	pull_header(pkt);
