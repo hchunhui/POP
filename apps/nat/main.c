@@ -103,10 +103,10 @@ enum action {
 	DROP,
 };
 
-static enum action snat(struct packet *pkt, struct map *snat_table, struct map *dnat_table)
+static enum action snat(struct packet *pkt,
+			struct map *snat_table, struct map *dnat_table,
+			struct map *env)
 {
-	static uint16_t next_port = 2000;
-
 	pull_header(pkt);
 	if(strcmp(read_header_type(pkt), "ipv4") == 0) {
 		uint32_t sip = value_to_32(read_packet(pkt, "nw_src"));
@@ -119,8 +119,8 @@ static enum action snat(struct packet *pkt, struct map *snat_table, struct map *
 			struct conn_info *ci = conn_info(sip, dip, sport, dport);
 			uint16_t new_sport = map_read(snat_table, PTR(ci)).v;
 			if(new_sport == 0) {
-				new_sport = next_port;
-				next_port++;
+				new_sport = map_read(env, PTR("next_port")).v;
+				map_mod(env, PTR("next_port"), INT(new_sport+1));
 
 				struct conn_info *dci = conn_info(dip, MY_PUBLIC_IP, dport, new_sport);
 				map_add_key(snat_table, PTR(ci), INT(new_sport), mapf_eq_int, mapf_free_int);
@@ -184,6 +184,8 @@ void init_f(struct map *env)
 	map_add_key(env, PTR("dnat_table"),
 		    PTR(map(ci_eq, ci_hash, ci_dup, ci_free)),
 		    mapf_eq_map, mapf_free_map);
+	map_add_key(env, PTR("next_port"), INT(2000),
+		    mapf_eq_int, mapf_free_int);
 }
 
 struct route *f(struct packet *pkt, struct map *env)
@@ -197,7 +199,7 @@ struct route *f(struct packet *pkt, struct map *env)
 
 	if(dpid == 1) {
 		if(in_port == 1) {
-			if(snat(pkt, snat_table, dnat_table) == PASS)
+			if(snat(pkt, snat_table, dnat_table, env) == PASS)
 				return forward(me, in_port, 2);
 			else
 				return route();
