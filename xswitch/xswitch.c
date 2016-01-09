@@ -218,7 +218,7 @@ next:
 		match_add(ma, "in_port", value_from_8(port_id),
 			  value_from_8(0xff));
 		ac = action();
-		action_add(ac, AC_COUNTER, port_id);
+		//action_add(ac, AC_COUNTER, port_id);
 		action_add_goto_table(ac, 1, 0);
 		msg = msg_flow_entry_add(ft, idx++, priority++, ma, ac);
 		match_free(ma);

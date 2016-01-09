@@ -61,7 +61,46 @@ static struct route *handle_ipv4_unicast(uint32_t hsrc_ip, uint32_t hdst_ip, str
 	return r;
 }
 
-static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip, struct map *env)
+int get_current_throughput(int ipaddr)
+{
+	struct entity *e;
+	int port;
+	int npkts;
+	e = get_host_adj_switch(get_host_by_paddr(ipaddr), &port);
+	npkts = get_port_recent_recvpkts(e, port);
+	xdebug("npkts = %d\n", npkts);
+	return npkts;
+}
+static int num_layer1 = 0;
+static struct entity *layer1[100];
+
+int get_layer(struct entity *ipaddr) {
+        int i;
+        for (i = 0; i < num_layer1; i++) {
+                if (layer1[i] == ipaddr)
+                        return 1;
+        }
+        return 0;
+}
+
+void add_layer1(struct entity *h) {
+	if(get_layer(h) == 0)
+	        layer1[num_layer1++] = h;
+}
+
+int del_layer1(struct entity *ipaddr) {
+        int i;
+        for (i = 0; i < num_layer1; i++) {
+                if (layer1[i] == ipaddr) {
+			layer1[i] = layer1[num_layer1 - 1];
+			num_layer1--;
+                        return 1;
+		}
+        }
+        return 0;
+}
+
+static struct route *handle_ipv4_multicast(struct packet *pkt, uint32_t hsrc_ip, uint32_t hdst_ip, struct map *env)
 {
 	int i;
 	int switches_num;
@@ -73,6 +112,8 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip, s
 	struct nodeinfo *visited;
 
 	struct igmp_addrs *l = igmp_get_maddrs(map_read(env, PTR("group_table")).p, hdst_ip);
+	int layer = value_to_8(read_packet(pkt, "tos"));
+
 	r = route();
 
 	hsrc = get_host_by_paddr(hsrc_ip);
@@ -86,6 +127,9 @@ static struct route *handle_ipv4_multicast(uint32_t hsrc_ip, uint32_t hdst_ip, s
 	xinfo("group_id: %08x, group_n: %d\n", hdst_ip, l->n);
 	for(i = 0; i < l->n; i++) {
 		hdst = get_host_by_paddr(l->addrs[i]);
+		if(layer == 1 && get_layer(hdst) < 1)
+			continue;
+		if(get_layer(hdst))
 		if(hdst == NULL) {
 			xerror("ipv4_multicast: bad dst address.\n");
 			continue;
@@ -106,6 +150,11 @@ static struct route *handle_igmp(struct packet *pkt, struct map *env)
 	uint32_t hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
 	const uint8_t *payload = read_payload(pkt, &len);
 	process_igmp(map_read(env, PTR("group_table")).p, hsrc_ip, payload, len);
+	if(get_current_throughput(hsrc_ip) < 50) { // XXX
+		add_layer1(get_host_by_paddr(hsrc_ip));
+	} else {
+		del_layer1(get_host_by_paddr(hsrc_ip));
+	}
 	return route();
 }
 
@@ -124,9 +173,9 @@ static struct route *handle_ipv4(struct packet *pkt, struct map *env)
 		uint32_t hsrc_ip = value_to_32(read_packet(pkt, "nw_src"));
 		uint32_t hdst_ip = value_to_32(read_packet(pkt, "nw_dst"));
 		if(is_multicast_ip(hdst_ip)) {
-			return handle_ipv4_multicast(hsrc_ip, hdst_ip, env);
+			return handle_ipv4_multicast(pkt, hsrc_ip, hdst_ip, env);
 		} else {
-			mod_packet(pkt, "ttl", value_from_8(42));
+			//mod_packet(pkt, "ttl", value_from_8(42));
 			return handle_ipv4_unicast(hsrc_ip, hdst_ip, env);
 		}
 	}

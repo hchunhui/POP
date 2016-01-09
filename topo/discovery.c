@@ -12,6 +12,7 @@ static void port_packet_out(struct xswitch *xsw, int port, const uint8_t *pkt, i
 	struct action *ac;
 	struct msgbuf *mb;
 	ac = action();
+	action_add(ac, AC_COUNTER, port);
 	action_add(ac, AC_OUTPUT, port);
 	mb = msg_packet_out(0, pkt, len, ac);
 	action_free(ac);
