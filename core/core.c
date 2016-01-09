@@ -390,6 +390,7 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 					struct action *a0 = action();
 					int plen;
 					const uint8_t *p = packet_parser_get_raw(pkt.pp, &plen);
+					action_add(a0, AC_COUNTER, out_port);
 					action_add(a0, AC_OUTPUT, out_port);
 					mb = msg_packet_out(0, p, plen, a0);
 					xswitch_send(cur_sw, mb);
@@ -407,6 +408,7 @@ void core_packet_in(struct xswitch *sw, int in_port, uint8_t *packet, int packet
 			       (sw_actions[entry].mode == MODE_EDGE && edges[i].ent2 == NULL) ||
 			       (sw_actions[entry].mode == MODE_CORE && edges[i].ent2 != NULL));
 
+			action_add(sw_actions[entry].ac, AC_COUNTER, out_port);
 			action_add(sw_actions[entry].ac, AC_OUTPUT, out_port);
 			for(j = 0; j < num_edges; j++) {
 				if(edges[j].ent2 == cur_ent)

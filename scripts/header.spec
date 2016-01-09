@@ -62,12 +62,12 @@ header ipv4 {
 	fields {
 		ver : 4;
 		ihl : 4;
-		__tos : 8;
+		tos : 8;
 		__len : 16;
 		__id : 16;
 		__flag : 3;
 		__off : 13;
-		ttl : 8;
+		__ttl : 8;
 		nw_proto : 8;
 		sum : 16;
 		nw_src : 32;
