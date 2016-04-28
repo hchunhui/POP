@@ -9,4 +9,4 @@ install:
   - sudo apt-get install -qq build-essential libev-dev
 
 script:
-  - make
+  - make CC=$CC LD=$CC
