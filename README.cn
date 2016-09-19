@@ -18,7 +18,7 @@ POP(Protocol oblivious Programming)是一个SDN的编程环境.
 
 POP 接受两个参数作为输入: 应用和数据包头规范.
 
-    main/controller -f apps/app.so -h header.spec
+    main/controller -f apps/app.so -s header.spec
 
 应用都放在 "apps" 目录中, 他们事先要编译成 .so 文件.
 
@@ -28,11 +28,11 @@ POP 接受两个参数作为输入: 应用和数据包头规范.
 
 l3_multi: IPV4 单播和多播, SDNP 单播.
 
-    main/controller -f apps/l3_multi.so -h scripts/header.spec
+    main/controller -f apps/l3_multi.so -s scripts/header.spec
 
 l2_learning: MAC 学习型交换机.
 
-    main/controller -f apps/l2_learning.so -h scripts/header.spec
+    main/controller -f apps/l2_learning.so -s scripts/header.spec
 
 
 文档
